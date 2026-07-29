@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Hardening de Segurança e Conformidade LGPD",
+    "subtitle": "Coordenação de esquecimento via evento, retenção por categoria e trilha de auditoria de acesso",
+    "output": "specs/008-hardening-seguranca-lgpd/diagrams/arquitetura.html",
+    "visual_preset": "blueprint",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "titular", "type": "external", "label": "Solicitante", "sublabel": "titular do dado", "pos": [40, 300], "size": [140, 62] },
+    { "id": "conformidade", "type": "backend", "label": "Conformidade", "sublabel": "src/platform", "pos": [280, 300], "size": [150, 62] },
+    { "id": "solicitacao", "type": "database", "label": "SolicitacaoEsquecimento", "sublabel": "agregado de coordenação", "pos": [280, 480], "size": [150, 62] },
+    { "id": "bus", "type": "messagebus", "label": "EventBridge", "sublabel": "nexo-dominio-bus", "pos": [520, 300], "size": [150, 62] },
+    { "id": "bc1", "type": "backend", "label": "BC Ingestão (001)", "sublabel": "anonimiza seu dado", "pos": [760, 180], "size": [150, 62] },
+    { "id": "bc2", "type": "backend", "label": "BCs 002-007", "sublabel": "anonimizam ao serem arquitetados", "pos": [760, 420], "size": [150, 62] },
+    { "id": "scheduler", "type": "cloud", "label": "EventBridge Scheduler", "sublabel": "job diário de retenção", "pos": [520, 100], "size": [150, 62] },
+    { "id": "auditoria", "type": "database", "label": "trilha_auditoria_acesso", "sublabel": "append-only", "pos": [1000, 300], "size": [150, 62] },
+    { "id": "organizations", "type": "security", "label": "AWS Organizations", "sublabel": "contas dev/hml/prod", "pos": [520, 500], "size": [150, 62] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "AWS us-east-1 · Nexo", "wraps": ["conformidade", "solicitacao", "bus", "auditoria", "scheduler"] }
+  ],
+  "connections": [
+    { "from": "titular", "to": "conformidade", "label": "solicita esquecimento", "variant": "emphasis", "labelDy": -25 },
+    { "from": "conformidade", "to": "solicitacao", "label": "registra", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "from": "conformidade", "to": "bus", "label": "SolicitacaoRegistrada", "labelDy": -25 },
+    { "from": "bus", "to": "bc1", "label": "consome + confirma" },
+    { "from": "bus", "to": "bc2", "label": "consome + confirma" },
+    { "from": "scheduler", "to": "bus", "label": "aplica retenção", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "from": "bus", "to": "auditoria", "label": "acesso a dado", "labelDy": -38 },
+    { "from": "organizations", "to": "bus", "label": "segrega ambiente", "variant": "security", "fromSide": "top", "toSide": "bottom" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Coordenação sem acesso direto", "items": ["Conformidade nunca lê banco de outro BC", "Cada BC anonimiza seu próprio dado", "Confirmação agregada via evento, não leitura direta"] },
+    { "dot": "rose", "title": "Nunca autoconclui", "items": ["Só conclui com 100% das confirmações", "Prazo excedido escala, nunca descarta", "Anonimização é irreversível por construção de tipo"] },
+    { "dot": "emerald", "title": "Auditoria distinta do histórico", "items": ["trilha_auditoria_acesso registra acesso, não só transição de pipeline", "Append-only, nenhuma role tem UPDATE/DELETE", "Segregação de ambiente via conta AWS, não convenção de código"] }
+  ]
+}

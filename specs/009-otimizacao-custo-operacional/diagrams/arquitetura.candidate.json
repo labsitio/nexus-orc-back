@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Otimização Contínua de Custo Operacional",
+    "subtitle": "Cache de identificação, Intelligent-Tiering e fila de baixa prioridade sobre o pipeline existente",
+    "output": "specs/009-otimizacao-custo-operacional/diagrams/arquitetura.html",
+    "visual_preset": "blueprint",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "classificar", "type": "backend", "label": "ClassificarOrcamento", "sublabel": "use case (spec 001)", "pos": [40, 300], "size": [150, 62] },
+    { "id": "s3", "type": "database", "label": "S3 Raw/Processado", "sublabel": "Intelligent-Tiering", "pos": [40, 480], "size": [150, 62] },
+    { "id": "cache", "type": "database", "label": "Cache Identificação", "sublabel": "DynamoDB on-demand", "pos": [280, 300], "size": [150, 62] },
+    { "id": "classificador", "type": "backend", "label": "Agente Classificador", "sublabel": "Bedrock (spec 001)", "pos": [520, 300], "size": [150, 62] },
+    { "id": "bus", "type": "messagebus", "label": "EventBridge", "sublabel": "campo prioridade opcional", "pos": [760, 300], "size": [150, 62] },
+    { "id": "fila_normal", "type": "cloud", "label": "Fila Padrão", "sublabel": "SLA 5min p95", "pos": [1000, 300], "size": [150, 62] },
+    { "id": "fila_lote", "type": "cloud", "label": "Fila -lote", "sublabel": "concorrência reservada baixa", "pos": [760, 480], "size": [150, 62] },
+    { "id": "worker_lote", "type": "backend", "label": "Processamento em Lote", "sublabel": "fora do caminho crítico", "pos": [1000, 480], "size": [150, 62] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "AWS us-east-1 · Nexo", "wraps": ["s3", "cache", "classificador", "bus", "fila_normal", "fila_lote"] }
+  ],
+  "connections": [
+    { "from": "classificar", "to": "cache", "label": "assinatura estrutural", "labelDy": -25 },
+    { "from": "classificar", "to": "s3", "label": "grava (lifecycle)", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "from": "cache", "to": "classificador", "label": "sinal hit/miss" },
+    { "from": "classificador", "to": "bus", "label": "publica (+prioridade opcional)", "labelDy": -25 },
+    { "from": "bus", "to": "fila_normal", "label": "fluxo padrão" },
+    { "from": "bus", "to": "fila_lote", "label": "prioridade=lote", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "from": "fila_lote", "to": "worker_lote", "label": "processa" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Cache nunca substitui o Classificador", "items": ["Cache miss degrada, nunca falha o pipeline", "Cache é só sinal auxiliar de contexto", "Evento de classificação é sempre publicado, nunca pulado"] },
+    { "dot": "emerald", "title": "Sem novo Bounded Context", "items": ["Extensão aditiva do BC Ingestão & Identificação", "Convenções de infraestrutura compartilhada p/ 002-005", "Campo prioridade opcional, retrocompatível"] },
+    { "dot": "rose", "title": "Custo sem sacrificar garantia", "items": ["Intelligent-Tiering nunca exclui objeto", "Fila -lote isolada nunca compete com SLA padrão", "Rastreabilidade e imutabilidade preservadas"] }
+  ]
+}
