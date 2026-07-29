@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Isolamento Multi-tenant e Exportação de Auditoria",
+    "subtitle": "Defesa em profundidade por tenant e trilha de auditoria consumida via evento",
+    "output": "specs/007-isolamento-multitenant-dados/diagrams/arquitetura.html",
+    "visual_preset": "blueprint",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "cliente", "type": "external", "label": "Cliente Autenticado", "sublabel": "JWT Cognito", "pos": [40, 180], "size": [150, 62] },
+    { "id": "api", "type": "backend", "label": "Interface REST", "sublabel": "TenantContextMiddleware", "pos": [280, 180], "size": [150, 62] },
+    { "id": "app", "type": "backend", "label": "Application", "sublabel": "tenantId obrigatório", "pos": [520, 180], "size": [150, 62] },
+    { "id": "repo", "type": "backend", "label": "Repository", "sublabel": "tenant-scoped", "pos": [760, 180], "size": [150, 62] },
+    { "id": "rls", "type": "database", "label": "Aurora + RLS", "sublabel": "garantia estrutural", "pos": [1000, 180], "size": [150, 62] },
+    { "id": "bcs_upstream", "type": "external", "label": "BCs 001-005", "sublabel": "publicam eventos +tenantId", "pos": [40, 420], "size": [150, 62] },
+    { "id": "bus", "type": "messagebus", "label": "EventBridge", "sublabel": "nexo-dominio-bus", "pos": [280, 420], "size": [150, 62] },
+    { "id": "acompanhamento", "type": "backend", "label": "BC Acompanhamento", "sublabel": "consumidor de auditoria", "pos": [520, 420], "size": [150, 62] },
+    { "id": "aurora_auditoria", "type": "database", "label": "Trilha de Auditoria", "sublabel": "auditoria_trilha_eventos", "pos": [760, 420], "size": [150, 62] },
+    { "id": "exportacao", "type": "external", "label": "Consumidor Externo", "sublabel": "exportação paginada", "pos": [1000, 420], "size": [150, 62] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "AWS us-east-1 · Nexo", "wraps": ["api", "app", "repo", "rls", "bus", "acompanhamento", "aurora_auditoria"] },
+    { "kind": "security-group", "label": "4 camadas de isolamento por tenant", "wraps": ["api", "app", "repo", "rls"], "pad": 16 }
+  ],
+  "connections": [
+    { "from": "cliente", "to": "api", "label": "request + JWT", "variant": "emphasis" },
+    { "from": "api", "to": "app", "label": "tenantId (claim)" },
+    { "from": "app", "to": "repo", "label": "tenantId (parâmetro)", "labelDy": -25 },
+    { "from": "repo", "to": "rls", "label": "SET LOCAL tenant_id", "variant": "security", "labelDy": -25 },
+    { "from": "bcs_upstream", "to": "bus", "label": "eventos +tenantId", "variant": "emphasis" },
+    { "from": "bus", "to": "acompanhamento", "label": "consome (SQS)" },
+    { "from": "acompanhamento", "to": "aurora_auditoria", "label": "grava" },
+    { "from": "aurora_auditoria", "to": "exportacao", "label": "exportação paginada", "variant": "dashed", "labelDy": -25 }
+  ],
+  "cards": [
+    { "dot": "rose", "title": "Guardrail não-negociável", "items": ["0 incidentes de vazamento cross-tenant, sempre", "RLS é a camada final — nunca contornável mesmo em erro de aplicação", "tenant_id nunca aceito de query/path/body, só de JWT verificado"] },
+    { "dot": "cyan", "title": "TenantId como Shared Kernel", "items": ["Único VO com import direto entre Bounded Contexts", "Sem lógica de negócio — só validação e serialização", "Atributo mandatório e imutável em todo agregado de orçamento"] },
+    { "dot": "emerald", "title": "Auditoria desacoplada", "items": ["Acompanhamento é consumidor puro, nunca chamada direta", "Falha do consumidor nunca bloqueia BCs upstream", "Exportação restrita ao tenant solicitante"] }
+  ]
+}
