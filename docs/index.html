@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexo — Plataforma de Dados de Varejo na AWS</title>
+<meta name="description" content="Nexo: plataforma construída do zero, 100% AWS, para processar orçamentos de fornecedores com agentes de inteligência artificial.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E14; --surface:#171B24; --surface-2:#1E2430; --border:rgba(255,255,255,.08);
+    --magenta:#FF0099; --blue:#02A4F2; --gradient:linear-gradient(135deg,#FF0099,#02A4F2);
+    --text:#F5F6FA; --text-muted:#9AA3B2; --success:#22C55E; --warning:#F5A623; --danger:#EF4444;
+    --radius:16px; --navh:64px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text);background:var(--bg);line-height:1.6;font-size:15px;padding-top:var(--navh);}
+  a{color:inherit;text-decoration:none;}
+  img,svg{display:block;}
+
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  .reveal{animation:fadeUp .5s ease both;}
+  @media (prefers-reduced-motion: reduce){ .reveal{animation:none;} }
+
+  /* ---- top navigation (shared across pages) ---- */
+  .topnav{position:fixed;top:0;left:0;right:0;height:var(--navh);z-index:100;background:rgba(11,14,20,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 5vw;}
+  .topnav .brand{font-weight:800;font-size:16px;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;}
+  .topnav .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--gradient);display:inline-block;}
+  .topnav .links{display:flex;gap:4px;flex-wrap:wrap;}
+  .topnav .links a{font-size:13px;font-weight:600;color:var(--text-muted);padding:9px 14px;border-radius:10px;min-height:44px;display:flex;align-items:center;transition:color .15s ease,background .15s ease;}
+  .topnav .links a:hover{color:var(--text);background:var(--surface);}
+  .topnav .links a.active{color:var(--text);background:var(--surface-2);position:relative;}
+  .topnav .links a.active::after{content:"";position:absolute;left:14px;right:14px;bottom:5px;height:2px;border-radius:2px;background:var(--gradient);}
+  @media(max-width:1024px){
+    .topnav{flex-direction:column;height:auto;padding:12px 5vw;gap:10px;position:sticky;}
+    body{padding-top:0;}
+    .topnav .links{width:100%;justify-content:flex-start;overflow-x:auto;}
+  }
+
+  /* ---- hero ---- */
+  .hero{background:radial-gradient(1200px 560px at 15% -10%, rgba(255,0,153,.18), transparent 60%),radial-gradient(1000px 560px at 90% -15%, rgba(2,164,242,.18), transparent 60%),var(--bg);padding:88px 6vw 64px;border-bottom:1px solid var(--border);text-align:center;}
+  .hero .badge{display:inline-block;border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:6px 16px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:24px;color:var(--text-muted);font-weight:700;}
+  .hero h1{font-size:clamp(32px,5.2vw,54px);font-weight:800;letter-spacing:-.6px;max-width:820px;margin:0 auto;}
+  .hero h1 .g{background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .hero p{margin:20px auto 0;color:var(--text-muted);max-width:640px;font-size:16.5px;}
+  .hero .metarow{display:flex;gap:40px;justify-content:center;margin-top:40px;flex-wrap:wrap;}
+  .hero .metarow div .k{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;}
+  .hero .metarow div .v{font-weight:700;font-size:14px;}
+
+  /* ---- nav cards ---- */
+  main{max-width:1180px;margin:0 auto;padding:64px 6vw 40px;}
+  .sectionlabel{font-size:11.5px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:14px;text-align:center;}
+  main > h2{text-align:center;font-size:24px;font-weight:800;letter-spacing:-.3px;margin-bottom:44px;}
+
+  .cardgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;}
+  @media(max-width:840px){ .cardgrid{grid-template-columns:1fr;} }
+  .navcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:30px;box-shadow:0 4px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:16px;transition:transform .18s ease,border-color .18s ease;min-height:220px;}
+  .navcard:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.18);}
+  .navcard .icon{width:44px;height:44px;border-radius:12px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;}
+  .navcard .icon svg{width:22px;height:22px;stroke:var(--magenta);}
+  .navcard .tag{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;}
+  .navcard h3{font-size:19px;font-weight:800;letter-spacing:-.2px;}
+  .navcard p{color:var(--text-muted);font-size:14px;flex:1;}
+  .navcard .go{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;}
+  .navcard .go svg{width:15px;height:15px;stroke:var(--blue);transition:transform .15s ease;}
+  .navcard:hover .go svg{transform:translateX(3px);}
+
+  /* ---- pipeline strip ---- */
+  .strip{margin-top:72px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;}
+  .strip h3{font-size:13px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-muted);margin-bottom:26px;text-align:center;}
+  .pipewrap{overflow-x:auto;padding-bottom:6px;}
+  .pipeline{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;width:max-content;margin:0 auto;}
+  .pnode{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;text-align:center;font-size:12px;font-weight:700;white-space:nowrap;}
+  .pnode.ai{border-color:rgba(255,0,153,.35);}
+  .pnode .lbl{display:flex;align-items:center;justify-content:center;gap:5px;}
+  .pnode .lbl svg{width:12px;height:12px;stroke:var(--magenta);flex-shrink:0;}
+  .pnode span{display:block;font-size:10px;font-weight:600;color:var(--text-muted);margin-top:3px;text-transform:none;letter-spacing:0;}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--text-muted);padding:0 8px;flex-shrink:0;}
+  .arrow svg{width:15px;height:15px;stroke:var(--text-muted);flex-shrink:0;}
+  @media(max-width:820px){
+    .pipewrap{overflow-x:visible;}
+    .pipeline{flex-direction:column;align-items:stretch;width:auto;}
+    .pnode{white-space:normal;}
+    .arrow{transform:rotate(90deg);padding:6px 0;align-self:center;}
+  }
+
+  footer{border-top:1px solid var(--border);margin-top:80px;padding:36px 6vw;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;color:var(--text-muted);font-size:12.5px;}
+  footer .dot{width:6px;height:6px;border-radius:50%;background:var(--gradient);display:inline-block;margin-right:8px;}
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <div class="brand"><span class="dot"></span>Nexo</div>
+  <div class="links">
+    <a href="index.html" class="active">Início</a>
+    <a href="briefing-projeto.html">Briefing do Projeto</a>
+    <a href="apresentacao-executiva.html">Apresentação Executiva</a>
+    <a href="apresentacao-time.html">Apresentação para o Time</a>
+    <a href="arquitetura-macro.html">Arquitetura &amp; Diagramas</a>
+  </div>
+</div>
+
+<section class="hero reveal">
+  <div class="badge">Plataforma nova · Construída do zero · 100% AWS</div>
+  <h1>Nexo: inteligência artificial que <span class="g">organiza orçamentos de fornecedores</span> automaticamente</h1>
+  <p>Um hub único para entender o projeto: da visão executiva à arquitetura técnica, dos agentes de IA ao roadmap de entrega. Fornecedores enviam orçamentos de produtos por upload web, API REST, SFTP ou aplicativo mobile — e o gestor de compras da rede varejista acompanha cada um deles de ponta a ponta pelo Portal Web de Acompanhamento.</p>
+  <div class="metarow">
+    <div><div class="k">Tipo de projeto</div><div class="v">Novo, construído do zero</div></div>
+    <div><div class="k">Infraestrutura</div><div class="v">100% AWS</div></div>
+    <div><div class="k">Núcleo de IA</div><div class="v">Amazon Bedrock (agentes especializados)</div></div>
+    <div><div class="k">Domínio</div><div class="v">Orçamentos de fornecedores para o varejo</div></div>
+  </div>
+</section>
+
+<main>
+  <div class="sectionlabel">Escolha por onde começar</div>
+  <h2>Quatro visões do mesmo projeto</h2>
+
+  <div class="cardgrid">
+    <a class="navcard reveal" href="briefing-projeto.html">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg></div>
+      <div class="tag">Documento executivo</div>
+      <h3>Briefing do Projeto</h3>
+      <p>Visão geral, executive brief, problema, solução, benefícios, custos estimados e roadmap — a leitura completa para decisão.</p>
+      <div class="go">Abrir briefing <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+    </a>
+
+    <a class="navcard reveal" href="apresentacao-executiva.html">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-4"/></svg></div>
+      <div class="tag">Deck de decisão</div>
+      <h3>Apresentação Executiva</h3>
+      <p>Formato slide, direto ao ponto: problema, solução, benefícios, roadmap e o que precisa ser decidido antes do início.</p>
+      <div class="go">Ver apresentação <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+    </a>
+
+    <a class="navcard reveal" href="apresentacao-time.html">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg></div>
+      <div class="tag">Guia técnico</div>
+      <h3>Apresentação para o Time</h3>
+      <p>Componentes, stack tecnológica justificada, os 5 agentes de IA, fluxo de processamento, segurança e escalabilidade.</p>
+      <div class="go">Ver detalhes técnicos <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+    </a>
+
+    <a class="navcard reveal" href="arquitetura-macro.html">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></div>
+      <div class="tag">Diagramas</div>
+      <h3>Arquitetura &amp; Diagramas</h3>
+      <p>Arquitetura geral, camadas da plataforma, fluxo dos dados, fluxo dos documentos, arquitetura na AWS e pipeline completo.</p>
+      <div class="go">Ver diagramas <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+    </a>
+  </div>
+
+  <div class="strip reveal">
+    <h3>O pipeline completo, em uma linha</h3>
+    <div class="pipewrap"><div class="pipeline">
+      <div class="pnode">Ingestão<span>Web · API · SFTP · App</span></div>
+      <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+      <div class="pnode">Eventos<span>EventBridge · SQS</span></div>
+      <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+      <div class="pnode ai"><div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>Classificador</div><span>Agente IA</span></div>
+      <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+      <div class="pnode ai"><div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>Extrator</div><span>Textract + LLM</span></div>
+      <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+      <div class="pnode ai"><div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>Validador</div><span>Regras de negócio</span></div>
+      <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+      <div class="pnode ai"><div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>Indexação</div><span>Busca semântica</span></div>
+      <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+      <div class="pnode ai"><div class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>Orquestrador</div><span>Decide o próximo passo</span></div>
+      <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+      <div class="pnode">Portal do Gestor<span>Rastreio ponta a ponta</span></div>
+    </div></div>
+  </div>
+</main>
+
+<footer>
+  <div><span class="dot"></span>Nexo · Plataforma de Dados de Varejo na AWS</div>
+  <div>Projeto novo, construído do zero</div>
+</footer>
+
+</body>
+</html>

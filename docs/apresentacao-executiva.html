@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexo — Apresentação Executiva</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E14; --surface:#171B24; --surface-2:#1E2430; --border:rgba(255,255,255,.08);
+    --magenta:#FF0099; --blue:#02A4F2; --gradient:linear-gradient(135deg,#FF0099,#02A4F2);
+    --text:#F5F6FA; --text-muted:#9AA3B2; --success:#22C55E; --warning:#F5A623; --danger:#EF4444;
+    --radius:16px; --navh:68px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    color:var(--text);
+    background:var(--bg);
+    line-height:1.5;
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none;}
+  .grad-text{background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;}
+
+  /* ---- progress bar ---- */
+  .progress{position:fixed;top:0;left:0;height:3px;background:var(--gradient);z-index:300;width:0%;transition:width .1s;}
+
+  /* ---- top navigation (standardized across all pages) ---- */
+  .topnav{position:fixed;top:0;left:0;right:0;height:var(--navh);z-index:200;background:rgba(11,14,20,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 5vw;}
+  .topnav .brand{font-weight:800;font-size:16px;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;}
+  .topnav .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--gradient);display:inline-block;color:transparent;}
+  .topnav .links{display:flex;gap:4px;flex-wrap:wrap;}
+  .topnav .links a{font-size:13px;font-weight:600;color:var(--text-muted);padding:9px 14px;border-radius:10px;min-height:44px;display:flex;align-items:center;transition:color .15s ease,background .15s ease;}
+  .topnav .links a:hover{color:var(--text);background:var(--surface);}
+  .topnav .links a.active{color:var(--text);background:var(--surface-2);position:relative;}
+  .topnav .links a.active::after{content:"";position:absolute;left:14px;right:14px;bottom:5px;height:2px;border-radius:2px;background:var(--gradient);}
+  @media(max-width:1024px){
+    .topnav{flex-direction:column;height:auto;padding:12px 5vw;gap:10px;position:sticky;}
+    section{padding-top:40px;}
+    .topnav .links{width:100%;justify-content:flex-start;overflow-x:auto;}
+  }
+
+  /* ---- nav dots ---- */
+  .navdots{position:fixed;right:22px;top:50%;transform:translateY(-50%);z-index:150;display:flex;flex-direction:column;gap:10px;}
+  .navdots a{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.15);display:block;transition:.2s;}
+  .navdots a.active{background:var(--magenta);transform:scale(1.5);}
+
+  section{min-height:100vh;position:relative;padding:calc(var(--navh) + 56px) 8vw 70px;display:flex;flex-direction:column;
+    justify-content:center;border-bottom:1px solid var(--border);}
+  .section-inner{max-width:1180px;margin:0 auto;width:100%;}
+  .eyebrow{font-size:12.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;}
+  .eyebrow.grad{background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  h1{font-size:clamp(34px,5.5vw,64px);font-weight:800;letter-spacing:-1px;line-height:1.06;}
+  h2{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.6px;line-height:1.12;margin-bottom:18px;}
+  .lede{font-size:clamp(15px,1.6vw,17.5px);color:var(--text-muted);max-width:720px;margin-top:16px;line-height:1.65;}
+  .accent-underline{width:64px;height:4px;background:var(--gradient);margin:24px 0;border-radius:2px;}
+  .section-tag{position:absolute;top:calc(var(--navh) + 20px);right:8vw;font-size:11.5px;font-weight:700;
+    letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);}
+  .footerbar{position:absolute;bottom:24px;left:8vw;right:8vw;display:flex;justify-content:space-between;
+    font-size:11.5px;color:var(--text-muted);letter-spacing:.3px;}
+
+  /* ---- reveal animation ---- */
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .5s ease,transform .5s ease;}
+  .reveal.in-view{opacity:1;transform:translateY(0);}
+  .reveal.d1{transition-delay:.08s;} .reveal.d2{transition-delay:.16s;} .reveal.d3{transition-delay:.24s;}
+  .reveal.d4{transition-delay:.32s;} .reveal.d5{transition-delay:.4s;}
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;}
+    .reveal{opacity:1;transform:none;transition:none;}
+  }
+
+  /* ---- HERO ---- */
+  #hero{background:
+      radial-gradient(900px 600px at 82% 8%, rgba(255,0,153,.16), transparent 60%),
+      radial-gradient(700px 600px at 6% 92%, rgba(2,164,242,.16), transparent 60%),
+      var(--bg);}
+  #hero .content{max-width:920px;}
+  #hero .lede{color:#C7CCDA;font-size:clamp(16px,1.8vw,19px);max-width:660px;}
+  .meta-row{display:flex;flex-wrap:wrap;gap:0;margin-top:52px;border-top:1px solid var(--border);max-width:860px;}
+  .meta-item{padding:18px 28px 0 0;margin-right:28px;}
+  .meta-item .k{font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;}
+  .meta-item .v{font-size:15px;font-weight:700;}
+
+  .icon{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+  /* ---- PROBLEM CARDS ---- */
+  .cards4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:40px;}
+  .pcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:26px 22px;}
+  .pcard .ic-wrap{width:44px;height:44px;border-radius:12px;background:var(--surface-2);display:flex;
+    align-items:center;justify-content:center;margin-bottom:20px;color:var(--magenta);}
+  .pcard h4{font-size:16.5px;font-weight:800;margin-bottom:10px;letter-spacing:-.2px;}
+  .pcard p{font-size:13.5px;color:var(--text-muted);line-height:1.55;}
+
+  /* ---- PIPELINE FLOW ---- */
+  .flowrow{display:grid;grid-template-columns:1fr .4fr 1fr .4fr 1fr .4fr 1fr .4fr 1fr;gap:0;align-items:stretch;margin-top:44px;}
+  .flownode{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 16px;
+    position:relative;text-align:center;}
+  .flownode .ic-wrap{width:40px;height:40px;border-radius:10px;background:var(--surface-2);display:flex;
+    align-items:center;justify-content:center;margin:0 auto 14px;color:var(--blue);}
+  .flownode .tag{font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:var(--magenta);font-weight:800;margin-bottom:8px;}
+  .flownode h5{font-size:14px;font-weight:800;margin-bottom:6px;}
+  .flownode p{font-size:11px;color:var(--text-muted);line-height:1.4;}
+  .flowarrow{display:flex;align-items:center;justify-content:center;color:var(--text-muted);}
+  .flowarrow svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;}
+
+  .agentchips{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px;}
+  .agentchip{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:9px 18px;
+    font-size:12.5px;font-weight:600;color:var(--text);}
+  .agentchip b{background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;
+    font-weight:800;margin-right:6px;}
+
+  /* ---- BENEFITS ---- */
+  .benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:40px;}
+  .benefit{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;}
+  .benefit .stat{font-size:clamp(28px,3vw,36px);font-weight:800;letter-spacing:-.5px;margin-bottom:10px;
+    background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .benefit h4{font-size:14.5px;font-weight:700;margin-bottom:10px;color:var(--text);}
+  .benefit p{font-size:13px;color:var(--text-muted);line-height:1.55;}
+
+  /* ---- ROADMAP ---- */
+  .phases{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:40px;}
+  .phase{border-radius:var(--radius);padding:26px 24px;background:var(--surface);border:1px solid var(--border);}
+  .phase.active{background:linear-gradient(160deg,#1B0F22,#0F1A2E);border-color:rgba(255,0,153,.35);}
+  .phase .pill{display:inline-block;background:var(--surface-2);color:var(--text);border-radius:999px;
+    padding:6px 16px;font-size:10.5px;font-weight:800;letter-spacing:.5px;margin-bottom:18px;text-transform:uppercase;}
+  .phase.active .pill{background:var(--gradient);color:#0B0E14;}
+  .phase h4{font-size:17px;font-weight:800;margin-bottom:16px;letter-spacing:-.2px;}
+  .phase ul{list-style:none;}
+  .phase li{font-size:13px;padding:7px 0;color:var(--text-muted);line-height:1.45;border-bottom:1px solid var(--border);}
+  .phase li:last-child{border-bottom:none;}
+  .phase .check{margin-top:16px;font-size:12px;font-weight:800;color:var(--success);display:flex;align-items:center;gap:6px;}
+
+  /* ---- COSTS ---- */
+  .cost-callout{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px 26px;margin-top:32px;display:flex;gap:16px;align-items:flex-start;}
+  .cost-callout .ic-wrap{width:38px;height:38px;border-radius:10px;background:var(--bg);display:flex;
+    align-items:center;justify-content:center;color:var(--warning);flex-shrink:0;}
+  .cost-callout p{font-size:14px;color:var(--text-muted);line-height:1.55;}
+  .cost-callout b{color:var(--text);}
+  .costs{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:28px;}
+  .costcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:26px 22px;}
+  .costcard .tier{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--blue);margin-bottom:12px;}
+  .costcard .range{font-size:clamp(22px,2.6vw,28px);font-weight:800;letter-spacing:-.4px;margin-bottom:8px;}
+  .costcard .desc{font-size:12.5px;color:var(--text-muted);line-height:1.5;}
+  .estimate-note{font-size:11.5px;color:var(--text-muted);margin-top:26px;font-style:italic;}
+
+  /* ---- CLOSING ---- */
+  #closing{background:radial-gradient(900px 600px at 20% 90%, rgba(255,0,153,.14), transparent 60%),
+      radial-gradient(700px 600px at 85% 10%, rgba(2,164,242,.14), transparent 60%), var(--bg);}
+  #closing .content{max-width:780px;}
+  .nextsteps{display:flex;flex-direction:column;gap:16px;margin-top:32px;}
+  .nextstep{display:flex;gap:16px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);
+    border-radius:14px;padding:18px 20px;}
+  .nextstep .num{width:30px;height:30px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;
+    justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;color:#0B0E14;}
+  .nextstep p{font-size:14.5px;color:var(--text-muted);padding-top:4px;}
+  .cta-row{margin-top:34px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;}
+  .btn-primary{display:inline-flex;align-items:center;gap:10px;background:var(--gradient);color:#0B0E14;
+    font-weight:800;font-size:14.5px;padding:14px 26px;border-radius:12px;min-height:44px;}
+  .btn-note{font-size:13px;color:var(--text-muted);}
+  small.disclaimer{display:block;margin-top:40px;color:var(--text-muted);font-size:11px;max-width:660px;line-height:1.6;}
+
+  @media(max-width:980px){
+    .cards4,.benefits,.phases,.costs,.flowrow{grid-template-columns:1fr;}
+    .flowarrow{transform:rotate(90deg);padding:8px 0;}
+    section{padding:40px 6vw 60px;}
+    .navdots{display:none;}
+    .section-tag{display:none;}
+  }
+  @media(max-width:640px){
+    .topnav .links a{font-size:12px;padding:8px 10px;}
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<div class="topnav">
+  <a class="brand" href="index.html"><span class="dot"></span>Nexo</a>
+  <nav class="links">
+      <a href="index.html">Início</a>
+      <a href="briefing-projeto.html">Briefing do Projeto</a>
+      <a href="apresentacao-executiva.html" class="active">Apresentação Executiva</a>
+      <a href="apresentacao-time.html">Apresentação para o Time</a>
+      <a href="arquitetura-macro.html">Arquitetura &amp; Diagramas</a>
+  </nav>
+</div>
+
+<div class="navdots" id="navdots"></div>
+
+<section id="hero">
+  <div class="section-tag">01 · ABERTURA</div>
+  <div class="section-inner content reveal">
+    <div class="eyebrow grad">Novo produto · 100% AWS</div>
+    <h1>Orçamentos de fornecedores, lidos e organizados por inteligência artificial — sem intervenção manual.</h1>
+    <div class="accent-underline"></div>
+    <p class="lede">Nexo é a plataforma de dados que recebe os orçamentos que fornecedores enviam para a rede varejista — upload, e-mail, API ou parceiro — e os transforma em informação organizada, validada e pronta para uso pelo time de compras. Construída do zero para rodar 100% na AWS.</p>
+    <div class="meta-row">
+      <div class="meta-item"><div class="k">Arquitetura</div><div class="v">100% Serverless AWS</div></div>
+      <div class="meta-item"><div class="k">Inteligência</div><div class="v">5 agentes de IA · Bedrock</div></div>
+      <div class="meta-item"><div class="k">Modelo de custo</div><div class="v">Sob demanda</div></div>
+      <div class="meta-item"><div class="k">Status</div><div class="v">Decisão de kickoff</div></div>
+    </div>
+  </div>
+  <div class="footerbar"><div>Nexo · Apresentação Executiva</div><div>01 / 07</div></div>
+</section>
+
+<section id="problema">
+  <div class="section-tag">02 · PROBLEMA</div>
+  <div class="section-inner">
+    <div class="eyebrow grad reveal">O problema</div>
+    <h2 class="reveal">Redes varejistas recebem orçamentos de fornecedores de todo lugar — e ainda tratam cada um na mão.</h2>
+    <p class="lede reveal">Orçamentos de produtos chegam de dezenas de fornecedores por canais diferentes — PDF, planilha, e-mail, formulário próprio — cada um em um formato distinto, sem padrão nenhum. O resultado: tempo perdido, erro humano e nenhuma visibilidade real do que está em processamento.</p>
+    <div class="cards4">
+      <div class="pcard reveal d1">
+        <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 4l8 8 8-8"/></svg></div>
+        <h4>Volume que só cresce</h4>
+        <p>Centenas de orçamentos por mês, chegando por e-mail, upload e integração com fornecedores.</p>
+      </div>
+      <div class="pcard reveal d2">
+        <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4"/><path d="M4 7h16"/><path d="M8 21l-4-4 4-4"/><path d="M20 17H4"/></svg></div>
+        <h4>Nenhum padrão</h4>
+        <p>Cada fornecedor envia seu orçamento em um formato e layout próprio — PDF, planilha, e-mail ou formulário.</p>
+      </div>
+      <div class="pcard reveal d3">
+        <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0114 0v1"/></svg></div>
+        <h4>Leitura manual</h4>
+        <p>Time de compras dedicado a abrir, ler e digitar itens, preços e condições um orçamento por vez.</p>
+      </div>
+      <div class="pcard reveal d4">
+        <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path d="M21 21l-5.5-5.5"/></svg></div>
+        <h4>Rastreabilidade frágil</h4>
+        <p>Difícil saber onde está um orçamento, quem tratou, quando e em que etapa do processo.</p>
+      </div>
+    </div>
+  </div>
+  <div class="footerbar"><div>Nexo · Apresentação Executiva</div><div>02 / 07</div></div>
+</section>
+
+<section id="solucao">
+  <div class="section-tag">03 · SOLUÇÃO</div>
+  <div class="section-inner">
+    <div class="eyebrow grad reveal">A virada</div>
+    <h2 class="reveal">Orçamentos entram. Agentes de IA processam. Dados saem prontos para decisão de compra.</h2>
+    <p class="lede reveal">Cada orçamento passa por agentes de IA especializados que identificam o fornecedor e o formato, extraem itens, preços e condições, validam consistência, indexam o conteúdo e entregam tudo pronto para busca, workflow e integração — do início ao fim, sem intervenção manual do time de compras.</p>
+    <div class="flowrow">
+      <div class="flownode reveal d1">
+        <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg></div>
+        <div class="tag">Entrada</div><h5>Ingestão</h5><p>Portal web, API REST, SFTP ou app mobile</p>
+      </div>
+      <div class="flowarrow"><svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M14 6l6 6-6 6"/></svg></div>
+      <div class="flownode reveal d2">
+        <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 10h16"/></svg></div>
+        <div class="tag">Fluxo</div><h5>Fila &amp; Orquestração</h5><p>Cada orçamento vira um evento controlado</p>
+      </div>
+      <div class="flowarrow"><svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M14 6l6 6-6 6"/></svg></div>
+      <div class="flownode reveal d3">
+        <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></div>
+        <div class="tag">Inteligência</div><h5>Agentes de IA</h5><p>Classificam, extraem e validam</p>
+      </div>
+      <div class="flowarrow"><svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M14 6l6 6-6 6"/></svg></div>
+      <div class="flownode reveal d4">
+        <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
+        <div class="tag">Dado curado</div><h5>Dados &amp; Busca</h5><p>Estruturado, indexado e pesquisável</p>
+      </div>
+      <div class="flowarrow"><svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M14 6l6 6-6 6"/></svg></div>
+      <div class="flownode reveal d5">
+        <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1.5-1.5"/></svg></div>
+        <div class="tag">Consumo</div><h5>Integrações &amp; Portal</h5><p>Rastreabilidade completa, ponta a ponta</p>
+      </div>
+    </div>
+    <div class="agentchips reveal">
+      <div class="agentchip"><b>01</b>Classificador</div>
+      <div class="agentchip"><b>02</b>Extrator</div>
+      <div class="agentchip"><b>03</b>Validador</div>
+      <div class="agentchip"><b>04</b>Indexador Semântico</div>
+      <div class="agentchip"><b>05</b>Orquestrador</div>
+    </div>
+  </div>
+  <div class="footerbar"><div>Nexo · Apresentação Executiva</div><div>03 / 07</div></div>
+</section>
+
+<section id="beneficios">
+  <div class="section-tag">04 · BENEFÍCIOS</div>
+  <div class="section-inner">
+    <div class="eyebrow grad reveal">Por que isso importa</div>
+    <h2 class="reveal">Menos tempo, mais confiança, custo sob controle.</h2>
+    <div class="benefits">
+      <div class="benefit reveal d1">
+        <div class="stat">Minutos</div>
+        <h4>Velocidade de processamento</h4>
+        <p>Tempo entre a chegada do orçamento e o dado disponível para uso — no lugar de dias.</p>
+      </div>
+      <div class="benefit reveal d2">
+        <div class="stat">Por etapa</div>
+        <h4>Precisão especializada</h4>
+        <p>Classificação, extração e validação feitas por agentes de IA dedicados a cada tarefa.</p>
+      </div>
+      <div class="benefit reveal d3">
+        <div class="stat">100%</div>
+        <h4>Rastreabilidade completa</h4>
+        <p>Todo orçamento com histórico de origem, agente responsável, decisão e destino.</p>
+      </div>
+      <div class="benefit reveal d4">
+        <div class="stat">Sob demanda</div>
+        <h4>Escalabilidade sem projeto novo</h4>
+        <p>Picos de volume absorvidos pela própria arquitetura, sem projeto novo de infraestrutura.</p>
+      </div>
+      <div class="benefit reveal d5">
+        <div class="stat">Paga pelo uso</div>
+        <h4>Custo sob demanda</h4>
+        <p>Sem servidor fixo rodando ocioso à espera de orçamentos — o custo acompanha o volume real.</p>
+      </div>
+      <div class="benefit reveal d5">
+        <div class="stat">Tempo real</div>
+        <h4>Portal Web de Acompanhamento</h4>
+        <p>Painel do gestor de compras: o ciclo de vida completo de cada orçamento, de ponta a ponta — entrada, classificação, extração, validação, indexação e disponibilização — com status em tempo real, alertas de pendência ou erro e trilha de auditoria completa.</p>
+      </div>
+    </div>
+  </div>
+  <div class="footerbar"><div>Nexo · Apresentação Executiva</div><div>04 / 07</div></div>
+</section>
+
+<section id="roadmap">
+  <div class="section-tag">05 · ROADMAP</div>
+  <div class="section-inner">
+    <div class="eyebrow grad reveal">Cronograma macro</div>
+    <h2 class="reveal">Três fases, do primeiro orçamento processado à escala de produto.</h2>
+    <div class="phases">
+      <div class="phase active reveal d1">
+        <div class="pill">Fase 01 · Fundação</div>
+        <h4>Pipeline em produção</h4>
+        <ul>
+          <li>Ingestão por upload, e-mail e API</li>
+          <li>Primeiros agentes de IA ativos: Classificador e Extrator</li>
+          <li>Dados estruturados e armazenados de forma confiável</li>
+        </ul>
+        <div class="check">✓ Pipeline ponta a ponta ativo</div>
+      </div>
+      <div class="phase reveal d2">
+        <div class="pill">Fase 02 · Inteligência</div>
+        <h4>Todos os agentes ativos</h4>
+        <ul>
+          <li>Validador e Orquestrador em produção</li>
+          <li>Indexação semântica e busca inteligente</li>
+          <li>Automação de workflows entre etapas</li>
+        </ul>
+        <div class="check">✓ Classificação e busca 100% por IA</div>
+      </div>
+      <div class="phase reveal d3">
+        <div class="pill">Fase 03 · Escala &amp; Produto</div>
+        <h4>Integrações e volume</h4>
+        <ul>
+          <li>Integração com outros sistemas e portal</li>
+          <li>Testes de volume e endurecimento de segurança</li>
+          <li>Rastreabilidade completa em produção</li>
+        </ul>
+        <div class="check">✓ Plataforma pronta para escala</div>
+      </div>
+    </div>
+  </div>
+  <div class="footerbar"><div>Nexo · Apresentação Executiva</div><div>05 / 07</div></div>
+</section>
+
+<section id="custos">
+  <div class="section-tag">06 · CUSTOS</div>
+  <div class="section-inner">
+    <div class="eyebrow grad reveal">Investimento</div>
+    <h2 class="reveal">Custo sob demanda — cresce com o uso, não com o tempo parado.</h2>
+    <p class="lede reveal">Arquitetura serverless-first: sem servidor fixo para manter na maior parte do sistema. O custo acompanha o volume de orçamentos processados e as chamadas aos agentes de IA.</p>
+    <div class="cost-callout reveal">
+      <div class="ic-wrap"><svg class="icon" viewBox="0 0 24 24" style="width:20px;height:20px;"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+      <p><b>Principal driver de custo:</b> chamadas aos agentes de IA (Amazon Bedrock) e volume de orçamentos processados por mês. Os demais componentes escalam a zero quando ociosos.</p>
+    </div>
+    <div class="costs">
+      <div class="costcard reveal d1">
+        <div class="tier">Fase 1 · Fundação</div>
+        <div class="range grad-text">Faixa inicial</div>
+        <div class="desc">Volume de validação, agentes essenciais ativos, arquitetura básica em operação.</div>
+      </div>
+      <div class="costcard reveal d2">
+        <div class="tier">Operação plena</div>
+        <div class="range grad-text">Faixa intermediária</div>
+        <div class="desc">Todos os agentes ativos, volume mensal de produção, busca semântica em uso contínuo.</div>
+      </div>
+      <div class="costcard reveal d3">
+        <div class="tier">Alto volume</div>
+        <div class="range grad-text">Faixa superior</div>
+        <div class="desc">Múltiplas fontes de orçamentos, picos sazonais e integrações adicionais em escala.</div>
+      </div>
+    </div>
+    <p class="estimate-note">Faixas ilustrativas para referência de planejamento — não constituem cotação. Valores reais dependem de volume, formatos de orçamento e integrações confirmadas na Fase 1.</p>
+  </div>
+  <div class="footerbar"><div>Nexo · Apresentação Executiva</div><div>06 / 07</div></div>
+</section>
+
+<section id="closing" style="border-bottom:none;">
+  <div class="section-tag">07 · PRÓXIMOS PASSOS</div>
+  <div class="section-inner content">
+    <div class="eyebrow grad reveal">Próximos passos</div>
+    <h2 class="reveal">O que decidir antes da Fase 1 começar.</h2>
+    <p class="lede reveal">Quatro decisões destravam o kickoff. Nenhuma exige mais do que uma conversa objetiva com as áreas certas.</p>
+    <div class="nextsteps">
+      <div class="nextstep reveal d1"><div class="num">1</div><p>Confirmar o volume esperado de orçamentos por mês para dimensionar corretamente a arquitetura.</p></div>
+      <div class="nextstep reveal d2"><div class="num">2</div><p>Definir quais fornecedores entram no escopo inicial da Fase 1.</p></div>
+      <div class="nextstep reveal d3"><div class="num">3</div><p>Validar requisitos de segurança e conformidade regulatória aplicáveis ao setor.</p></div>
+      <div class="nextstep reveal d4"><div class="num">4</div><p>Confirmar acesso aos canais de origem dos orçamentos: e-mail, API e fornecedores.</p></div>
+    </div>
+    <div class="cta-row reveal">
+      <div class="btn-primary">
+        <svg class="icon" viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#0B0E14;"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 3v4M16 3v4"/></svg>
+        Agendar reunião de kickoff
+      </div>
+      <div class="btn-note">Decisões acima como pauta principal</div>
+    </div>
+    <small class="disclaimer">Este material é uma apresentação executiva do projeto Nexo. Cenários, faixas de custo e prazos são ilustrativos, para fins de planejamento e decisão, e não representam dados de clientes ou contratos reais.</small>
+  </div>
+</section>
+
+<script>
+  const sections = document.querySelectorAll('section');
+  const dotsWrap = document.getElementById('navdots');
+  sections.forEach((s)=>{
+    const a = document.createElement('a');
+    a.href = '#'+s.id;
+    a.title = s.id;
+    dotsWrap.appendChild(a);
+  });
+  const dots = dotsWrap.querySelectorAll('a');
+  function onScroll(){
+    const scrollTop = window.scrollY;
+    const docH = document.documentElement.scrollHeight - window.innerHeight;
+    document.getElementById('progress').style.width = (docH>0 ? (scrollTop/docH*100) : 0) + '%';
+    let idx = 0;
+    sections.forEach((s,i)=>{ if (scrollTop >= s.offsetTop - window.innerHeight*0.4) idx = i; });
+    dots.forEach((d,i)=> d.classList.toggle('active', i===idx));
+  }
+  document.addEventListener('scroll', onScroll);
+  onScroll();
+
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in-view'); io.unobserve(e.target); } });
+  }, {threshold:.15});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexo — Arquitetura &amp; Diagramas Técnicos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E14; --surface:#171B24; --surface-2:#1E2430; --border:rgba(255,255,255,.08);
+    --magenta:#FF0099; --blue:#02A4F2; --gradient:linear-gradient(135deg,#FF0099,#02A4F2);
+    --text:#F5F6FA; --text-muted:#9AA3B2; --success:#22C55E; --warning:#F5A623; --danger:#EF4444;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    line-height:1.6; font-size:15px; -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit; text-decoration:none;}
+  img,svg{max-width:100%;}
+
+  /* ---------- top nav (shared across the 4 pages) ---------- */
+  .topnav{
+    position:sticky; top:0; z-index:100; display:flex; align-items:center; justify-content:space-between;
+    gap:16px; padding:14px 5vw; background:rgba(11,14,20,.86); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border); flex-wrap:wrap;
+  }
+  .topnav .brand{display:flex; align-items:center; gap:10px; font-weight:800; font-size:16px; letter-spacing:-.2px;}
+  .topnav .brand .dot{width:9px; height:9px; border-radius:50%; background:var(--gradient); display:inline-block;}
+  .topnav .links{display:flex; gap:4px; flex-wrap:wrap;}
+  .topnav .links a{
+    font-size:12.5px; font-weight:600; color:var(--text-muted); padding:8px 12px; border-radius:999px;
+    border:1px solid transparent; transition:background .2s ease, color .2s ease, border-color .2s ease;
+    white-space:nowrap;
+  }
+  .topnav .links a:hover{color:var(--text); background:var(--surface-2);}
+  .topnav .links a.current{color:var(--text); background:var(--surface-2); border-color:var(--border);}
+  .topnav .links a.current::before{content:"● "; color:var(--magenta); font-size:8px;}
+
+  /* ---------- hero ---------- */
+  .hero{padding:56px 5vw 40px; max-width:1400px; margin:0 auto;}
+  .hero .eyebrow{
+    display:inline-flex; align-items:center; gap:8px; font-size:11px; font-weight:700; letter-spacing:1.6px;
+    text-transform:uppercase; color:var(--magenta); border:1px solid var(--border); background:var(--surface);
+    padding:6px 14px; border-radius:999px; margin-bottom:18px;
+  }
+  .hero h1{font-size:clamp(28px,4vw,42px); font-weight:800; letter-spacing:-.6px; max-width:820px;}
+  .hero h1 span{background:var(--gradient); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .hero p{color:var(--text-muted); max-width:680px; margin-top:14px; font-size:15px;}
+
+  /* ---------- layout: side nav + content ---------- */
+  .layout{display:grid; grid-template-columns:240px 1fr; gap:0; max-width:1400px; margin:0 auto; padding:0 5vw 100px;}
+  .sidenav{position:sticky; top:64px; align-self:start; height:calc(100vh - 64px); overflow-y:auto; padding:24px 20px 40px 0;}
+  .sidenav .label{font-size:10.5px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--text-muted); margin-bottom:12px;}
+  .sidenav a{
+    display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; color:var(--text-muted);
+    padding:9px 12px; border-left:2px solid transparent; margin-left:-1px; border-radius:0 8px 8px 0;
+    transition:color .2s ease, background .2s ease, border-color .2s ease;
+  }
+  .sidenav a .n{
+    flex:none; width:20px; height:20px; border-radius:6px; background:var(--surface-2); display:flex;
+    align-items:center; justify-content:center; font-size:10.5px; font-weight:700; color:var(--text-muted);
+  }
+  .sidenav a:hover{color:var(--text); background:var(--surface);}
+  .sidenav a.active{color:var(--text); border-left-color:var(--magenta); background:var(--surface);}
+  .sidenav a.active .n{background:var(--gradient); color:#fff;}
+
+  main{min-width:0; padding-top:24px;}
+
+  .sec{margin-bottom:72px; scroll-margin-top:80px; opacity:0; animation:fadeUp .5s ease forwards;}
+  .sec:nth-of-type(1){animation-delay:.02s;}
+  .sec:nth-of-type(2){animation-delay:.06s;}
+  @keyframes fadeUp{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+  @media (prefers-reduced-motion:reduce){ .sec{animation:none; opacity:1;} html{scroll-behavior:auto;} }
+
+  .sec .kicker{font-size:11px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--blue); margin-bottom:8px;}
+  .sec h2{font-size:24px; font-weight:800; letter-spacing:-.3px; margin-bottom:10px;}
+  .sec > p.lede{color:var(--text-muted); max-width:760px; margin-bottom:22px; font-size:14.5px;}
+
+  .legend{display:flex; flex-wrap:wrap; gap:10px 18px; margin-bottom:16px;}
+  .legend .item{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text-muted); font-weight:500;}
+  .legend .swatch{width:12px; height:12px; border-radius:4px; flex:none;}
+  .legend .swatch.dashed{background:transparent; border:1.5px dashed var(--text-muted); border-radius:3px;}
+
+  .diagram-card{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:20px; position:relative;
+  }
+  .diagram-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .diagram-scroll::-webkit-scrollbar{height:8px;}
+  .diagram-scroll::-webkit-scrollbar-thumb{background:var(--surface-2); border-radius:8px;}
+  .diagram-scroll svg{display:block; height:auto;}
+
+  .note{
+    margin-top:14px; font-size:12.5px; color:var(--text-muted); background:var(--surface-2);
+    border:1px solid var(--border); border-radius:10px; padding:10px 14px;
+  }
+  .note b{color:var(--text); font-weight:600;}
+
+  footer{max-width:1400px; margin:0 auto; padding:32px 5vw 60px; border-top:1px solid var(--border); color:var(--text-muted); font-size:12.5px;}
+
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;}
+    .sidenav{
+      position:sticky; top:57px; height:auto; display:flex; overflow-x:auto; gap:6px; padding:12px 0;
+      border-bottom:1px solid var(--border); background:var(--bg); z-index:50;
+    }
+    .sidenav .label{display:none;}
+    .sidenav a{border-left:none; border-bottom:2px solid transparent; white-space:nowrap; padding:8px 10px; border-radius:8px;}
+    .sidenav a.active{border-left-color:transparent; border-bottom-color:var(--magenta);}
+    main{padding-top:16px;}
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="index.html"><span class="dot"></span>Nexo</a>
+  <div class="links">
+    <a href="index.html">Início</a>
+    <a href="briefing-projeto.html">Briefing do Projeto</a>
+    <a href="apresentacao-executiva.html">Apresentação Executiva</a>
+    <a href="apresentacao-time.html">Apresentação para o Time</a>
+    <a href="arquitetura-macro.html" class="current">Arquitetura &amp; Diagramas</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="eyebrow">Documentação técnica</div>
+  <h1>Arquitetura <span>&amp; Diagramas</span> Técnicos</h1>
+  <p>Visão macro, camadas de plataforma, fluxo de dados, jornada do documento, arquitetura de referência na AWS e o
+  pipeline completo dos agentes de inteligência artificial que processam orçamentos de fornecedores do zero, com todos os
+  componentes construídos nativamente na nuvem.</p>
+</header>
+
+<div class="layout">
+  <nav class="sidenav" id="sidenav">
+    <div class="label">Diagramas</div>
+    <a href="#arquitetura-geral" data-target="arquitetura-geral"><span class="n">1</span>Arquitetura Geral</a>
+    <a href="#diagramas-plataforma" data-target="diagramas-plataforma"><span class="n">2</span>Plataforma em Camadas</a>
+    <a href="#fluxo-dados" data-target="fluxo-dados"><span class="n">3</span>Fluxo dos Dados</a>
+    <a href="#fluxo-documentos" data-target="fluxo-documentos"><span class="n">4</span>Fluxo dos Documentos</a>
+    <a href="#arquitetura-aws" data-target="arquitetura-aws"><span class="n">5</span>Arquitetura na AWS</a>
+    <a href="#fluxo-processamento" data-target="fluxo-processamento"><span class="n">6</span>Pipeline dos Agentes</a>
+  </nav>
+
+  <main>
+
+    <!-- ============================================================ -->
+    <!-- 1. ARQUITETURA GERAL -->
+    <!-- ============================================================ -->
+    <section class="sec" id="arquitetura-geral">
+      <div class="kicker">Diagrama 1</div>
+      <h2>Arquitetura Geral</h2>
+      <p class="lede">Visão macro ponta a ponta: da chegada do documento, por qualquer canal, até a disponibilização
+      dos dados extraídos para busca e integrações — com segurança e observabilidade como camadas transversais a
+      todo o fluxo.</p>
+
+      <div class="legend">
+        <div class="item"><span class="swatch" style="background:var(--blue)"></span>Ingestão Multi-canal &amp; Portal</div>
+        <div class="item"><span class="swatch" style="background:var(--gradient)"></span>Orquestração &amp; Eventos</div>
+        <div class="item"><span class="swatch" style="background:var(--magenta)"></span>Agentes de IA</div>
+        <div class="item"><span class="swatch" style="background:rgba(2,164,242,.35);border:1px solid var(--blue)"></span>Dados &amp; Persistência</div>
+        <div class="item"><span class="swatch dashed"></span>Segurança &amp; Observabilidade (transversal)</div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="diagram-scroll">
+<svg viewBox="0 0 1400 640" width="1400" height="640" role="img" aria-label="Diagrama de arquitetura geral do Nexo">
+  <defs>
+    <marker id="a1h" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#02A4F2"/></marker>
+    <marker id="a1m" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#FF0099"/></marker>
+    <marker id="a1g" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9AA3B2"/></marker>
+  </defs>
+  <rect x="1" y="1" width="1398" height="638" rx="16" fill="none" stroke="#9AA3B2" stroke-opacity=".35" stroke-dasharray="6 6"/>
+  <text x="20" y="26" font-size="11" font-weight="700" fill="#9AA3B2" letter-spacing=".5">SEGURANÇA — IAM · KMS · WAF · GuardDuty · Secrets Manager · CloudTrail · VPC privada · LGPD</text>
+  <text x="1380" y="622" font-size="11" font-weight="700" fill="#9AA3B2" text-anchor="end" letter-spacing=".5">OBSERVABILIDADE — CloudWatch · X-Ray · OpenTelemetry</text>
+
+  <!-- Col 1: Origem -->
+  <rect x="24" y="70" width="150" height="500" rx="12" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".4"/>
+  <text x="99" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="#02A4F2">ORIGEM</text>
+  <rect x="34" y="210" width="130" height="176" rx="10" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+  <text x="99" y="232" text-anchor="middle" font-size="11" font-weight="700" fill="#F5F6FA">Canais de Entrada</text>
+  <text x="99" y="254" text-anchor="middle" font-size="10" fill="#9AA3B2">Upload via portal web</text>
+  <text x="99" y="272" text-anchor="middle" font-size="10" fill="#9AA3B2">API REST</text>
+  <text x="99" y="290" text-anchor="middle" font-size="10" fill="#9AA3B2">SFTP (Transfer Family)</text>
+  <text x="99" y="308" text-anchor="middle" font-size="10" fill="#9AA3B2">Aplicativo mobile</text>
+  <text x="99" y="332" text-anchor="middle" font-size="9.5" fill="#02A4F2">fornecedores de produtos</text>
+  <text x="99" y="348" text-anchor="middle" font-size="9.5" fill="#02A4F2">para a rede varejista</text>
+
+  <!-- Col 2: Ingestão -->
+  <rect x="200" y="70" width="160" height="500" rx="12" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".4"/>
+  <text x="280" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="#02A4F2">INGESTÃO</text>
+  <g font-size="11.5" font-weight="600" fill="#F5F6FA">
+    <rect x="214" y="130" width="132" height="52" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+    <text x="280" y="161" text-anchor="middle">Amazon S3 (raw)</text>
+    <rect x="214" y="196" width="132" height="52" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+    <text x="280" y="227" text-anchor="middle">Amazon SES</text>
+    <rect x="214" y="262" width="132" height="52" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+    <text x="280" y="284" text-anchor="middle">API Gateway</text>
+    <text x="280" y="298" text-anchor="middle" font-weight="400" font-size="10" fill="#9AA3B2">API REST / app mobile</text>
+    <rect x="214" y="330" width="132" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+    <text x="280" y="350" text-anchor="middle" font-size="10.5">AWS Transfer</text>
+    <text x="280" y="364" text-anchor="middle" font-size="10.5">Family (SFTP)</text>
+    <text x="280" y="378" text-anchor="middle" font-weight="400" font-size="9" fill="#9AA3B2">upload de parceiros</text>
+  </g>
+
+  <!-- Col 3: Eventos & Filas -->
+  <rect x="396" y="70" width="160" height="500" rx="12" fill="#1E2430" stroke="url(#gradstroke1)"/>
+  <text x="476" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="#FF0099">EVENTOS &amp; FILAS</text>
+  <rect x="410" y="160" width="132" height="60" rx="8" fill="rgba(255,0,153,.10)" stroke="#FF0099"/>
+  <text x="476" y="185" text-anchor="middle" font-size="11.5" font-weight="600" fill="#F5F6FA">Amazon EventBridge</text>
+  <text x="476" y="200" text-anchor="middle" font-size="10" fill="#9AA3B2">bus de domínio</text>
+  <rect x="410" y="236" width="132" height="60" rx="8" fill="rgba(2,164,242,.10)" stroke="#02A4F2"/>
+  <text x="476" y="261" text-anchor="middle" font-size="11.5" font-weight="600" fill="#F5F6FA">Amazon SQS</text>
+  <text x="476" y="276" text-anchor="middle" font-size="10" fill="#9AA3B2">filas por tarefa</text>
+
+  <!-- Col 4: Orquestração -->
+  <rect x="576" y="70" width="140" height="500" rx="12" fill="#1E2430" stroke="#FF0099" stroke-opacity=".4"/>
+  <text x="646" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="#FF0099">ORQUESTRAÇÃO</text>
+  <rect x="590" y="200" width="112" height="180" rx="10" fill="rgba(255,0,153,.10)" stroke="#FF0099"/>
+  <text x="646" y="280" text-anchor="middle" font-size="12" font-weight="700" fill="#F5F6FA" transform="rotate(-90 646 290)">AWS Step Functions</text>
+  <text x="646" y="440" text-anchor="middle" font-size="10" fill="#9AA3B2">coordena o</text>
+  <text x="646" y="454" text-anchor="middle" font-size="10" fill="#9AA3B2">pipeline de agentes</text>
+
+  <!-- Col 5: Agentes de IA -->
+  <rect x="756" y="70" width="190" height="500" rx="12" fill="#1E2430" stroke="#FF0099" stroke-opacity=".5"/>
+  <text x="851" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="#FF0099">AGENTES DE IA — BEDROCK</text>
+  <g font-size="11" font-weight="600" fill="#F5F6FA">
+    <rect x="770" y="112" width="162" height="66" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+    <text x="851" y="138" text-anchor="middle">1 · Classificador</text>
+    <text x="851" y="153" text-anchor="middle" font-weight="400" font-size="9.5" fill="#9AA3B2">fornecedor e formato</text>
+    <rect x="770" y="184" width="162" height="66" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+    <text x="851" y="210" text-anchor="middle">2 · Extrator</text>
+    <text x="851" y="225" text-anchor="middle" font-weight="400" font-size="9.5" fill="#9AA3B2">Textract + LLM</text>
+    <rect x="770" y="256" width="162" height="66" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+    <text x="851" y="282" text-anchor="middle">3 · Validador</text>
+    <text x="851" y="297" text-anchor="middle" font-weight="400" font-size="9.5" fill="#9AA3B2">regras de negócio</text>
+    <rect x="770" y="328" width="162" height="66" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+    <text x="851" y="354" text-anchor="middle">4 · Indexação</text>
+    <text x="851" y="369" text-anchor="middle" font-weight="400" font-size="9.5" fill="#9AA3B2">embeddings semânticos</text>
+    <rect x="770" y="400" width="162" height="66" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+    <text x="851" y="426" text-anchor="middle">5 · Orquestrador</text>
+    <text x="851" y="441" text-anchor="middle" font-weight="400" font-size="9.5" fill="#9AA3B2">workflow &amp; integrações</text>
+  </g>
+
+  <!-- Col 6: Dados -->
+  <rect x="972" y="70" width="170" height="500" rx="12" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".4"/>
+  <text x="1057" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="#02A4F2">DADOS</text>
+  <rect x="986" y="160" width="142" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+  <text x="1057" y="185" text-anchor="middle" font-size="11.5" font-weight="600" fill="#F5F6FA">S3 processed/curated</text>
+  <text x="1057" y="200" text-anchor="middle" font-size="10" fill="#9AA3B2">lifecycle p/ frio</text>
+  <rect x="986" y="236" width="142" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+  <text x="1057" y="261" text-anchor="middle" font-size="11.5" font-weight="600" fill="#F5F6FA">Aurora Serverless v2</text>
+  <text x="1057" y="276" text-anchor="middle" font-size="10" fill="#9AA3B2">Postgres + pgvector</text>
+  <rect x="986" y="312" width="142" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+  <text x="1057" y="337" text-anchor="middle" font-size="11.5" font-weight="600" fill="#F5F6FA">OpenSearch Serverless</text>
+  <text x="1057" y="352" text-anchor="middle" font-size="10" fill="#9AA3B2">busca vetorial</text>
+
+  <!-- Col 7: Portal & Integrações -->
+  <rect x="1182" y="70" width="196" height="500" rx="12" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".4"/>
+  <text x="1280" y="94" text-anchor="middle" font-size="11.5" font-weight="700" fill="#02A4F2">PORTAL &amp; INTEGRAÇÕES</text>
+  <rect x="1196" y="130" width="168" height="56" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+  <text x="1280" y="153" text-anchor="middle" font-size="11" font-weight="600" fill="#F5F6FA">Portal Web</text>
+  <text x="1280" y="168" text-anchor="middle" font-size="9.5" fill="#9AA3B2">CloudFront + S3 + Cognito</text>
+  <rect x="1196" y="198" width="168" height="56" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+  <text x="1280" y="221" text-anchor="middle" font-size="11" font-weight="600" fill="#F5F6FA">API Gateway / AppSync</text>
+  <text x="1280" y="236" text-anchor="middle" font-size="9.5" fill="#9AA3B2">busca inteligente</text>
+  <rect x="1196" y="266" width="168" height="56" rx="8" fill="rgba(255,0,153,.10)" stroke="#FF0099"/>
+  <text x="1280" y="289" text-anchor="middle" font-size="11" font-weight="600" fill="#F5F6FA">SNS + EventBridge</text>
+  <text x="1280" y="304" text-anchor="middle" font-size="9.5" fill="#9AA3B2">integrações externas</text>
+  <rect x="1196" y="340" width="168" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+  <text x="1280" y="362" text-anchor="middle" font-size="11" font-weight="600" fill="#F5F6FA">Portal do Gestor</text>
+  <text x="1280" y="377" text-anchor="middle" font-size="9" fill="#9AA3B2">rastreamento ponta a ponta</text>
+
+  <!-- Arrows -->
+  <path d="M164,298 L196,298" stroke="#02A4F2" stroke-width="2" marker-end="url(#a1h)" fill="none"/>
+  <path d="M360,220 L392,220" stroke="#02A4F2" stroke-width="2" marker-end="url(#a1h)" fill="none"/>
+  <path d="M556,220 L572,220" stroke="#FF0099" stroke-width="2" marker-end="url(#a1m)" fill="none"/>
+  <path d="M542,290 C560,290 570,290 586,290" stroke="#FF0099" stroke-width="2" marker-end="url(#a1m)" fill="none"/>
+  <path d="M712,290 L752,290" stroke="#FF0099" stroke-width="2" marker-end="url(#a1m)" fill="none"/>
+  <path d="M946,290 L968,290" stroke="#FF0099" stroke-width="2" marker-end="url(#a1m)" fill="none"/>
+  <path d="M1142,290 L1178,290" stroke="#02A4F2" stroke-width="2" marker-end="url(#a1h)" fill="none"/>
+  <path d="M1196,294 C1140,420 700,470 480,296" stroke="#9AA3B2" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#a1g)" fill="none"/>
+  <text x="820" y="470" font-size="10" fill="#9AA3B2" text-anchor="middle">eventos de integração externa</text>
+</svg>
+        </div>
+      </div>
+      <div class="note"><b>Leitura do diagrama:</b> o fluxo principal corre da esquerda para a direita; a linha
+      tracejada representa eventos de integração que retornam ao barramento a partir de sistemas externos da
+      rede varejista. Segurança e observabilidade cobrem todas as colunas, sem interromper o fluxo de processamento.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 2. DIAGRAMAS DA PLATAFORMA -->
+    <!-- ============================================================ -->
+    <section class="sec" id="diagramas-plataforma">
+      <div class="kicker">Diagrama 2</div>
+      <h2>Plataforma em Camadas</h2>
+      <p class="lede">Visão da plataforma organizada por domínios de responsabilidade, da apresentação ao time de
+      compras até a camada de plataforma e segurança que sustenta todas as demais.</p>
+
+      <div class="legend">
+        <div class="item"><span class="swatch" style="background:var(--blue)"></span>Apresentação &amp; Integração</div>
+        <div class="item"><span class="swatch" style="background:var(--magenta)"></span>Inteligência (Agentes de IA)</div>
+        <div class="item"><span class="swatch" style="background:var(--gradient)"></span>Orquestração &amp; Mensageria</div>
+        <div class="item"><span class="swatch" style="background:rgba(2,164,242,.35);border:1px solid var(--blue)"></span>Dados &amp; Persistência</div>
+        <div class="item"><span class="swatch" style="background:#3A4152;border:1px solid var(--text-muted)"></span>Plataforma &amp; Segurança</div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="diagram-scroll">
+<svg viewBox="0 0 1200 560" width="1200" height="560" role="img" aria-label="Diagrama de camadas da plataforma Nexo">
+  <defs><marker id="a2c" markerWidth="10" markerHeight="10" refX="4" refY="6" orient="auto"><path d="M0,0 L8,6 L0,12 Z" fill="#4B5566"/></marker></defs>
+
+  <!-- Band 1: Apresentação -->
+  <rect x="20" y="20" width="1160" height="86" rx="12" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".45"/>
+  <rect x="20" y="20" width="6" height="86" rx="3" fill="#02A4F2"/>
+  <text x="44" y="45" font-size="12.5" font-weight="700" fill="#02A4F2">APRESENTAÇÃO &amp; INTEGRAÇÃO</text>
+  <g font-size="10.5" font-weight="600" fill="#F5F6FA">
+    <rect x="44" y="56" width="200" height="38" rx="8" fill="rgba(2,164,242,.12)" stroke="#02A4F2"/>
+    <text x="144" y="79" text-anchor="middle">Portal Web (CloudFront+S3)</text>
+    <rect x="260" y="56" width="180" height="38" rx="8" fill="rgba(2,164,242,.12)" stroke="#02A4F2"/>
+    <text x="350" y="79" text-anchor="middle">API Gateway / AppSync</text>
+    <rect x="456" y="56" width="170" height="38" rx="8" fill="rgba(2,164,242,.12)" stroke="#02A4F2"/>
+    <text x="541" y="79" text-anchor="middle">Cognito + MFA</text>
+    <rect x="642" y="56" width="230" height="38" rx="8" fill="rgba(255,0,153,.10)" stroke="#FF0099"/>
+    <text x="757" y="79" text-anchor="middle">Integrações externas (SNS/EventBridge)</text>
+  </g>
+
+  <path d="M600,106 L600,120" stroke="#4B5566" stroke-width="2" marker-end="url(#a2c)"/>
+
+  <!-- Band 2: Inteligência -->
+  <rect x="20" y="130" width="1160" height="86" rx="12" fill="#1E2430" stroke="#FF0099" stroke-opacity=".45"/>
+  <rect x="20" y="130" width="6" height="86" rx="3" fill="#FF0099"/>
+  <text x="44" y="155" font-size="12.5" font-weight="700" fill="#FF0099">INTELIGÊNCIA — AGENTES DE IA (AMAZON BEDROCK)</text>
+  <g font-size="10" font-weight="600" fill="#F5F6FA">
+    <rect x="44" y="166" width="205" height="38" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/><text x="146" y="189" text-anchor="middle">1. Classificador</text>
+    <rect x="256" y="166" width="205" height="38" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/><text x="358" y="189" text-anchor="middle">2. Extrator de Dados</text>
+    <rect x="468" y="166" width="205" height="38" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/><text x="570" y="189" text-anchor="middle">3. Validador</text>
+    <rect x="680" y="166" width="205" height="38" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/><text x="782" y="189" text-anchor="middle">4. Indexação Semântica</text>
+    <rect x="892" y="166" width="252" height="38" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/><text x="1018" y="189" text-anchor="middle">5. Orquestrador de Workflow</text>
+  </g>
+
+  <path d="M600,216 L600,230" stroke="#4B5566" stroke-width="2" marker-end="url(#a2c)"/>
+
+  <!-- Band 3: Orquestração -->
+  <rect x="20" y="240" width="1160" height="86" rx="12" fill="#1E2430" stroke="url(#gradstroke2)"/>
+  <rect x="20" y="240" width="6" height="86" rx="3" fill="#FF0099"/>
+  <text x="44" y="265" font-size="12.5" font-weight="700" fill="#FF0099">ORQUESTRAÇÃO &amp; MENSAGERIA</text>
+  <g font-size="10.5" font-weight="600" fill="#F5F6FA">
+    <rect x="44" y="276" width="220" height="38" rx="8" fill="rgba(255,0,153,.10)" stroke="#FF0099"/><text x="154" y="299" text-anchor="middle">AWS Step Functions</text>
+    <rect x="280" y="276" width="220" height="38" rx="8" fill="rgba(2,164,242,.12)" stroke="#02A4F2"/><text x="390" y="299" text-anchor="middle">Amazon EventBridge</text>
+    <rect x="516" y="276" width="220" height="38" rx="8" fill="rgba(2,164,242,.12)" stroke="#02A4F2"/><text x="626" y="299" text-anchor="middle">Amazon SQS</text>
+    <rect x="752" y="276" width="220" height="38" rx="8" fill="rgba(2,164,242,.12)" stroke="#02A4F2"/><text x="862" y="299" text-anchor="middle">Amazon SNS</text>
+  </g>
+
+  <path d="M600,326 L600,340" stroke="#4B5566" stroke-width="2" marker-end="url(#a2c)"/>
+
+  <!-- Band 4: Dados -->
+  <rect x="20" y="350" width="1160" height="86" rx="12" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".45"/>
+  <rect x="20" y="350" width="6" height="86" rx="3" fill="#02A4F2"/>
+  <text x="44" y="375" font-size="12.5" font-weight="700" fill="#02A4F2">DADOS &amp; PERSISTÊNCIA</text>
+  <g font-size="10.5" font-weight="600" fill="#F5F6FA">
+    <rect x="44" y="386" width="280" height="38" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="184" y="409" text-anchor="middle">S3 (raw / processed / curated)</text>
+    <rect x="340" y="386" width="280" height="38" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="480" y="409" text-anchor="middle">Aurora Serverless v2 (Postgres)</text>
+    <rect x="636" y="386" width="280" height="38" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="776" y="409" text-anchor="middle">pgvector / OpenSearch Serverless</text>
+  </g>
+
+  <path d="M600,436 L600,450" stroke="#4B5566" stroke-width="2" marker-end="url(#a2c)"/>
+
+  <!-- Band 5: Plataforma & Segurança -->
+  <rect x="20" y="460" width="1160" height="86" rx="12" fill="#1E2430" stroke="#9AA3B2" stroke-opacity=".45"/>
+  <rect x="20" y="460" width="6" height="86" rx="3" fill="#9AA3B2"/>
+  <text x="44" y="485" font-size="12.5" font-weight="700" fill="#C7CDD9">PLATAFORMA &amp; SEGURANÇA (TRANSVERSAL)</text>
+  <text x="44" y="510" font-size="10.5" fill="#F5F6FA">IAM · KMS · Secrets Manager · WAF · GuardDuty · CloudTrail · VPC privada</text>
+  <text x="44" y="528" font-size="10.5" fill="#F5F6FA">CloudWatch · X-Ray · OpenTelemetry &nbsp;·&nbsp; conformidade LGPD (anonimização, retenção, direito ao esquecimento)</text>
+</svg>
+        </div>
+      </div>
+      <div class="note"><b>Leitura do diagrama:</b> cada camada depende da camada abaixo; a camada de plataforma e
+      segurança é transversal e se aplica a todas as demais, não apenas à camada inferior.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 3. FLUXO DOS DADOS -->
+    <!-- ============================================================ -->
+    <section class="sec" id="fluxo-dados">
+      <div class="kicker">Diagrama 3</div>
+      <h2>Fluxo dos Dados</h2>
+      <p class="lede">Como o dado se transforma a cada etapa: do arquivo bruto recebido até a informação estruturada,
+      validada e pronta para busca semântica e integrações.</p>
+
+      <div class="legend">
+        <div class="item"><span class="swatch" style="background:var(--blue)"></span>Estado do dado</div>
+        <div class="item"><span class="swatch" style="background:var(--warning)"></span>Exceção / revisão manual</div>
+        <div class="item"><span class="swatch dashed"></span>Retorno / reprocessamento</div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="diagram-scroll">
+<svg viewBox="0 0 1300 420" width="1300" height="420" role="img" aria-label="Diagrama de fluxo dos dados">
+  <defs>
+    <marker id="a3h" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#02A4F2"/></marker>
+    <marker id="a3w" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#F5A623"/></marker>
+  </defs>
+
+  <!-- main states -->
+  <g font-family="Inter">
+    <rect x="20" y="60" width="210" height="110" rx="12" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+    <text x="125" y="90" text-anchor="middle" font-size="13" font-weight="700" fill="#F5F6FA">Bruto</text>
+    <text x="125" y="110" text-anchor="middle" font-size="10.5" fill="#9AA3B2">Amazon S3 (raw)</text>
+    <text x="125" y="126" text-anchor="middle" font-size="10.5" fill="#9AA3B2">PDF · imagem · e-mail</text>
+    <text x="125" y="150" text-anchor="middle" font-size="9.5" fill="#02A4F2">formato original</text>
+
+    <rect x="280" y="60" width="230" height="110" rx="12" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+    <text x="395" y="90" text-anchor="middle" font-size="13" font-weight="700" fill="#F5F6FA">Extraído / Estruturado</text>
+    <text x="395" y="110" text-anchor="middle" font-size="10.5" fill="#9AA3B2">Amazon Textract + Agente Extrator</text>
+    <text x="395" y="126" text-anchor="middle" font-size="10.5" fill="#9AA3B2">campos em JSON</text>
+    <text x="395" y="150" text-anchor="middle" font-size="9.5" fill="#02A4F2">dado semiestruturado</text>
+
+    <rect x="560" y="60" width="210" height="110" rx="12" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+    <text x="665" y="90" text-anchor="middle" font-size="13" font-weight="700" fill="#F5F6FA">Validado</text>
+    <text x="665" y="110" text-anchor="middle" font-size="10.5" fill="#9AA3B2">Agente Validador</text>
+    <text x="665" y="126" text-anchor="middle" font-size="10.5" fill="#9AA3B2">regras de negócio, CPF/CNPJ, datas</text>
+    <text x="665" y="150" text-anchor="middle" font-size="9.5" fill="#02A4F2">Aurora Postgres</text>
+
+    <rect x="820" y="60" width="230" height="110" rx="12" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+    <text x="935" y="90" text-anchor="middle" font-size="13" font-weight="700" fill="#F5F6FA">Indexado / Vetorizado</text>
+    <text x="935" y="110" text-anchor="middle" font-size="10.5" fill="#9AA3B2">embeddings semânticos</text>
+    <text x="935" y="126" text-anchor="middle" font-size="10.5" fill="#9AA3B2">pgvector / OpenSearch Serverless</text>
+    <text x="935" y="150" text-anchor="middle" font-size="9.5" fill="#02A4F2">dado vetorizado</text>
+
+    <rect x="1090" y="60" width="190" height="110" rx="12" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+    <text x="1185" y="90" text-anchor="middle" font-size="13" font-weight="700" fill="#F5F6FA">Disponível</text>
+    <text x="1185" y="110" text-anchor="middle" font-size="10.5" fill="#9AA3B2">API / Portal</text>
+    <text x="1185" y="126" text-anchor="middle" font-size="10.5" fill="#9AA3B2">busca &amp; integrações</text>
+    <text x="1185" y="150" text-anchor="middle" font-size="9.5" fill="#02A4F2">dado consumível</text>
+  </g>
+
+  <path d="M230,115 L276,115" stroke="#02A4F2" stroke-width="2" marker-end="url(#a3h)"/>
+  <path d="M510,115 L556,115" stroke="#02A4F2" stroke-width="2" marker-end="url(#a3h)"/>
+  <path d="M770,115 L816,115" stroke="#02A4F2" stroke-width="2" marker-end="url(#a3h)"/>
+  <path d="M1050,115 L1086,115" stroke="#02A4F2" stroke-width="2" marker-end="url(#a3h)"/>
+
+  <!-- cold storage branch -->
+  <rect x="20" y="260" width="210" height="70" rx="10" fill="#1E2430" stroke="#9AA3B2" stroke-dasharray="4 4"/>
+  <text x="125" y="288" text-anchor="middle" font-size="11" font-weight="600" fill="#F5F6FA">Arquivamento frio</text>
+  <text x="125" y="304" text-anchor="middle" font-size="10" fill="#9AA3B2">S3 lifecycle policy</text>
+  <path d="M125,170 L125,256" stroke="#9AA3B2" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#a3h)"/>
+
+  <!-- exception branch -->
+  <rect x="560" y="260" width="230" height="70" rx="10" fill="rgba(245,166,35,.10)" stroke="#F5A623"/>
+  <text x="675" y="288" text-anchor="middle" font-size="11" font-weight="600" fill="#F5F6FA">Exceção detectada</text>
+  <text x="675" y="304" text-anchor="middle" font-size="10" fill="#9AA3B2">fila de revisão manual</text>
+  <path d="M665,170 L675,256" stroke="#F5A623" stroke-width="1.5" marker-end="url(#a3w)"/>
+  <path d="M600,260 C480,220 440,180 390,172" stroke="#F5A623" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#a3w)"/>
+  <text x="470" y="215" font-size="9.5" fill="#F5A623" text-anchor="middle">reprocessar após correção</text>
+</svg>
+        </div>
+      </div>
+      <div class="note"><b>Leitura do diagrama:</b> o dado bruto nunca é sobrescrito — cada etapa grava uma nova
+      representação, permitindo rastreabilidade completa entre o documento original e o dado final consumido.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 4. FLUXO DOS DOCUMENTOS -->
+    <!-- ============================================================ -->
+    <section class="sec" id="fluxo-documentos">
+      <div class="kicker">Diagrama 4</div>
+      <h2>Fluxo dos Documentos</h2>
+      <p class="lede">A jornada operacional de cada documento, do ponto de vista de quem acompanha o processamento:
+      uma esteira com status visível em cada etapa, do recebimento à disponibilização no portal.</p>
+
+      <div class="legend">
+        <div class="item"><span class="swatch" style="background:var(--blue)"></span>Recebido / em processamento</div>
+        <div class="item"><span class="swatch" style="background:var(--warning)"></span>Em fila</div>
+        <div class="item"><span class="swatch" style="background:var(--success)"></span>Validado / concluído</div>
+        <div class="item"><span class="swatch" style="background:var(--danger)"></span>Exceção / revisão manual</div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="diagram-scroll">
+<svg viewBox="0 0 1300 460" width="1300" height="460" role="img" aria-label="Diagrama de fluxo dos documentos, estilo esteira">
+  <defs>
+    <marker id="a4h" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4B5566"/></marker>
+    <marker id="a4d" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#EF4444"/></marker>
+  </defs>
+
+  <!-- track -->
+  <rect x="40" y="160" width="1220" height="10" rx="5" fill="#1E2430" stroke="#2A3140"/>
+
+  <!-- stops: 1 chegada, 2 triagem, 3 classificacao, 4 extracao, 5 validacao, 6 indexacao, 7 arquivamento -->
+  <!-- x positions spaced along track -->
+  <g font-family="Inter">
+    <!-- 1 -->
+    <circle cx="90" cy="165" r="12" fill="#02A4F2"/>
+    <text x="90" y="130" text-anchor="middle" font-size="11" font-weight="700" fill="#F5F6FA">Chegada</text>
+    <text x="90" y="146" text-anchor="middle" font-size="8.5" fill="#9AA3B2">Portal · API · SFTP · App</text>
+    <text x="90" y="205" text-anchor="middle" font-size="9.5" fill="#02A4F2">recebido</text>
+
+    <!-- 2 -->
+    <circle cx="270" cy="165" r="12" fill="#F5A623"/>
+    <text x="270" y="130" text-anchor="middle" font-size="11" font-weight="700" fill="#F5F6FA">Triagem automática</text>
+    <text x="270" y="146" text-anchor="middle" font-size="9.5" fill="#9AA3B2">EventBridge dispara pipeline</text>
+    <text x="270" y="205" text-anchor="middle" font-size="9.5" fill="#F5A623">em fila</text>
+
+    <!-- 3 -->
+    <circle cx="450" cy="165" r="12" fill="#02A4F2"/>
+    <text x="450" y="130" text-anchor="middle" font-size="11" font-weight="700" fill="#F5F6FA">Classificação</text>
+    <text x="450" y="146" text-anchor="middle" font-size="9.5" fill="#9AA3B2">agente 1 · fornecedor e formato</text>
+    <text x="450" y="205" text-anchor="middle" font-size="9.5" fill="#02A4F2">em processamento</text>
+
+    <!-- 4 -->
+    <circle cx="630" cy="165" r="12" fill="#02A4F2"/>
+    <text x="630" y="130" text-anchor="middle" font-size="11" font-weight="700" fill="#F5F6FA">Extração</text>
+    <text x="630" y="146" text-anchor="middle" font-size="9.5" fill="#9AA3B2">agente 2 · campos estruturados</text>
+    <text x="630" y="205" text-anchor="middle" font-size="9.5" fill="#02A4F2">em processamento</text>
+
+    <!-- 5 -->
+    <circle cx="810" cy="165" r="12" fill="#22C55E"/>
+    <text x="810" y="130" text-anchor="middle" font-size="11" font-weight="700" fill="#F5F6FA">Validação</text>
+    <text x="810" y="146" text-anchor="middle" font-size="9.5" fill="#9AA3B2">agente 3 · consistência</text>
+    <text x="810" y="205" text-anchor="middle" font-size="9.5" fill="#22C55E">validado</text>
+
+    <!-- 6 -->
+    <circle cx="990" cy="165" r="12" fill="#22C55E"/>
+    <text x="990" y="130" text-anchor="middle" font-size="11" font-weight="700" fill="#F5F6FA">Categorização &amp; Índice</text>
+    <text x="990" y="146" text-anchor="middle" font-size="9.5" fill="#9AA3B2">agente 4 · busca semântica</text>
+    <text x="990" y="205" text-anchor="middle" font-size="9.5" fill="#22C55E">indexado</text>
+
+    <!-- 7 -->
+    <circle cx="1180" cy="165" r="12" fill="#22C55E"/>
+    <text x="1180" y="130" text-anchor="middle" font-size="11" font-weight="700" fill="#F5F6FA">Disponível</text>
+    <text x="1180" y="146" text-anchor="middle" font-size="9.5" fill="#9AA3B2">agente 5 · portal / integrações</text>
+    <text x="1180" y="205" text-anchor="middle" font-size="9.5" fill="#22C55E">concluído</text>
+  </g>
+
+  <path d="M102,165 L258,165" stroke="#4B5566" stroke-width="2" marker-end="url(#a4h)"/>
+  <path d="M282,165 L438,165" stroke="#4B5566" stroke-width="2" marker-end="url(#a4h)"/>
+  <path d="M462,165 L618,165" stroke="#4B5566" stroke-width="2" marker-end="url(#a4h)"/>
+  <path d="M642,165 L798,165" stroke="#4B5566" stroke-width="2" marker-end="url(#a4h)"/>
+  <path d="M822,165 L978,165" stroke="#4B5566" stroke-width="2" marker-end="url(#a4h)"/>
+  <path d="M1002,165 L1168,165" stroke="#4B5566" stroke-width="2" marker-end="url(#a4h)"/>
+
+  <!-- manual review branch -->
+  <rect x="720" y="300" width="220" height="80" rx="10" fill="rgba(239,68,68,.10)" stroke="#EF4444"/>
+  <text x="830" y="330" text-anchor="middle" font-size="11.5" font-weight="700" fill="#F5F6FA">Revisão manual</text>
+  <text x="830" y="348" text-anchor="middle" font-size="9.5" fill="#9AA3B2">documento inconsistente</text>
+  <text x="830" y="364" text-anchor="middle" font-size="9.5" fill="#EF4444">exceção</text>
+  <path d="M810,177 C810,230 830,260 830,296" stroke="#EF4444" stroke-width="2" marker-end="url(#a4d)"/>
+  <text x="866" y="240" font-size="9.5" fill="#EF4444">inconsistente</text>
+  <path d="M720,320 C670,300 640,260 632,178" stroke="#EF4444" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#a4d)"/>
+  <text x="660" y="260" font-size="9.5" fill="#EF4444">reprocessar</text>
+
+  <!-- Portal do Gestor: real-time tracking of every stop -->
+  <rect x="40" y="400" width="600" height="50" rx="10" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".5"/>
+  <text x="60" y="420" font-size="11" font-weight="700" fill="#F5F6FA">Portal do Gestor — rastreamento ponta a ponta</text>
+  <text x="60" y="436" font-size="9.5" fill="#9AA3B2">recebido → classificado → extraído → validado → indexado → disponível</text>
+  <path d="M270,178 C270,260 200,340 200,396" stroke="#02A4F2" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#a4h)"/>
+  <text x="150" y="300" font-size="9" fill="#02A4F2" text-anchor="middle">status em tempo real</text>
+</svg>
+        </div>
+      </div>
+      <div class="note"><b>Leitura do diagrama:</b> documentos que falham na validação seguem para revisão manual e
+      retornam à esteira após correção; os demais avançam automaticamente até a disponibilização.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 5. ARQUITETURA NA AWS -->
+    <!-- ============================================================ -->
+    <section class="sec" id="arquitetura-aws">
+      <div class="kicker">Diagrama 5</div>
+      <h2>Arquitetura na AWS</h2>
+      <p class="lede">Serviços nomeados e agrupados por camada e por perímetro de rede — os dados sensíveis
+      permanecem em subnets privadas dentro da VPC, com segurança e observabilidade cobrindo toda a conta.</p>
+
+      <div class="legend">
+        <div class="item"><span class="swatch" style="background:var(--blue)"></span>Ingestão</div>
+        <div class="item"><span class="swatch" style="background:var(--gradient)"></span>Eventos &amp; Orquestração</div>
+        <div class="item"><span class="swatch" style="background:var(--magenta)"></span>Compute &amp; Agentes de IA</div>
+        <div class="item"><span class="swatch" style="background:rgba(2,164,242,.35);border:1px solid var(--blue)"></span>Dados</div>
+        <div class="item"><span class="swatch" style="background:rgba(239,68,68,.25);border:1px solid var(--danger)"></span>Segurança</div>
+        <div class="item"><span class="swatch" style="background:rgba(245,166,35,.25);border:1px solid var(--warning)"></span>Observabilidade</div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="diagram-scroll">
+<svg viewBox="0 0 1480 720" width="1480" height="720" role="img" aria-label="Diagrama de arquitetura de referência na AWS">
+  <!-- account boundary -->
+  <rect x="16" y="16" width="1448" height="688" rx="14" fill="none" stroke="#9AA3B2" stroke-dasharray="7 5" stroke-opacity=".5"/>
+  <text x="36" y="42" font-size="12" font-weight="700" fill="#9AA3B2" letter-spacing=".5">CONTA AWS — REGIÃO ÚNICA</text>
+
+  <!-- Ingestão + Eventos strip -->
+  <rect x="36" y="60" width="860" height="110" rx="12" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".4"/>
+  <text x="54" y="82" font-size="11" font-weight="700" fill="#02A4F2">INGESTÃO &amp; EVENTOS (SERVIÇOS GERENCIADOS)</text>
+  <g font-size="10" font-weight="600" fill="#F5F6FA">
+    <rect x="54" y="92" width="104" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="106" y="118" text-anchor="middle">S3 (raw)</text><text x="106" y="134" text-anchor="middle" font-size="8.5" font-weight="400" fill="#9AA3B2">portal web</text>
+    <rect x="173" y="92" width="104" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="225" y="118" text-anchor="middle">SES</text><text x="225" y="134" text-anchor="middle" font-size="8.5" font-weight="400" fill="#9AA3B2">e-mail inbound</text>
+    <rect x="292" y="92" width="104" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="344" y="118" text-anchor="middle">API Gateway</text><text x="344" y="134" text-anchor="middle" font-size="8.5" font-weight="400" fill="#9AA3B2">REST · app mobile</text>
+    <rect x="411" y="92" width="104" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="463" y="112" text-anchor="middle">Transfer</text><text x="463" y="124" text-anchor="middle">Family</text><text x="463" y="140" text-anchor="middle" font-size="8.5" font-weight="400" fill="#9AA3B2">SFTP parceiros</text>
+    <rect x="530" y="92" width="104" height="60" rx="8" fill="rgba(255,0,153,.10)" stroke="#FF0099"/><text x="582" y="118" text-anchor="middle">EventBridge</text><text x="582" y="134" text-anchor="middle" font-size="8.5" font-weight="400" fill="#9AA3B2">bus de domínio</text>
+    <rect x="649" y="92" width="104" height="60" rx="8" fill="rgba(255,0,153,.10)" stroke="#FF0099"/><text x="701" y="118" text-anchor="middle">SQS</text><text x="701" y="134" text-anchor="middle" font-size="8.5" font-weight="400" fill="#9AA3B2">filas por tarefa</text>
+    <rect x="768" y="92" width="104" height="60" rx="8" fill="rgba(255,0,153,.10)" stroke="#FF0099"/><text x="820" y="118" text-anchor="middle">Step Functions</text><text x="820" y="134" text-anchor="middle" font-size="8.5" font-weight="400" fill="#9AA3B2">orquestração</text>
+  </g>
+
+  <!-- VPC box -->
+  <rect x="36" y="190" width="860" height="270" rx="12" fill="#171B24" stroke="#F5F6FA" stroke-opacity=".18"/>
+  <text x="54" y="212" font-size="11" font-weight="700" fill="#F5F6FA">VPC PRIVADA — SUBNETS DE COMPUTE E DADOS</text>
+
+  <!-- compute subnet -->
+  <rect x="54" y="224" width="400" height="220" rx="10" fill="#1E2430" stroke="#FF0099" stroke-opacity=".4"/>
+  <text x="70" y="244" font-size="10.5" font-weight="700" fill="#FF0099">SUBNET DE COMPUTE</text>
+  <rect x="70" y="256" width="170" height="52" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/><text x="155" y="278" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">AWS Lambda</text><text x="155" y="293" text-anchor="middle" font-size="9" fill="#9AA3B2">tarefas leves</text>
+  <rect x="256" y="256" width="180" height="52" rx="8" fill="rgba(255,0,153,.14)" stroke="#FF0099"/><text x="346" y="278" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">Fargate / ECS</text><text x="346" y="293" text-anchor="middle" font-size="9" fill="#9AA3B2">cargas pesadas</text>
+  <rect x="70" y="322" width="366" height="100" rx="8" fill="rgba(255,0,153,.10)" stroke="#FF0099"/>
+  <text x="253" y="344" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">Agentes de IA — Amazon Bedrock (Claude)</text>
+  <text x="253" y="362" text-anchor="middle" font-size="9.5" fill="#9AA3B2">Classificador · Extrator · Validador</text>
+  <text x="253" y="378" text-anchor="middle" font-size="9.5" fill="#9AA3B2">Indexação Semântica · Orquestrador de Workflow</text>
+  <text x="253" y="398" text-anchor="middle" font-size="9" fill="#9AA3B2">acesso via VPC endpoint</text>
+
+  <!-- data subnet -->
+  <rect x="470" y="224" width="410" height="220" rx="10" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".4"/>
+  <text x="486" y="244" font-size="10.5" font-weight="700" fill="#02A4F2">SUBNET DE DADOS</text>
+  <rect x="486" y="256" width="180" height="52" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="576" y="278" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">Aurora Serverless v2</text><text x="576" y="293" text-anchor="middle" font-size="9" fill="#9AA3B2">Postgres + pgvector</text>
+  <rect x="678" y="256" width="180" height="52" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="768" y="278" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">OpenSearch Serverless</text><text x="768" y="293" text-anchor="middle" font-size="9" fill="#9AA3B2">índice vetorial</text>
+  <rect x="486" y="322" width="372" height="60" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="672" y="346" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">S3 (processed / curated)</text><text x="672" y="362" text-anchor="middle" font-size="9" fill="#9AA3B2">via VPC endpoint · lifecycle p/ arquivamento frio</text>
+
+  <!-- Apresentação column -->
+  <rect x="916" y="60" width="176" height="400" rx="12" fill="#1E2430" stroke="#02A4F2" stroke-opacity=".4"/>
+  <text x="1004" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#02A4F2">APRESENTAÇÃO</text>
+  <rect x="930" y="96" width="148" height="56" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="1004" y="120" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">CloudFront + S3</text><text x="1004" y="136" text-anchor="middle" font-size="9" fill="#9AA3B2">Portal do Gestor</text>
+  <rect x="930" y="164" width="148" height="56" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="1004" y="188" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">AppSync / REST</text><text x="1004" y="204" text-anchor="middle" font-size="9" fill="#9AA3B2">rastreamento ponta a ponta</text>
+  <rect x="930" y="232" width="148" height="56" rx="8" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/><text x="1004" y="256" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">Cognito + MFA</text><text x="1004" y="272" text-anchor="middle" font-size="9" fill="#9AA3B2">autenticação</text>
+  <rect x="930" y="300" width="148" height="56" rx="8" fill="rgba(255,0,153,.10)" stroke="#FF0099"/><text x="1004" y="324" text-anchor="middle" font-size="10.5" font-weight="600" fill="#F5F6FA">SNS</text><text x="1004" y="340" text-anchor="middle" font-size="9" fill="#9AA3B2">notificações</text>
+
+  <!-- Segurança column -->
+  <rect x="1112" y="60" width="170" height="400" rx="12" fill="rgba(239,68,68,.06)" stroke="#EF4444" stroke-opacity=".5"/>
+  <text x="1197" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#EF4444">SEGURANÇA</text>
+  <g font-size="10" font-weight="600" fill="#F5F6FA">
+    <rect x="1126" y="94" width="142" height="34" rx="7" fill="rgba(239,68,68,.10)" stroke="#EF4444"/><text x="1197" y="115" text-anchor="middle">IAM (least privilege)</text>
+    <rect x="1126" y="134" width="142" height="34" rx="7" fill="rgba(239,68,68,.10)" stroke="#EF4444"/><text x="1197" y="155" text-anchor="middle">KMS</text>
+    <rect x="1126" y="174" width="142" height="34" rx="7" fill="rgba(239,68,68,.10)" stroke="#EF4444"/><text x="1197" y="195" text-anchor="middle">Secrets Manager</text>
+    <rect x="1126" y="214" width="142" height="34" rx="7" fill="rgba(239,68,68,.10)" stroke="#EF4444"/><text x="1197" y="235" text-anchor="middle">WAF</text>
+    <rect x="1126" y="254" width="142" height="34" rx="7" fill="rgba(239,68,68,.10)" stroke="#EF4444"/><text x="1197" y="275" text-anchor="middle">GuardDuty</text>
+    <rect x="1126" y="294" width="142" height="34" rx="7" fill="rgba(239,68,68,.10)" stroke="#EF4444"/><text x="1197" y="315" text-anchor="middle">CloudTrail</text>
+    <rect x="1126" y="334" width="142" height="34" rx="7" fill="rgba(239,68,68,.10)" stroke="#EF4444"/><text x="1197" y="355" text-anchor="middle">Conformidade LGPD</text>
+  </g>
+
+  <!-- Observabilidade strip -->
+  <rect x="36" y="480" width="1246" height="70" rx="12" fill="rgba(245,166,35,.07)" stroke="#F5A623" stroke-opacity=".5"/>
+  <text x="54" y="502" font-size="11" font-weight="700" fill="#F5A623">OBSERVABILIDADE</text>
+  <text x="54" y="524" font-size="10.5" fill="#F5F6FA">Amazon CloudWatch (logs/métricas/alarmes) · AWS X-Ray (rastreamento distribuído) · dashboards OpenTelemetry</text>
+
+  <!-- summary note area (right of security) width filled by dashed boundary already -->
+</svg>
+        </div>
+      </div>
+      <div class="note"><b>Leitura do diagrama:</b> serviços gerenciados de ingestão e eventos ficam fora da VPC;
+      compute e dados que tocam informação sensível do cliente ficam em subnets privadas, acessadas por VPC
+      endpoint; segurança e observabilidade cobrem toda a conta.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 6. PIPELINE COMPLETO DOS AGENTES -->
+    <!-- ============================================================ -->
+    <section class="sec" id="fluxo-processamento">
+      <div class="kicker">Diagrama 6</div>
+      <h2>Fluxo Completo de Processamento</h2>
+      <p class="lede">Pipeline ponta a ponta dos cinco agentes de inteligência artificial, orquestrados pelo AWS Step
+      Functions, com o ponto de decisão que envia documentos inconsistentes para revisão manual.</p>
+
+      <div class="legend">
+        <div class="item"><span class="swatch" style="background:var(--magenta)"></span>Agente de IA (Bedrock)</div>
+        <div class="item"><span class="swatch" style="background:#3A4152;border:1px solid var(--text-muted)"></span>Decisão</div>
+        <div class="item"><span class="swatch" style="background:var(--danger)"></span>Caminho de exceção</div>
+        <div class="item"><span class="swatch" style="background:var(--blue)"></span>Saída / integração</div>
+      </div>
+
+      <div class="diagram-card">
+        <div class="diagram-scroll">
+<svg viewBox="0 0 1320 440" width="1320" height="440" role="img" aria-label="Diagrama de pipeline completo dos agentes de IA">
+  <defs>
+    <marker id="a6h" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#FF0099"/></marker>
+    <marker id="a6b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#02A4F2"/></marker>
+    <marker id="a6d" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#EF4444"/></marker>
+  </defs>
+
+  <rect x="20" y="150" width="120" height="70" rx="10" fill="#1E2430" stroke="#02A4F2"/>
+  <text x="80" y="180" text-anchor="middle" font-size="11" font-weight="700" fill="#F5F6FA">Documento</text>
+  <text x="80" y="196" text-anchor="middle" font-size="9.5" fill="#9AA3B2">recebido (S3/SES/API)</text>
+
+  <rect x="180" y="140" width="160" height="90" rx="10" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+  <text x="260" y="170" text-anchor="middle" font-size="11.5" font-weight="700" fill="#F5F6FA">1 · Classificador</text>
+  <text x="260" y="188" text-anchor="middle" font-size="9.5" fill="#9AA3B2">identifica o fornecedor</text>
+  <text x="260" y="203" text-anchor="middle" font-size="9.5" fill="#9AA3B2">e o formato do envio</text>
+
+  <rect x="380" y="140" width="160" height="90" rx="10" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+  <text x="460" y="170" text-anchor="middle" font-size="11.5" font-weight="700" fill="#F5F6FA">2 · Extrator</text>
+  <text x="460" y="188" text-anchor="middle" font-size="9.5" fill="#9AA3B2">Textract + LLM</text>
+  <text x="460" y="203" text-anchor="middle" font-size="9.5" fill="#9AA3B2">campos estruturados</text>
+
+  <rect x="580" y="140" width="160" height="90" rx="10" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+  <text x="660" y="170" text-anchor="middle" font-size="11.5" font-weight="700" fill="#F5F6FA">3 · Validador</text>
+  <text x="660" y="188" text-anchor="middle" font-size="9.5" fill="#9AA3B2">regras de negócio</text>
+  <text x="660" y="203" text-anchor="middle" font-size="9.5" fill="#9AA3B2">CPF/CNPJ, datas, valores</text>
+
+  <!-- decision diamond -->
+  <polygon points="660,250 720,290 660,330 600,290" fill="#3A4152" stroke="#9AA3B2"/>
+  <text x="660" y="286" text-anchor="middle" font-size="10" font-weight="700" fill="#F5F6FA">Consistente?</text>
+  <text x="660" y="301" text-anchor="middle" font-size="9" fill="#9AA3B2">valida dados</text>
+
+  <rect x="580" y="360" width="160" height="70" rx="10" fill="rgba(239,68,68,.10)" stroke="#EF4444"/>
+  <text x="660" y="388" text-anchor="middle" font-size="10.5" font-weight="700" fill="#F5F6FA">Revisão manual</text>
+  <text x="660" y="404" text-anchor="middle" font-size="9.5" fill="#EF4444">fila de exceções</text>
+
+  <rect x="780" y="140" width="170" height="90" rx="10" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+  <text x="865" y="170" text-anchor="middle" font-size="11.5" font-weight="700" fill="#F5F6FA">4 · Indexação</text>
+  <text x="865" y="188" text-anchor="middle" font-size="9.5" fill="#9AA3B2">gera embeddings</text>
+  <text x="865" y="203" text-anchor="middle" font-size="9.5" fill="#9AA3B2">grava no banco vetorial</text>
+
+  <rect x="990" y="140" width="180" height="90" rx="10" fill="rgba(255,0,153,.14)" stroke="#FF0099"/>
+  <text x="1080" y="170" text-anchor="middle" font-size="11.5" font-weight="700" fill="#F5F6FA">5 · Orquestrador</text>
+  <text x="1080" y="188" text-anchor="middle" font-size="9.5" fill="#9AA3B2">decide próximo passo</text>
+  <text x="1080" y="203" text-anchor="middle" font-size="9.5" fill="#9AA3B2">workflow de negócio</text>
+
+  <rect x="1210" y="150" width="96" height="70" rx="10" fill="rgba(2,164,242,.14)" stroke="#02A4F2"/>
+  <text x="1258" y="178" text-anchor="middle" font-size="10" font-weight="700" fill="#F5F6FA">Integrações</text>
+  <text x="1258" y="194" text-anchor="middle" font-size="9" fill="#9AA3B2">SNS + EventBridge</text>
+
+  <path d="M140,185 L176,185" stroke="#FF0099" stroke-width="2" marker-end="url(#a6h)"/>
+  <path d="M340,185 L376,185" stroke="#FF0099" stroke-width="2" marker-end="url(#a6h)"/>
+  <path d="M540,185 L576,185" stroke="#FF0099" stroke-width="2" marker-end="url(#a6h)"/>
+  <path d="M660,230 L660,246" stroke="#9AA3B2" stroke-width="2" marker-end="url(#a6h)"/>
+  <path d="M720,290 C750,290 780,240 776,186" stroke="#FF0099" stroke-width="2" marker-end="url(#a6h)"/>
+  <text x="778" y="250" font-size="9.5" fill="#22C55E">sim</text>
+  <path d="M660,330 L660,356" stroke="#EF4444" stroke-width="2" marker-end="url(#a6d)"/>
+  <text x="672" y="348" font-size="9.5" fill="#EF4444">não</text>
+  <path d="M580,395 C480,395 460,260 452,234" stroke="#EF4444" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#a6d)"/>
+  <text x="470" y="330" font-size="9.5" fill="#EF4444" text-anchor="middle">reprocessar após correção</text>
+
+  <path d="M950,185 L986,185" stroke="#FF0099" stroke-width="2" marker-end="url(#a6h)"/>
+  <path d="M1170,185 L1206,185" stroke="#02A4F2" stroke-width="2" marker-end="url(#a6b)"/>
+</svg>
+        </div>
+      </div>
+      <div class="note"><b>Leitura do diagrama:</b> o AWS Step Functions mantém o estado de cada execução; a
+      decisão de consistência é o único ponto de desvio do pipeline — documentos aprovados seguem direto até a
+      integração externa.</div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  Nexo — plataforma de dados para o varejo, construída nativamente na AWS. Documentação de arquitetura técnica.
+</footer>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="gradstroke1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF0099"/><stop offset="1" stop-color="#02A4F2"/></linearGradient>
+    <linearGradient id="gradstroke2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF0099"/><stop offset="1" stop-color="#02A4F2"/></linearGradient>
+  </defs>
+</svg>
+
+<script>
+  (function(){
+    var links = Array.prototype.slice.call(document.querySelectorAll('#sidenav a'));
+    var sections = links.map(function(l){ return document.getElementById(l.dataset.target); });
+    if (!('IntersectionObserver' in window)) return;
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (!e.isIntersecting) return;
+        var idx = sections.indexOf(e.target);
+        if (idx === -1) return;
+        links.forEach(function(l){ l.classList.remove('active'); });
+        links[idx].classList.add('active');
+      });
+    }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+    sections.forEach(function(s){ if (s) io.observe(s); });
+  })();
+</script>
+</body>
+</html>
