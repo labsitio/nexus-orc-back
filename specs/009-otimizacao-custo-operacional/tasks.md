@@ -43,14 +43,14 @@
 
 **Goal**: um orçamento de fornecedor/formato já conhecido reaproveita o sinal cacheado como contexto para o Classificador, com custo de processamento reduzido, sem nunca pular a publicação do evento de classificação.
 
-**Independent Test**: publicar `OrcamentoRecebido` duas vezes para o mesmo fornecedor/formato (fingerprint idêntico); verificar que a segunda execução consulta o cache (hit), ainda invoca `AgenteClassificadorGateway`, e ainda publica `OrcamentoClassificado`/`OrcamentoBaixaConfiancaDetectada` normalmente — critério de aceite spec.md "gera um evento de classificação igualmente válido e rastreável... sem nunca pular a publicação do evento".
+**Independent Test**: publicar `OrcamentoRecebido` duas vezes para o mesmo fornecedor/formato (fingerprint idêntico); verificar que a segunda execução consulta o cache (hit), ainda invoca `AgenteClassificadorGateway`, e ainda publica `OrcamentoClassificado`/`OrcamentoEscalonadoParaRevisaoHumana` normalmente — critério de aceite spec.md "gera um evento de classificação igualmente válido e rastreável... sem nunca pular a publicação do evento".
 
 ### Tests (US1)
 
 - [ ] T012 [P] [US1] Unit test: cache miss não bloqueia nem falha `ClassificarOrcamento` — simula `CacheIdentificacaoGateway.buscar` lançando erro/timeout e verifica que o caso de uso segue o caminho de custo total normalmente.
 - [ ] T013 [P] [US1] Unit test: escrita no cache só ocorre quando `nivelConfianca >= 80` (limiar de 001) — simula resultado de baixa confiança e verifica que `CacheIdentificacaoGateway.registrar` NÃO é chamado.
-- [ ] T014 [P] [US1] Unit test: uma correção humana/Revisor com resultado diferente do sinal cacheado sobrescreve a entrada de cache (nunca acumula/funde com a anterior) — critério de aceite spec.md "nenhuma alavanca... reduz a rastreabilidade".
-- [ ] T015 [P] [US1] Integration test: consumidor `classificador-queue` com cache hit simulado ainda produz exatamente um dos dois eventos de saída (`OrcamentoClassificado` ou `OrcamentoBaixaConfiancaDetectada`) — mesmo contrato de evento de 001/US2, inalterado.
+- [ ] T014 [P] [US1] Unit test: uma correção humana com resultado diferente do sinal cacheado sobrescreve a entrada de cache (nunca acumula/funde com a anterior) — critério de aceite spec.md "nenhuma alavanca... reduz a rastreabilidade".
+- [ ] T015 [P] [US1] Integration test: consumidor `classificador-queue` com cache hit simulado ainda produz exatamente um dos dois eventos de saída (`OrcamentoClassificado` ou `OrcamentoEscalonadoParaRevisaoHumana`) — mesmo contrato de evento de 001/US2, inalterado.
 
 ### Implementation (US1)
 
@@ -187,7 +187,7 @@ Com múltiplos desenvolvedores:
 
 - `[P]` = arquivos diferentes, sem dependência entre si.
 - `[Story]` mapeia a task à user story para rastreabilidade.
-- Nenhuma task desta spec MUST alterar o contrato de evento externo já publicado por 001 (`OrcamentoClassificado`, `OrcamentoBaixaConfiancaDetectada`, etc.) — toda mudança é aditiva (campo opcional) ou puramente de infraestrutura.
+- Nenhuma task desta spec MUST alterar o contrato de evento externo já publicado por 001 (`OrcamentoClassificado`, `OrcamentoEscalonadoParaRevisaoHumana`, etc.) — toda mudança é aditiva (campo opcional) ou puramente de infraestrutura.
 - Verificar que os testes falham antes de implementar.
 - Parar em qualquer checkpoint para validar a story isoladamente.
 - Evitar: task vaga, conflito de mesmo arquivo entre US1 e US3 (ambas tocam infraestrutura de fila/evento — coordenar T016/T017 com T027/T030 se feitas em paralelo).

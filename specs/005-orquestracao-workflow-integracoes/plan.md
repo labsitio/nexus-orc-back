@@ -12,7 +12,7 @@
 
 Requisito primário: orçamento já validado (evento `OrcamentoValidado`/`OrcamentoValidadoComRessalva` da spec 003) recebe uma decisão final de workflow — aprovar automaticamente, encaminhar ao comprador responsável, ou solicitar reenvio ao fornecedor — consolidando o resultado de Classificador (001), Extrator (002) e Validador (003). É a decisão de **maior risco financeiro do produto** (aprovação automática de compra): nunca autoaprova sem confiança suficiente, nunca autoaprova por exaustão/tempo/volume de fila, decisão de integração externa é sempre publicada como evento desacoplado (nenhum decisor conhece o contrato do sistema parceiro).
 
-Abordagem técnica: novo Bounded Context **Orquestração**, com agregado raiz próprio (`DecisaoWorkflow`) — nunca reaproveita os agregados de Ingestão/Extração/Validação. Comunicação de entrada exclusivamente via assinatura de eventos (Customer/Supplier, Orquestração é customer de Ingestão, Extração e Validação simultaneamente — não apenas de Validação; ver ADR-001 sobre como o contexto consolidado é construído sem chamada síncrona cross-BC). Governança de baixa confiança reaproveita o mesmo padrão de duas linhas já vinculante na constituição (Princípio IV) e replicado nas specs 001/002: Agente Orquestrador → (baixa confiança) Agente Revisor de IA → (baixa confiança) fila de escalonamento assíncrona do comprador (ADR-002, mesmo racional do ADR-003 da spec 002 — componente próprio deste BC, nunca físico compartilhado). Persistência Aurora Serverless v2 + Drizzle (ADR-001 da spec 001, herdado).
+Abordagem técnica: novo Bounded Context **Orquestração**, com agregado raiz próprio (`DecisaoWorkflow`) — nunca reaproveita os agregados de Ingestão/Extração/Validação. Comunicação de entrada exclusivamente via assinatura de eventos (Customer/Supplier, Orquestração é customer de Ingestão, Extração e Validação simultaneamente — não apenas de Validação; ver ADR-001 sobre como o contexto consolidado é construído sem chamada síncrona cross-BC). Governança de baixa confiança segue o padrão vigente no produto (specs 001/002): Agente Orquestrador → (baixa confiança) escalonamento direto para a fila de decisão humana do comprador (ADR-002 — componente próprio deste BC, sem um segundo agente de IA). Persistência Aurora Serverless v2 + Drizzle (ADR-001 da spec 001, herdado).
 
 ## Technical Context
 
@@ -24,15 +24,15 @@ Abordagem técnica: novo Bounded Context **Orquestração**, com agregado raiz p
 
 **Testing**: Vitest (unit Domain/Application sem mocks de rede — invariantes de "nunca aprovar sem confiança suficiente" e "nunca aprovar sem validação bem-sucedida" são candidatas prioritárias a teste de unidade puro); testes de contrato para os 2 endpoints REST próprios; testes de integração local contra LocalStack para SQS/EventBridge (execução cabe a Ricardo/CI).
 
-**Target Platform**: AWS Lambda atrás de API Gateway (endpoint de decisão humana e de status); consumidores SQS para os casos de uso assíncronos (3 filas de entrada de contexto + 1 fila de revisão + 1 fila de escalonamento); EventBridge custom bus `nexo-dominio-bus` (mesmo bus das specs 001–003).
+**Target Platform**: AWS Lambda atrás de API Gateway (endpoint de decisão humana e de status); consumidores SQS para os casos de uso assíncronos (2 filas de entrada de contexto + 1 fila de decisão); EventBridge custom bus `nexo-dominio-bus` (mesmo bus das specs 001–003). O escalonamento humano é um estado do agregado (`PENDENTE_REVISAO_HUMANA`), não uma fila SQS adicional.
 
 **Project Type**: Web service (pipeline de eventos assíncrono + 2 endpoints síncronos), mesmo monorepo único das specs 001–003 (sem frontend, Additional Constraint de escopo backend).
 
-**Performance Goals**: p95 ≤ 5 minutos entre "orçamento validado disponível" e "decisão de workflow publicada" (para decisões resolvidas por Orquestrador ou Agente Revisor) — meta definida na própria spec (seção Métricas), não medida ainda (produto novo).
+**Performance Goals**: p95 ≤ 5 minutos entre "orçamento validado disponível" e "decisão de workflow publicada" (para decisões resolvidas pelo Orquestrador) — meta definida na própria spec (seção Métricas), não medida ainda (produto novo).
 
-**Constraints**: consolidação de contexto depende da ordem causal real do pipeline (Classificação → Extração → Validação sempre ocorrem antes da decisão de workflow para o mesmo `orcamentoId`), mas a entrega dos eventos via EventBridge/SQS não garante ordem de chegada ao consumidor deste BC — o caso de uso de decisão MUST tolerar chegada fora de ordem sem decidir com contexto incompleto (ver ADR-001, "contexto incompleto nunca é decidido, é reprocessado"); cold start do `AgenteOrquestradorGateway`/`AgenteRevisorWorkflowGateway` (chamada síncrona Bedrock) é a mesma consideração de design das specs 001–003; esta é a decisão de maior risco financeiro da cadeia — nenhuma otimização de custo/latência MUST comprometer a garantia de "nunca aprovar sem confiança suficiente reportada com base auditável" (ver Segurança).
+**Constraints**: consolidação de contexto depende da ordem causal real do pipeline (Classificação → Extração → Validação sempre ocorrem antes da decisão de workflow para o mesmo `orcamentoId`), mas a entrega dos eventos via EventBridge/SQS não garante ordem de chegada ao consumidor deste BC — o caso de uso de decisão MUST tolerar chegada fora de ordem sem decidir com contexto incompleto (ver ADR-001, "contexto incompleto nunca é decidido, é reprocessado"); cold start do `AgenteOrquestradorGateway` (chamada síncrona Bedrock) é a mesma consideração de design das specs 001–003; esta é a decisão de maior risco financeiro da cadeia — nenhuma otimização de custo/latência MUST comprometer a garantia de "nunca aprovar sem confiança suficiente reportada com base auditável" (ver Segurança).
 
-**Scale/Scope**: 1 Bounded Context (Orquestração), 1 agregado raiz, 2 agentes de IA (Orquestrador + Agente Revisor de Workflow — este último é "agente adicional explícito" já autorizado pela constituição, análogo ao Revisor das specs 001/002), 1 fila de escalonamento humana própria deste BC, 3 eventos de entrada de contexto (Ingestão, Extração, Validação) + 1 evento de decisão consolidada.
+**Scale/Scope**: 1 Bounded Context (Orquestração), 1 agregado raiz, 1 agente de IA (Orquestrador — papel fixo), 1 fila de escalonamento humana própria deste BC (estado do agregado), 3 eventos de entrada de contexto (Ingestão, Extração, Validação) + 1 evento de decisão consolidada. Baixa confiança do Orquestrador escala diretamente para o comprador, sem agente revisor de IA.
 
 ## Constitution Check
 
@@ -40,15 +40,15 @@ Abordagem técnica: novo Bounded Context **Orquestração**, com agregado raiz p
 
 | Princípio | Verificação | Status |
 |---|---|---|
-| I. Rastreabilidade ponta a ponta | Tabela `decisoes_workflow_historico` append-only grava agente decisor (Orquestrador/Revisor/Humano), critério, nível de confiança e timestamp de cada tentativa; reconstruível por `orcamentoId` | PASS |
+| I. Rastreabilidade ponta a ponta | Tabela `decisoes_workflow_historico` append-only grava agente decisor (Orquestrador/Humano), critério, nível de confiança e timestamp de cada tentativa; reconstruível por `orcamentoId` | PASS |
 | II. Desacoplamento por eventos | Orquestração só entra em ação via assinatura de eventos (`OrcamentoClassificado`, `OrcamentoExtraido`/`ComPendenciaConfirmada`, `OrcamentoValidado`/`ComRessalva`); nunca chama diretamente componente interno de Ingestão/Extração/Validação; contexto consolidado é read-model próprio (ver ADR-001), nunca query síncrona cross-BC | PASS |
 | III. Dado bruto imutável | Não aplicável a escrita de bruto (BC não toca S3); decisão de workflow é nova representação em tabela própria, vinculada por referência, nunca sobrescrevendo dado de nenhum BC upstream | PASS |
-| IV. Exceção nunca é silenciosa | Cadeia Orquestrador → Agente Revisor de Workflow → fila de escalonamento assíncrona implementa Princípio IV(b) explicitamente; nenhum agente pode reportar confiança artificial (VO `NivelConfianca` reaproveitado, faixa 0–100, nunca number solto; decisão `APROVAR` MUST carregar `criterio` textual não vazio, tornando a base da confiança auditável — ver Segurança); fila nunca autoaprova por tempo/volume/exaustão (invariante estrutural do agregado, não apenas processo); histórico nunca sobrescrito | PASS |
-| V. IA generativa como motor de entendimento | Orquestrador e Revisor de Workflow são 100% Bedrock; NUNCA decidem conteúdo de fornecedor/formato/extração/validação (já decidido pelos agentes anteriores) — atuam estritamente sobre o resultado consolidado; nenhuma regra fixa por fornecedor | PASS |
+| IV. Exceção nunca é silenciosa | Cadeia Orquestrador → fila de escalonamento humano assíncrona implementa Princípio IV(b) explicitamente; o agente não pode reportar confiança artificial (VO `NivelConfianca` reaproveitado, faixa 0–100, nunca number solto; decisão `APROVAR` MUST carregar `criterio` textual não vazio, tornando a base da confiança auditável — ver Segurança); fila nunca autoaprova por tempo/volume/exaustão (invariante estrutural do agregado, não apenas processo); histórico nunca sobrescrito | PASS |
+| V. IA generativa como motor de entendimento | Orquestrador é 100% Bedrock; NUNCA decide conteúdo de fornecedor/formato/extração/validação (já decidido pelos agentes anteriores) — atua estritamente sobre o resultado consolidado; nenhuma regra fixa por fornecedor | PASS |
 | VI. Serverless-first | Toda a stack é Lambda/managed (API Gateway, EventBridge, SQS, Aurora Serverless v2); nenhum servidor fixo ocioso introduzido | PASS |
 | VII. Segurança e LGPD desde o desenho | Ver seção Segurança; dado comercial consolidado (fornecedor, itens, preços, decisão de compra) é o mais sensível da cadeia por ser a base de uma aprovação financeira — least-privilege IAM, criptografia em repouso (KMS) e trânsito (TLS); nenhum novo dado pessoal introduzido além do já tratado nas specs 001–003 | PASS |
 | VIII. Roadmap em 3 fases vinculante | Esta spec é Fase 02, depende de Ingestão (001, Fase 01), Extração (002, Fase 01) e Validação (003, Fase 02) — todas já especificadas; não trata nenhuma capacidade de Indexação (004) ou Multi-tenant (007, Fase 03) como pré-requisito bloqueante | PASS |
-| Additional Constraint — 5 agentes, papéis fixos | Agente Orquestrador mapeado ao papel fixo "Orquestrador (workflow/roteamento)"; Agente Revisor de Workflow é agente adicional explícito, mesmo padrão já autorizado pela constituição para tratamento de exceção (Princípio IV), replicado das specs 001/002 | PASS |
+| Additional Constraint — 5 agentes, papéis fixos | Apenas o Agente Orquestrador (papel fixo "Orquestrador (workflow/roteamento)") é usado; o tratamento de exceção de baixa confiança é escalonamento humano direto ao comprador, sem agente de IA adicional | PASS |
 | Additional Constraint — escopo exclusivamente backend | Nenhum componente de UI especificado; avaliação do comprador sobre orçamentos encaminhados/escalonados tratada como consumidor externo de frontend, fora de escopo (conforme "Fora de escopo" do `spec.md`) | PASS |
 | Additional Constraint — MarkItDown antes de serviço pago | Não aplicável — esta spec não converte documento bruto | N/A |
 
@@ -64,14 +64,10 @@ Abordagem técnica: novo Bounded Context **Orquestração**, com agregado raiz p
 [BC: Validação] --(evento)--> OrcamentoValidado/ComRessalva            ---+                                                  |
                                                                                                         [Agente Orquestrador (Bedrock)]
                                                                                                                               |
-                    (confiança suficiente) -----------------------------------------+------(<confiança) DecisaoWorkflowBaixaConfiancaDetectada
+                    (confiança suficiente) -----------------------------------------+------(<confiança) DecisaoWorkflowEscalonadaParaComprador
                                             |                    |                  |                              |
                                   OrcamentoAprovadoParaProcessamento    OrcamentoEncaminhadoParaComprador   OrcamentoReenvioSolicitado
                                                                                                                               v
-                                                                                                     [Agente Revisor de Workflow (Bedrock)]
-                                                                                                                              |
-                                            (confiança suficiente, mesmos 3 desfechos possíveis)         (<confiança) DecisaoWorkflowEscalonadaParaComprador
-                                                                                                                              |
                                                                                                     [Fila de escalonamento assíncrona — própria da Orquestração]
                                                                                                                               |
                                                                                             (confirmação humana explícita, via API própria — qualquer um dos 3 desfechos)
@@ -88,7 +84,7 @@ Consumidores externos (fora deste BC, apenas via evento/API — nunca chamada di
 
 Relação entre contextos: **Customer/Supplier**, com Orquestração como customer simultâneo de três suppliers (Ingestão, Extração, Validação) — situação nova em relação às specs 001–003, que tinham sempre um único supplier direto. Orquestração nunca altera o modelo de dado de nenhum BC upstream, apenas consome seus eventos e mantém sua própria cópia consolidada e imutável do contexto necessário à decisão.
 
-**Anti-Corruption Layer obrigatória**: entre o Domain deste contexto e (a) os payloads brutos dos três eventos upstream (`OrcamentoClassificadoEventACL`, `OrcamentoExtraidoEventACL` — este último redefinido localmente, mesmo padrão de duplicação aceitável já usado na spec 003 para o ACL equivalente, `OrcamentoValidadoEventACL`), cada um traduzindo o shape do evento de origem para VOs locais deste BC, nunca importando tipos de domínio de outro BC; e (b) a resposta do Bedrock (Orquestrador/Revisor de Workflow, `BedrockDecisaoWorkflowACL`).
+**Anti-Corruption Layer obrigatória**: entre o Domain deste contexto e (a) os payloads brutos dos três eventos upstream (`OrcamentoClassificadoEventACL`, `OrcamentoExtraidoEventACL` — este último redefinido localmente, mesmo padrão de duplicação aceitável já usado na spec 003 para o ACL equivalente, `OrcamentoValidadoEventACL`), cada um traduzindo o shape do evento de origem para VOs locais deste BC, nunca importando tipos de domínio de outro BC; e (b) a resposta do Bedrock (Orquestrador, `BedrockDecisaoWorkflowACL`).
 
 ## Domain — Agregados, VOs, Domain Events
 
@@ -99,17 +95,16 @@ Relação entre contextos: **Customer/Supplier**, com Orquestração como custom
   - `contextoClassificacao` (VO `ContextoClassificacao`, opcional até o evento `OrcamentoClassificado` chegar: `{ fornecedorIdentificado, formatoIdentificado }`).
   - `contextoExtracao` (VO `ContextoExtracao`, opcional até `OrcamentoExtraido`/`ComPendenciaConfirmada` chegar: `{ itensResumo, condicoesComerciaisResumo, houvePendenciaConfirmada: boolean }`).
   - `contextoValidacao` (VO `ContextoValidacao`, opcional até `OrcamentoValidado`/`ComRessalva` chegar: `{ resultado: 'VALIDADO' | 'VALIDADO_COM_RESSALVA', inconsistenciasAceitas (se houver) }`).
-  - `status` (VO `StatusDecisaoWorkflow`: `AGUARDANDO_CONTEXTO` | `CONTEXTO_CONSOLIDADO` | `DECIDIDO` | `EM_REVISAO_AUTOMATICA` | `PENDENTE_REVISAO_HUMANA`).
-  - `decisaoAtual` (VO `DecisaoRoteamento`, opcional até haver decisão com confiança suficiente ou decisão humana: `{ acao: 'APROVAR' | 'ENCAMINHAR_COMPRADOR' | 'SOLICITAR_REENVIO', nivelConfianca: NivelConfianca | null (null apenas quando `agenteOrigem === 'HUMANO'`), criterio (texto não vazio, obrigatório), agenteOrigem: 'ORQUESTRADOR' | 'REVISOR' | 'HUMANO', requerIntegracaoExterna: boolean, motivoDadoAusente (obrigatório e não vazio quando `acao === 'SOLICITAR_REENVIO'`, referenciando uma inconsistência/pendência concreta do `contextoValidacao`/`contextoExtracao`) }`).
+  - `status` (VO `StatusDecisaoWorkflow`: `AGUARDANDO_CONTEXTO` | `CONTEXTO_CONSOLIDADO` | `DECIDIDO` | `PENDENTE_REVISAO_HUMANA`).
+  - `decisaoAtual` (VO `DecisaoRoteamento`, opcional até haver decisão com confiança suficiente ou decisão humana: `{ acao: 'APROVAR' | 'ENCAMINHAR_COMPRADOR' | 'SOLICITAR_REENVIO', nivelConfianca: NivelConfianca | null (null apenas quando `agenteOrigem === 'HUMANO'`), criterio (texto não vazio, obrigatório), agenteOrigem: 'ORQUESTRADOR' | 'HUMANO', requerIntegracaoExterna: boolean, motivoDadoAusente (obrigatório e não vazio quando `acao === 'SOLICITAR_REENVIO'`, referenciando uma inconsistência/pendência concreta do `contextoValidacao`/`contextoExtracao`) }`).
   - `historico` (lista imutável de `TentativaDecisaoWorkflow`, append-only).
 - **Invariantes** (aplicadas nos métodos do agregado, nunca na Application):
   - `registrarContextoClassificacao/Extracao/Validacao(contexto)`: apenas anexa/preenche o respectivo atributo (idempotente — reaplicar o mesmo evento não duplica nem sobrescreve com dado divergente sem erro de domínio); nunca dispara decisão por si só.
   - `consolidarContexto()`: só transita para `CONTEXTO_CONSOLIDADO` quando os três contextos (`contextoClassificacao`, `contextoExtracao`, `contextoValidacao`) estão presentes; caso contrário permanece `AGUARDANDO_CONTEXTO` e lança `ContextoIncompletoError` (tratado pela Application como sinal de reprocessamento, nunca como decisão parcial — ver ADR-001).
-  - `registrarTentativaOrquestrador(resultado)`: só pode ser chamado a partir de `CONTEXTO_CONSOLIDADO`. Se `resultado.nivelConfianca < LIMIAR_CONFIANCA (80, parâmetro operacional — ver "Fora de escopo" do spec.md)`, transita para `EM_REVISAO_AUTOMATICA`, nunca decide. Se confiança suficiente, aplica as regras de negócio abaixo e transita para `DECIDIDO`:
+  - `registrarTentativaOrquestrador(resultado)`: só pode ser chamado a partir de `CONTEXTO_CONSOLIDADO`. Se `resultado.nivelConfianca < LIMIAR_CONFIANCA (80, parâmetro operacional — ver "Fora de escopo" do spec.md)`, transita diretamente para `PENDENTE_REVISAO_HUMANA` (escalonamento ao comprador, sem segundo agente de IA), nunca decide. Se confiança suficiente, aplica as regras de negócio abaixo e transita para `DECIDIDO`:
     - `acao === 'APROVAR'` só é aceito se `contextoValidacao.resultado` for `VALIDADO` ou `VALIDADO_COM_RESSALVA` — tentar aprovar sem validação bem-sucedida lança `AprovacaoSemValidacaoError` (mapeamento direto da "Ação proibida" da spec: "nunca aprovar automaticamente um orçamento que não tenha passado por validação bem-sucedida").
     - `acao === 'SOLICITAR_REENVIO'` exige `motivoDadoAusente` não vazio, referenciando uma inconsistência/pendência concreta já registrada por Validação ou Extração — tentar solicitar reenvio sem essa referência lança `ReenvioSemFundamentoError` (mapeamento direto do critério de aceite "uma decisão de solicitar reenvio nunca é tomada sem que a validação tenha apontado ausência de dado essencial específico").
     - `criterio` (texto explicando a base da decisão) MUST ser não vazio para qualquer decisão automática — construtor de `DecisaoRoteamento` rejeita `criterio` vazio quando `agenteOrigem !== 'HUMANO'` (mitigação estrutural contra "reportar confiança artificial sem base auditável", ver Segurança).
-  - `registrarTentativaRevisor(resultado)`: mesma regra do Revisor das specs 001/002 — só uma tentativa; se confiança < limiar, transita para `PENDENTE_REVISAO_HUMANA`, nunca reabre uma segunda tentativa automática; se confiança suficiente, mesmas regras de negócio de `registrarTentativaOrquestrador` (aprovação exige validação bem-sucedida, reenvio exige fundamento) se aplicam igualmente ao Revisor — nenhum agente automático é exceção a essas regras.
   - `registrarDecisaoHumana(decisao)`: só é transição válida a partir de `PENDENTE_REVISAO_HUMANA`; humano pode escolher qualquer uma das 3 ações sem exigência de `nivelConfianca` (mas `criterio`/justificativa textual ainda MUST ser não vazia, para auditoria); mesma regra de fundamento obrigatório para `SOLICITAR_REENVIO`; transita para `DECIDIDO`; nunca apaga `historico`, apenas anexa.
   - Qualquer tentativa de sobrescrever `contextoClassificacao`, `contextoExtracao` ou `contextoValidacao` com valor divergente do já registrado lança `ContextoImutavelError` (mesmo padrão de `ReferenciaImutavelError` das specs 002/003) — proteção contra reentrega de evento com payload diferente do original.
 
@@ -118,19 +113,18 @@ Relação entre contextos: **Customer/Supplier**, com Orquestração como custom
 - `OrcamentoId` — mesmo formato/validação das specs 001–003 (UUID v7), redefinido localmente.
 - `NivelConfianca` — inteiro 0–100, mesma regra das specs 001–003 (redefinido localmente).
 - `ContextoClassificacao`, `ContextoExtracao`, `ContextoValidacao` — cópias traduzidas (via os três ACLs de evento) dos payloads upstream, cada uma imutável após criação.
-- `DecisaoRoteamento` — `{ acao, nivelConfianca, criterio, agenteOrigem, requerIntegracaoExterna, motivoDadoAusente }`; construtor aplica as invariantes de negócio descritas acima (é o VO mais crítico desta spec — nenhuma instância inválida é representável).
+- `DecisaoRoteamento` — `{ acao, nivelConfianca, criterio, agenteOrigem: 'ORQUESTRADOR' | 'HUMANO', requerIntegracaoExterna, motivoDadoAusente }`; construtor aplica as invariantes de negócio descritas acima (é o VO mais crítico desta spec — nenhuma instância inválida é representável).
 - `TentativaDecisaoWorkflow` — entrada de histórico imutável: `{ agente, resultado ou motivoInsucesso, timestamp }`.
 
 ### Domain Events (payload sempre com `schemaVersion: 1`, `orcamentoId`, `ocorreuEm`; `source: nexo.orquestracao`)
 
-1. `OrcamentoAprovadoParaProcessamento` — publicado quando `DecisaoRoteamento.acao === 'APROVAR'` é registrada (Orquestrador, Revisor, ou decisão humana — campo `agenteOrigem` distingue). Consumido pelas etapas de negócio subsequentes (fora de escopo) e por Acompanhamento.
+1. `OrcamentoAprovadoParaProcessamento` — publicado quando `DecisaoRoteamento.acao === 'APROVAR'` é registrada (Orquestrador ou decisão humana — campo `agenteOrigem` distingue). Consumido pelas etapas de negócio subsequentes (fora de escopo) e por Acompanhamento.
 2. `OrcamentoEncaminhadoParaComprador` — publicado quando `acao === 'ENCAMINHAR_COMPRADOR'` é registrada, com confiança suficiente (nunca confundir com escalonamento por falta de confiança — este é um desfecho decidido, não uma ausência de decisão). Consumido por Acompanhamento.
 3. `OrcamentoReenvioSolicitado` — publicado quando `acao === 'SOLICITAR_REENVIO'` é registrada; payload inclui `motivoDadoAusente`. Consumido por Acompanhamento e pela futura spec de notificação ao fornecedor (fora de escopo).
 4. `IntegracaoExternaSolicitada` — publicado em conjunto com qualquer um dos três eventos acima quando `requerIntegracaoExterna === true`; payload deliberadamente genérico (`orcamentoId`, `acaoOrigem`, `ocorreuEm`), nenhum decisor conhece o contrato do sistema parceiro (critério de aceite explícito do spec.md).
-5. `DecisaoWorkflowBaixaConfiancaDetectada` — publicado internamente pelo caso de uso de decisão quando o Orquestrador não atinge confiança suficiente; único gatilho para acionar o Agente Revisor de Workflow (nunca chamada direta). Evento interno, não é contrato externo estável (mesmo padrão de `OrcamentoBaixaConfiancaDetectada` da spec 001).
-6. `DecisaoWorkflowEscalonadaParaComprador` — publicado quando o Agente Revisor de Workflow também não atinge confiança suficiente. Consumido pelo Acompanhamento/consumidor externo para exibir "pendente de decisão de workflow".
+5. `DecisaoWorkflowEscalonadaParaComprador` — publicado diretamente pelo caso de uso de decisão quando o Orquestrador não atinge confiança suficiente. Alimenta a fila de escalonamento humano (estado `PENDENTE_REVISAO_HUMANA` do agregado) e é consumido pelo Acompanhamento/consumidor externo para exibir "pendente de decisão de workflow".
 
-Nota: os quatro primeiros eventos são os contratos externos estáveis desta spec — `DecisaoWorkflowBaixaConfiancaDetectada` é detalhe de implementação interno, mesmo padrão já estabelecido pelas specs 001/002 para os equivalentes de baixa confiança.
+Nota: os quatro primeiros eventos são os contratos externos estáveis de desfecho desta spec; `DecisaoWorkflowEscalonadaParaComprador` sinaliza a pendência de decisão humana.
 
 ## Application — Casos de uso
 
@@ -138,8 +132,7 @@ Nota: os quatro primeiros eventos são os contratos externos estáveis desta spe
 - `RegistrarContextoExtracao(orcamentoId, payload)` — consumidor de `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada` (via SQS). Mesmo padrão do caso de uso acima, via `OrcamentoExtraidoEventACL`.
 - `ConsolidarEDecidirWorkflow(orcamentoId, payload)` — consumidor de `OrcamentoValidado`/`OrcamentoValidadoComRessalva` (via SQS), o gatilho real da decisão (último evento da cadeia causal). Traduz via `OrcamentoValidadoEventACL`, aplica `registrarContextoValidacao`, tenta `consolidarContexto()`:
   - Se lançar `ContextoIncompletoError` (contexto de classificação e/ou extração ainda não chegou, por entrega fora de ordem) — a mensagem SQS NÃO é confirmada (nack/erro), retorna à fila para nova tentativa após o *visibility timeout*; após N tentativas, vai para a DLQ própria com alarme CloudWatch (Princípio IV — exceção de infraestrutura também nunca silenciosa; ver ADR-001 e Riscos remanescentes).
-  - Se consolidado, invoca `AgenteOrquestradorGateway`, aplica `DecisaoWorkflow.registrarTentativaOrquestrador`, persiste, publica o evento de desfecho correspondente (+ `IntegracaoExternaSolicitada` se aplicável) ou `DecisaoWorkflowBaixaConfiancaDetectada`.
-- `RevisarDecisaoWorkflowComIA(orcamentoId)` — consumidor de `DecisaoWorkflowBaixaConfiancaDetectada`. Invoca `AgenteRevisorWorkflowGateway` com contexto adicional (histórico de decisões anteriores do mesmo fornecedor, consultado via `buscarDecisoesAnterioresPorFornecedor` no próprio repositório deste BC — nunca uma chamada cross-BC), aplica `registrarTentativaRevisor`, persiste, publica o evento de desfecho correspondente ou `DecisaoWorkflowEscalonadaParaComprador`.
+  - Se consolidado, invoca `AgenteOrquestradorGateway`, aplica `DecisaoWorkflow.registrarTentativaOrquestrador`, persiste, publica o evento de desfecho correspondente (+ `IntegracaoExternaSolicitada` se aplicável) se a confiança for suficiente, ou `DecisaoWorkflowEscalonadaParaComprador` (transita para `PENDENTE_REVISAO_HUMANA`) se for insuficiente.
 - `RegistrarDecisaoHumanaWorkflow(orcamentoId, decisao)` — caso de uso síncrono acionado pelo endpoint REST de decisão humana. Valida que o agregado está em `PENDENTE_REVISAO_HUMANA`, aplica `registrarDecisaoHumana`, publica o evento de desfecho correspondente com `agenteOrigem: 'HUMANO'` (+ `IntegracaoExternaSolicitada` se aplicável).
 - `ConsultarStatusDecisaoWorkflow(orcamentoId)` — query, retorna status atual + contexto consolidado + decisão + histórico completo (nunca escreve).
 
@@ -147,19 +140,18 @@ Todos os casos de uso publicam evento via a mesma interface `EventPublisher` (im
 
 ## Infrastructure
 
-- `BedrockOrquestradorGateway` / `BedrockRevisorWorkflowGateway` — implementam os dois gateways de agente; cada um com seu `BedrockDecisaoWorkflowACL` de parsing de resposta (structured output/tool-use do Bedrock, exigindo obrigatoriamente `acao`, `nivelConfianca`, `criterio` não vazio — nunca parsing de texto livre por regex; ver Segurança quanto a rejeitar respostas sem `criterio`).
+- `BedrockOrquestradorGateway` — implementa o gateway do agente Orquestrador, com seu `BedrockDecisaoWorkflowACL` de parsing de resposta (structured output/tool-use do Bedrock, exigindo obrigatoriamente `acao`, `nivelConfianca`, `criterio` não vazio — nunca parsing de texto livre por regex; ver Segurança quanto a rejeitar respostas sem `criterio`).
 - `OrcamentoClassificadoEventACL` / `OrcamentoExtraidoEventACL` / `OrcamentoValidadoEventACL` — traduzem os três payloads de evento upstream para os VOs locais deste BC (`ContextoClassificacao`/`ContextoExtracao`/`ContextoValidacao`), nunca importando tipos de domínio de Ingestão/Extração/Validação.
 - `EventBridgePublisher` — implementa `EventPublisher`, publica no bus `nexo-dominio-bus` (mesma instância física, wiring próprio deste BC).
-- `DrizzleDecisaoWorkflowRepository` — traduz linha↔agregado sobre Aurora Serverless v2 Postgres; tabelas `decisoes_workflow` (estado atual, `contexto_classificacao`/`contexto_extracao`/`contexto_validacao`/`decisao_atual` em colunas JSONB, mesmo racional YAGNI do ADR-004 da spec 002) e `decisoes_workflow_historico` (append-only, nunca UPDATE/DELETE, apenas INSERT); expõe `buscarDecisoesAnterioresPorFornecedor(fornecedorIdentificado)` para o contexto adicional do Revisor.
-- Filas SQS por consumidor: `contexto-classificacao-queue`, `contexto-extracao-queue`, `decisao-workflow-queue` (gatilho de decisão), `revisor-workflow-queue`, cada uma com DLQ própria + alarme CloudWatch em mensagem na DLQ — a DLQ de `decisao-workflow-queue` é o mecanismo operacional que torna visível um contexto que nunca se consolida (Princípio IV, ver ADR-001).
-- IAM: uma role por Lambda (`RegistrarContextoClassificacaoLambdaRole`, `RegistrarContextoExtracaoLambdaRole`, `ConsolidarEDecidirWorkflowLambdaRole`, `RevisarDecisaoWorkflowComIALambdaRole`, `RegistrarDecisaoHumanaWorkflowLambdaRole`, `ConsultaStatusDecisaoWorkflowLambdaRole`), least privilege — ex.: `ConsolidarEDecidirWorkflowLambdaRole` tem `bedrock:InvokeModel` restrito ao ARN do modelo aprovado, sem qualquer permissão sobre `nexo-orcamentos-raw` ou sobre as tabelas de outros BCs.
+- `DrizzleDecisaoWorkflowRepository` — traduz linha↔agregado sobre Aurora Serverless v2 Postgres; tabelas `decisoes_workflow` (estado atual, `contexto_classificacao`/`contexto_extracao`/`contexto_validacao`/`decisao_atual` em colunas JSONB, mesmo racional YAGNI do ADR-004 da spec 002) e `decisoes_workflow_historico` (append-only, nunca UPDATE/DELETE, apenas INSERT).
+- Filas SQS por consumidor: `contexto-classificacao-queue`, `contexto-extracao-queue`, `decisao-workflow-queue` (gatilho de decisão), cada uma com DLQ própria + alarme CloudWatch em mensagem na DLQ — a DLQ de `decisao-workflow-queue` é o mecanismo operacional que torna visível um contexto que nunca se consolida (Princípio IV, ver ADR-001).
+- IAM: uma role por Lambda (`RegistrarContextoClassificacaoLambdaRole`, `RegistrarContextoExtracaoLambdaRole`, `ConsolidarEDecidirWorkflowLambdaRole`, `RegistrarDecisaoHumanaWorkflowLambdaRole`, `ConsultaStatusDecisaoWorkflowLambdaRole`), least privilege — ex.: `ConsolidarEDecidirWorkflowLambdaRole` tem `bedrock:InvokeModel` restrito ao ARN do modelo aprovado, sem qualquer permissão sobre `nexo-orcamentos-raw` ou sobre as tabelas de outros BCs.
 
 ## Interface
 
 - Consumidor SQS (`contexto-classificacao-queue`) acionado por regra EventBridge roteando `detail-type: OrcamentoClassificado`, `source: nexo.ingestao-identificacao` → fila deste BC.
 - Consumidor SQS (`contexto-extracao-queue`) acionado por regra EventBridge roteando `detail-type: OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, `source: nexo.extracao` → fila deste BC.
 - Consumidor SQS (`decisao-workflow-queue`) acionado por regra EventBridge roteando `detail-type: OrcamentoValidado`/`OrcamentoValidadoComRessalva`, `source: nexo.validacao` → fila deste BC.
-- Consumidor SQS (`revisor-workflow-queue`) acionado por regra EventBridge roteando `detail-type: DecisaoWorkflowBaixaConfiancaDetectada` (interno) → fila deste BC.
 - `POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana` — decisão humana explícita (body: `acao: 'APROVAR' | 'ENCAMINHAR_COMPRADOR' | 'SOLICITAR_REENVIO'`, `justificativa` textual obrigatória, `motivoDadoAusente` obrigatório quando `acao === 'SOLICITAR_REENVIO'`). Só aceito quando status é `PENDENTE_REVISAO_HUMANA`; caso contrário, 409 Problem Details (RFC 7807).
 - `GET /v1/orcamentos/{orcamentoId}/workflow/status` — retorna status + contexto consolidado + decisão + histórico. Contrato Problem Details para erros.
 - Todos os endpoints validam entrada via Zod na borda; nenhuma regra de negócio nos controllers — apenas mapeamento request↔Application.
@@ -168,7 +160,7 @@ Todos os casos de uso publicam evento via a mesma interface `EventPublisher` (im
 ## Segurança (riscos específicos desta spec)
 
 - **Maior risco financeiro da cadeia de agentes**: esta é a única spec cuja decisão de IA aprova diretamente uma compra. Mitigações estruturais, não apenas de processo: (a) `DecisaoRoteamento` é um VO que torna estruturalmente impossível representar uma aprovação sem `criterio` não vazio ou sem `contextoValidacao` bem-sucedido (ver invariantes do agregado); (b) `BedrockDecisaoWorkflowACL` rejeita qualquer resposta do modelo que não inclua `criterio` textual junto do `nivelConfianca` — um agente não pode "reportar confiança suficiente artificialmente" sem também produzir uma justificativa auditável, tornando qualquer aprovação indevida detectável em auditoria manual, mesmo que não impedível 100% no momento da decisão; (c) a métrica "taxa de decisão de aprovação automática revertida posteriormente por um comprador" (definida no `spec.md` como a de maior criticidade de negócio) depende de dado que só o BC Acompanhamento pode calcular (cruzando decisão automática com reversão humana futura) — registrado como dependência de coordenação, não implementada nesta spec (ver Riscos remanescentes).
-- **Prompt injection via contexto consolidado**: embora esta spec não leia o documento bruto, o `contextoExtracao` carrega texto originalmente extraído de um documento de fornecedor (ex.: descrição de item) e repassado pelo evento upstream — MUST continuar sendo tratado como entrada não confiável ao compor o prompt do Orquestrador/Revisor de Workflow, mesmo já tendo passado por uma ACL antes (defesa em profundidade, mesma disciplina de bloco delimitado de conteúdo das specs 001–003).
+- **Prompt injection via contexto consolidado**: embora esta spec não leia o documento bruto, o `contextoExtracao` carrega texto originalmente extraído de um documento de fornecedor (ex.: descrição de item) e repassado pelo evento upstream — MUST continuar sendo tratado como entrada não confiável ao compor o prompt do Orquestrador, mesmo já tendo passado por uma ACL antes (defesa em profundidade, mesma disciplina de bloco delimitado de conteúdo das specs 001–003).
 - **Dado comercial consolidado (fornecedor + itens + preços + decisão de compra)**: é o dado mais sensível da cadeia por reunir, em um único registro, a base de uma decisão financeira — least privilege IAM, criptografia em repouso (Aurora KMS) e trânsito (TLS), sem exposição cross-tenant (preparação para Fase 03 multi-tenant, sem implementar isolamento completo agora).
 - **Integração externa desacoplada por desenho**: `IntegracaoExternaSolicitada` nunca carrega detalhe de protocolo/contrato do sistema parceiro — nenhum componente deste BC MUST ser modificado quando o sistema parceiro real for definido (spec futura de integração consome o evento e traduz para o protocolo específico).
 
@@ -192,15 +184,15 @@ src/
         ├── domain/
         │   ├── decisao-workflow.aggregate.ts
         │   ├── value-objects/ (orcamento-id, nivel-confianca, contexto-classificacao, contexto-extracao, contexto-validacao, decisao-roteamento, tentativa-decisao-workflow)
-        │   ├── events/ (orcamento-aprovado-para-processamento, orcamento-encaminhado-para-comprador, orcamento-reenvio-solicitado, integracao-externa-solicitada, decisao-workflow-baixa-confianca-detectada, decisao-workflow-escalonada-para-comprador)
+        │   ├── events/ (orcamento-aprovado-para-processamento, orcamento-encaminhado-para-comprador, orcamento-reenvio-solicitado, integracao-externa-solicitada, decisao-workflow-escalonada-para-comprador)
         │   ├── repositories/ (decisao-workflow.repository.ts — interface)
-        │   └── gateways/ (agente-orquestrador.gateway.ts, agente-revisor-workflow.gateway.ts, orcamento-classificado-event.acl.ts, orcamento-extraido-event.acl.ts, orcamento-validado-event.acl.ts — interfaces)
+        │   └── gateways/ (agente-orquestrador.gateway.ts, orcamento-classificado-event.acl.ts, orcamento-extraido-event.acl.ts, orcamento-validado-event.acl.ts — interfaces)
         ├── application/
-        │   └── use-cases/ (registrar-contexto-classificacao, registrar-contexto-extracao, consolidar-e-decidir-workflow, revisar-decisao-workflow-com-ia, registrar-decisao-humana-workflow, consultar-status-decisao-workflow)
+        │   └── use-cases/ (registrar-contexto-classificacao, registrar-contexto-extracao, consolidar-e-decidir-workflow, registrar-decisao-humana-workflow, consultar-status-decisao-workflow)
         ├── infrastructure/
         │   ├── persistence/ (drizzle-decisao-workflow.repository.ts, schema/)
         │   ├── aws/ (eventbridge.publisher.ts)
-        │   └── bedrock/ (bedrock-orquestrador.gateway.ts, bedrock-revisor-workflow.gateway.ts, acl/)
+        │   └── bedrock/ (bedrock-orquestrador.gateway.ts, acl/)
         └── interface/
             ├── http/ (controllers REST + Zod schemas)
             └── events/ (handlers Lambda consumidores de SQS)
@@ -212,7 +204,7 @@ tests/
     └── contract/ (contratos REST)
 ```
 
-**Structure Decision**: mesma convenção das specs 001–003 — novo subdiretório `src/bounded-contexts/orquestracao/` isolado, sem import direto de código de `ingestao-identificacao/`, `extracao/` ou `validacao/`; toda comunicação de entrada via evento, consumida por SQS (quatro filas distintas, refletindo os quatro pontos de entrada de evento desta spec).
+**Structure Decision**: mesma convenção das specs 001–003 — novo subdiretório `src/bounded-contexts/orquestracao/` isolado, sem import direto de código de `ingestao-identificacao/`, `extracao/` ou `validacao/`; toda comunicação de entrada via evento, consumida por SQS (três filas distintas, refletindo os três pontos de entrada de evento desta spec).
 
 ## Complexity Tracking
 
@@ -241,23 +233,19 @@ tests/
 
 **Impactos futuros**: qualquer spec futura que precise consolidar eventos de múltiplos BCs upstream (ex.: um futuro relatório analítico cross-pipeline) MUST seguir o mesmo padrão — assinatura de eventos + read-model próprio, nunca payload expandido sob demanda de um consumidor específico nem chamada síncrona cross-BC.
 
-### ADR-002 — Governança de baixa confiança da Orquestração é padrão replicado (Orquestrador → Revisor de Workflow → escalonamento), componente próprio deste BC
+### ADR-002 — Governança de baixa confiança da Orquestração é escalonamento humano direto ao comprador, sem agente revisor de IA
 
-**Contexto**: mesma decisão de desenho já enfrentada pela spec 002 (ADR-003 daquela spec) — a spec.md desta feature explicitamente reaproveita "o mesmo padrão de duas linhas já vinculante na constituição e já usado na spec 001", sem exigir componente físico compartilhado.
+**Contexto**: a versão original desta spec previa um Agente Revisor de Workflow (segundo agente de IA) antes do escalonamento ao comprador, espelhando o Revisor das specs 001/002. Decisão de produto posterior **removeu os agentes revisores de IA** de todo o Nexo (specs 001, 002 e 005).
 
-**Problema**: replicar componente próprio (Agente Revisor de Workflow + fila de escalonamento) vs. reutilizar algum componente físico das specs 001/002/003.
+**Problema**: como tratar decisão de workflow de baixa confiança do Orquestrador, agora sem um segundo agente de IA.
 
-**Alternativas consideradas**: (a) componente físico compartilhado entre BCs; (b) padrão replicado, componentes próprios por BC (mesma decisão já tomada em 002/ADR-003 e implicitamente em 003/ADR-001, que optou por *não* replicar o Revisor por razão específica àquela spec, mas manteve o princípio de "decisão por BC, nunca componente físico compartilhado").
+**Alternativas consideradas**: (a) manter um Agente Revisor de Workflow de IA como passo intermediário; (b) escalonar diretamente para decisão humana do comprador, com fila (estado) própria deste BC.
 
-**Vantagens (opção b, escolhida)**: mesma linha de raciocínio do ADR-003 da spec 002 — preserva autonomia de deploy, preserva "cada BC decide sua própria pergunta de negócio" (aqui, "o roteamento é confiável?", distinta de "a extração é confiável?" ou "a validação passou?"), preserva Princípio II.
+**Decisão**: opção (b). O Orquestrador faz uma única tentativa; confiança insuficiente transita o agregado diretamente para `PENDENTE_REVISAO_HUMANA` e publica `DecisaoWorkflowEscalonadaParaComprador`, sem agente revisor de IA. A decisão humana explícita (qualquer uma das 3 ações, com `criterio`/justificativa obrigatório) é registrada com o mesmo peso de uma decisão automática. As invariantes críticas de negócio (nunca aprovar sem validação bem-sucedida, reenvio sempre fundamentado, `criterio` obrigatório) continuam valendo integralmente.
 
-**Desvantagens**: mesma replicação de estrutura (fila + Lambda + gateway Bedrock) já aceita como trade-off nas specs 001/002.
+**Trade-offs**: perde-se a tentativa automática extra do revisor de IA (que agregava custo/latência sem garantia de resolver o que o papel fixo já não resolveu) em troca de um caminho de exceção mais simples; mantém-se zero acoplamento entre BCs e a garantia NON-NEGOTIABLE de "nunca autoaprovar por exaustão/tempo/volume" (o escalonamento humano é indefinido no tempo, nunca decide por timeout).
 
-**Decisão**: Orquestração implementa `AgenteRevisorWorkflowGateway` e sua própria fila de escalonamento assíncrona (`revisor-workflow-queue` para acionar o Revisor + estado `PENDENTE_REVISAO_HUMANA` no próprio agregado `DecisaoWorkflow` para o escalonamento final ao comprador), seguindo o mesmo padrão de estados/transições das specs 001/002, sem nenhuma chamada cross-BC.
-
-**Trade-offs**: idêntico ao ADR-003 da spec 002 — menos reuso físico em troca de zero acoplamento entre BCs.
-
-**Impactos futuros**: nenhum além do já registrado pelo ADR-003 da spec 002 — este ADR apenas confirma a aplicação consistente do mesmo padrão à quarta spec do pipeline que precisa dele.
+**Impactos futuros**: padrão consistente com o adotado nas specs 001/002 — papel fixo → escalonamento humano direto, fila própria por BC, nunca um agente revisor de IA.
 
 ### ADR-003 — Necessidade de integração externa é uma decisão explícita do agente decisor (flag `requerIntegracaoExterna`), não uma regra fixa determinística
 
@@ -267,7 +255,7 @@ tests/
 
 **Alternativas consideradas**:
 (a) Regra fixa determinística no Domain: `requerIntegracaoExterna = (acao === 'APROVAR')` sempre, para as outras ações nunca;
-(b) O próprio agente decisor (Orquestrador/Revisor de Workflow) reporta `requerIntegracaoExterna` como parte de sua saída estruturada, junto de `acao`/`nivelConfianca`/`criterio`, e o Domain apenas valida a forma (booleano presente), sem impor a regra de quando é verdade;
+(b) O próprio agente decisor (Orquestrador) reporta `requerIntegracaoExterna` como parte de sua saída estruturada, junto de `acao`/`nivelConfianca`/`criterio`, e o Domain apenas valida a forma (booleano presente), sem impor a regra de quando é verdade;
 (c) Deixar de publicar `IntegracaoExternaSolicitada` nesta spec até haver uma regra de negócio explícita do produto.
 
 **Vantagens (opção b, escolhida)**: não inventa uma regra de negócio ("toda aprovação sempre integra") que o próprio PM não confirmou — a spec deixa essa decisão para quando o sistema parceiro real for definido; ainda satisfaz o critério de aceite "uma decisão que exige integração externa publica um evento de integração desacoplado" ao permitir que o agente (que tem visibilidade do contexto completo — fornecedor, tipo de decisão, histórico) sinalize a necessidade, mantendo a decisão de conteúdo fora do Domain (Princípio V — IA decide contexto de negócio variável, Domain só garante que a decisão é estruturalmente válida e auditável). A opção (a) foi descartada por fixar uma regra que o produto nunca validou; a opção (c) foi descartada por deixar um critério de aceite explícito sem nenhuma implementação.

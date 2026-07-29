@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="generator" content="archify 2.12.0">
-  <title>Orquestração — Decisão de Workflow e Integrações Diagram</title>
+  <title>Nexo — Escopo Completo Diagram</title>
   <script>
     // Resolve the theme before first paint so light-preference users don't
     // see a dark flash. The toolbar script below re-applies with UI state.
@@ -4496,12 +4496,12 @@
     <div class="header">
       <div class="header-row">
         <div class="pulse-dot"></div>
-        <h1>Orquestração — Decisão de Workflow e Integrações</h1>
+        <h1>Nexo — Escopo Completo</h1>
       </div>
-      <p class="subtitle">Consolida 3 upstreams e decide aprovar/encaminhar/reenviar — maior risco financeiro do produto</p>
+      <p class="subtitle">Bounded Contexts, espinha de eventos EventBridge e integrações Core ↔ Amazon Bedrock Runtime</p>
     </div>
 
-    <script id="archify-guided-views-data" type="application/json">[]</script>
+    <script id="archify-guided-views-data" type="application/json">[{"id":"bedrock","label":"Integrações Bedrock","focus":["ing","ext","val","idx","orq","class","extag","cat","emb","qry","orqag"],"note":"Cada BC invoca agentes no Bedrock Runtime sempre atrás de uma ACL própria."},{"id":"eventos","label":"Espinha de eventos","focus":["ing","ext","val","idx","orq","bus","acomp"],"note":"EventBridge nexo-dominio-bus é o único mecanismo de acoplamento entre BCs."},{"id":"ingestao","label":"Ingestão → Extração","focus":["canais","gateway","s3raw","ing","class","ext","extag"],"note":"Entrada bruta imutável, classificação e extração assistidas por IA."},{"id":"estado","label":"Persistência \u0026 multi-tenant","focus":["bus","aurora","acomp","conf"],"note":"Estado por BC em schema isolado, RLS e conformidade LGPD."},{"id":"externos","label":"Integrações externas","focus":["canais","gateway","val","orq","fornecedores","compras"],"note":"Cadastro de fornecedores (síncrono) e sistema de compras (por evento)."}]</script>
 
     <div class="guided-views no-print" id="guided-views" hidden aria-label="Guided diagram views">
       <button id="guided-view-prev" type="button" aria-label="Previous guided view" title="Previous guided view ([)">&#8592;</button>
@@ -4544,9 +4544,9 @@
 
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read">
-      <svg viewBox="0 0 1190 630" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="blueprint" data-quality-profile="showcase">
-        <title id="archify-diagram-title">Orquestração — Decisão de Workflow e Integrações</title>
-        <desc id="archify-diagram-description">Consolida 3 upstreams e decide aprovar/encaminhar/reenviar — maior risco financeiro do produto</desc>
+      <svg viewBox="0 0 2270 1152" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="blueprint" data-quality-profile="showcase">
+        <title id="archify-diagram-title">Nexo — Escopo Completo</title>
+        <desc id="archify-diagram-description">Bounded Contexts, espinha de eventos EventBridge e integrações Core ↔ Amazon Bedrock Runtime</desc>
         <!-- Definitions -->
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -4570,153 +4570,376 @@
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" x="250" y="270" width="690" height="292" rx="12" class="c-region" stroke-width="1"/>
-        <text x="258" y="288" class="t-cloud" font-size="9" font-weight="600">AWS us-east-1 · Nexo</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" x="490" y="250" width="1740" height="108" rx="12" class="c-region" stroke-width="1"/>
+        <text x="498" y="268" class="t-cloud" font-size="9" font-weight="600">Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="1" x="504" y="284" width="422" height="98" rx="8" class="c-security-group" stroke-width="1"/>
-        <text x="512" y="302" class="t-security" font-size="9" font-weight="600">BC: Orquestração</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="1" x="520" y="970" width="980" height="114" rx="8" class="c-security-group" stroke-width="1"/>
+        <text x="528" y="988" class="t-security" font-size="9" font-weight="600">Isolamento multi-tenant · TenantId (Shared Kernel) + RLS</text>
 
         <!-- Connection paths (before components for correct z-order) -->
-        <path data-edge-from="upstreams" data-edge-to="bus" data-edge-label="3 eventos upstream" data-edge-key="0" data-composition-points="190,331;280,331" d="M 190 331 L 280 331" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="bus" data-edge-to="orquestrador" data-edge-label="decide roteamento" data-edge-key="1" data-composition-points="430,331;520,331" d="M 430 331 L 520 331" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="orquestrador" data-edge-to="fila" data-edge-label="baixa confiança → comprador" data-edge-key="2" data-composition-points="670,331;760,331" d="M 670 331 L 760 331" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="fila" data-edge-to="humano" data-edge-label="confirmação" data-edge-key="3" data-composition-points="910,331;1000,331" d="M 910 331 L 1000 331" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="bus" data-edge-to="aurora" data-edge-label="persiste contexto" data-edge-key="4" data-composition-points="355,362;355,480" d="M 355 362 L 355 480" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="bus" data-edge-to="consumidores" data-edge-label="decisão + integração externa" data-edge-key="5" data-composition-points="355,300;355,182" d="M 355 300 L 355 182" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="canais" data-edge-to="gateway" data-edge-key="0" data-composition-points="250,591;300,591" d="M 250 591 L 300 591" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="gateway" data-edge-to="ing" data-edge-key="1" data-composition-points="470,591;520,591" d="M 470 591 L 520 591" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="gateway" data-edge-to="s3raw" data-edge-label="grava bruto imutável" data-edge-key="2" data-composition-points="385,626;385,730" d="M 385 626 L 385 730" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="ing" data-edge-to="class" data-edge-label="ACL · InvokeModel" data-edge-key="3" data-composition-points="610,552;610,338" d="M 610 552 L 610 338" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="ext" data-edge-to="extag" data-edge-label="ACL · InvokeModel" data-edge-key="4" data-composition-points="970,552;970,338" d="M 970 552 L 970 338" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="val" data-edge-to="cat" data-edge-label="ACL · InvokeModel" data-edge-key="5" data-composition-points="1330,552;1330,338" d="M 1330 552 L 1330 338" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="idx" data-edge-to="emb" data-edge-label="ACL · embedding" data-edge-key="6" data-composition-points="1683,552;1683,445;1600,445;1600,338" d="M 1683 552 L 1683 453 Q 1683 445 1675 445 L 1608 445 Q 1600 445 1600 437 L 1600 338" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="idx" data-edge-to="qry" data-edge-label="ACL · consulta" data-edge-key="7" data-composition-points="1697,552;1697,445;1810,445;1810,338" d="M 1697 552 L 1697 453 Q 1697 445 1705 445 L 1802 445 Q 1810 445 1810 437 L 1810 338" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="orq" data-edge-to="orqag" data-edge-label="ACL · InvokeModel" data-edge-key="8" data-composition-points="2110,552;2110,338" d="M 2110 552 L 2110 338" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="ing" data-edge-to="bus" data-edge-label="OrcamentoClassificado" data-edge-key="9" data-composition-points="700,591;724,591;724,833;1160,833" d="M 700 591 L 716 591 Q 724 591 724 599 L 724 825 Q 724 833 732 833 L 1160 833" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="ext" data-edge-to="bus" data-edge-label="OrcamentoExtraido" data-edge-key="10" data-composition-points="1060,591;1110,591;1110,819;1160,819" d="M 1060 591 L 1102 591 Q 1110 591 1110 599 L 1110 811 Q 1110 819 1118 819 L 1160 819" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="val" data-edge-to="bus" data-edge-label="OrcamentoValidado" data-edge-key="11" data-composition-points="1330,630;1330,654;1356,654;1356,768;1340,768;1340,792" d="M 1330 630 L 1330 646 Q 1330 654 1338 654 L 1348 654 Q 1356 654 1356 662 L 1356 760 Q 1356 768 1348 768 L 1348 768 Q 1340 768 1340 776 L 1340 792" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="idx" data-edge-to="bus" data-edge-label="OrcamentoIndexado" data-edge-key="12" data-composition-points="1600,591;1560,591;1560,819;1520,819" d="M 1600 591 L 1568 591 Q 1560 591 1560 599 L 1560 811 Q 1560 819 1552 819 L 1520 819" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="orq" data-edge-to="bus" data-edge-label="decisões de workflow" data-edge-key="13" data-composition-points="2020,591;1996,591;1996,833;1520,833" d="M 2020 591 L 2004 591 Q 1996 591 1996 599 L 1996 825 Q 1996 833 1988 833 L 1520 833" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="bus" data-edge-to="aurora" data-edge-label="materializa estado" data-edge-key="14" data-composition-points="1160,861;754,861;754,1032;730,1032" d="M 1160 861 L 762 861 Q 754 861 754 869 L 754 1024 Q 754 1032 746 1032 L 730 1032" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="bus" data-edge-to="acomp" data-edge-label="consome TODOS os eventos" data-edge-key="15" data-composition-points="1160,847;1130,847;1130,1032;1100,1032" d="M 1160 847 L 1138 847 Q 1130 847 1130 855 L 1130 1024 Q 1130 1032 1122 1032 L 1100 1032" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="bus" data-edge-to="conf" data-edge-label="eventos LGPD" data-edge-key="16" data-composition-points="1340,888;1340,944;1380,944;1380,1000" d="M 1340 888 L 1340 936 Q 1340 944 1348 944 L 1372 944 Q 1380 944 1380 952 L 1380 1000" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="bus" data-edge-to="fornecedores" data-edge-label="consulta síncrona" data-edge-key="17" data-composition-points="1520,861;1590,861;1590,1032;1660,1032" d="M 1520 861 L 1582 861 Q 1590 861 1590 869 L 1590 1024 Q 1590 1032 1598 1032 L 1660 1032" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="bus" data-edge-to="compras" data-edge-label="IntegracaoExternaSolicitada" data-edge-key="18" data-composition-points="1520,847;1996,847;1996,1032;2020,1032" d="M 1520 847 L 1988 847 Q 1996 847 1996 855 L 1996 1024 Q 1996 1032 2004 1032 L 2020 1032" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
-        <g id="node-upstreams" data-node-id="upstreams" data-node-label="BCs 001-003" tabindex="0" role="button" aria-label="Focus BCs 001-003, Ingestão + Extração + Validação, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Ingestão + Extração + Validação" data-node-context="Architecture component">
-          <title>BCs 001-003 · Ingestão + Extração + Validação · Architecture component</title>
-          <rect x="40" y="300" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="40" y="300" width="150" height="62" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(46 306) scale(0.6875)">
+        <g id="node-class" data-node-id="class" data-node-label="Classificador" tabindex="0" role="button" aria-label="Focus Classificador, papel fixo — fornecedor + formato, Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="papel fixo — fornecedor + formato" data-node-tag="Bedrock" data-node-context="Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)">
+          <title>Classificador · papel fixo — fornecedor + formato · Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema) · Bedrock</title>
+          <rect x="520" y="280" width="180" height="58" rx="6" class="c-mask"/>
+          <rect x="520" y="280" width="180" height="58" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(526 286) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-detail-anchor x="610" y="307" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Classificador</text>
+        <text data-detail="context" x="610" y="323" class="t-muted" font-size="9" text-anchor="middle">papel fixo — fornecedor + formato</text>
+        <text data-detail="fine" x="610" y="330" class="t-cloud" font-size="7" text-anchor="middle">Bedrock</text>
+        </g>
+
+        <g id="node-extag" data-node-id="extag" data-node-label="Extrator" tabindex="0" role="button" aria-label="Focus Extrator, papel fixo — itens + condições, Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="papel fixo — itens + condições" data-node-tag="Bedrock" data-node-context="Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)">
+          <title>Extrator · papel fixo — itens + condições · Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema) · Bedrock</title>
+          <rect x="880" y="280" width="180" height="58" rx="6" class="c-mask"/>
+          <rect x="880" y="280" width="180" height="58" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(886 286) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-detail-anchor x="970" y="307" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Extrator</text>
+        <text data-detail="context" x="970" y="323" class="t-muted" font-size="9" text-anchor="middle">papel fixo — itens + condições</text>
+        <text data-detail="fine" x="970" y="330" class="t-cloud" font-size="7" text-anchor="middle">Bedrock</text>
+        </g>
+
+        <g id="node-cat" data-node-id="cat" data-node-label="Categorizador de Item" tabindex="0" role="button" aria-label="Focus Categorizador de Item, auxiliar da Validação, Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="auxiliar da Validação" data-node-tag="Bedrock" data-node-context="Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)">
+          <title>Categorizador de Item · auxiliar da Validação · Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema) · Bedrock</title>
+          <rect x="1240" y="280" width="180" height="58" rx="6" class="c-mask"/>
+          <rect x="1240" y="280" width="180" height="58" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(1246 286) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-detail-anchor x="1330" y="307" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Categorizador de Item</text>
+        <text data-detail="context" x="1330" y="323" class="t-muted" font-size="9" text-anchor="middle">auxiliar da Validação</text>
+        <text data-detail="fine" x="1330" y="330" class="t-cloud" font-size="7" text-anchor="middle">Bedrock</text>
+        </g>
+
+        <g id="node-emb" data-node-id="emb" data-node-label="Gerador de Embeddings" tabindex="0" role="button" aria-label="Focus Gerador de Embeddings, Titan Text Embeddings V2, Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="Titan Text Embeddings V2" data-node-tag="Bedrock" data-node-context="Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)">
+          <title>Gerador de Embeddings · Titan Text Embeddings V2 · Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema) · Bedrock</title>
+          <rect x="1510" y="280" width="180" height="58" rx="6" class="c-mask"/>
+          <rect x="1510" y="280" width="180" height="58" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(1516 286) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-detail-anchor x="1600" y="307" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Gerador de Embeddings</text>
+        <text data-detail="context" x="1600" y="323" class="t-muted" font-size="9" text-anchor="middle">Titan Text Embeddings V2</text>
+        <text data-detail="fine" x="1600" y="330" class="t-cloud" font-size="7" text-anchor="middle">Bedrock</text>
+        </g>
+
+        <g id="node-qry" data-node-id="qry" data-node-label="Interpretador de Consulta" tabindex="0" role="button" aria-label="Focus Interpretador de Consulta, busca em linguagem natural, Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="busca em linguagem natural" data-node-tag="Bedrock" data-node-context="Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)">
+          <title>Interpretador de Consulta · busca em linguagem natural · Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema) · Bedrock</title>
+          <rect x="1720" y="280" width="180" height="58" rx="6" class="c-mask"/>
+          <rect x="1720" y="280" width="180" height="58" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(1726 286) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-detail-anchor x="1810" y="307" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Interpretador de Consulta</text>
+        <text data-detail="context" x="1810" y="323" class="t-muted" font-size="9" text-anchor="middle">busca em linguagem natural</text>
+        <text data-detail="fine" x="1810" y="330" class="t-cloud" font-size="7" text-anchor="middle">Bedrock</text>
+        </g>
+
+        <g id="node-orqag" data-node-id="orqag" data-node-label="Orquestrador" tabindex="0" role="button" aria-label="Focus Orquestrador, papel fixo — decide workflow, Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="papel fixo — decide workflow" data-node-tag="Bedrock" data-node-context="Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema)">
+          <title>Orquestrador · papel fixo — decide workflow · Amazon Bedrock Runtime · InvokeModel (tool-use / JSON Schema) · Bedrock</title>
+          <rect x="2020" y="280" width="180" height="58" rx="6" class="c-mask"/>
+          <rect x="2020" y="280" width="180" height="58" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(2026 286) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-detail-anchor x="2110" y="307" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Orquestrador</text>
+        <text data-detail="context" x="2110" y="323" class="t-muted" font-size="9" text-anchor="middle">papel fixo — decide workflow</text>
+        <text data-detail="fine" x="2110" y="330" class="t-cloud" font-size="7" text-anchor="middle">Bedrock</text>
+        </g>
+
+        <g id="node-canais" data-node-id="canais" data-node-label="Canais de Ingestão" tabindex="0" role="button" aria-label="Focus Canais de Ingestão, Portal · API · SFTP · Mobile, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Portal · API · SFTP · Mobile" data-node-context="Architecture component">
+          <title>Canais de Ingestão · Portal · API · SFTP · Mobile · Architecture component</title>
+          <rect x="80" y="556" width="170" height="70" rx="6" class="c-mask"/>
+          <rect x="80" y="556" width="170" height="70" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(86 562) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-detail-anchor x="115" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">BCs 001-003</text>
-        <text data-detail="context" x="115" y="345" class="t-muted" font-size="9" text-anchor="middle">Ingestão + Extração + Validação</text>
+          <text data-detail-anchor x="165" y="589" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Canais de Ingestão</text>
+        <text data-detail="context" x="165" y="605" class="t-muted" font-size="9" text-anchor="middle">Portal · API · SFTP · Mobile</text>
         </g>
 
-        <g id="node-bus" data-node-id="bus" data-node-label="EventBridge" tabindex="0" role="button" aria-label="Focus EventBridge, nexo-dominio-bus, AWS us-east-1 · Nexo" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="nexo-dominio-bus" data-node-context="AWS us-east-1 · Nexo">
-          <title>EventBridge · nexo-dominio-bus · AWS us-east-1 · Nexo</title>
-          <rect x="280" y="300" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="280" y="300" width="150" height="62" rx="6" class="c-messagebus" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(286 306) scale(0.6875)">
+        <g id="node-gateway" data-node-id="gateway" data-node-label="Gateway de Ingestão" tabindex="0" role="button" aria-label="Focus Gateway de Ingestão, API Gateway + Lambda, Architecture component" aria-pressed="false" data-node-kind="security" data-node-sublabel="API Gateway + Lambda" data-node-tag="platform" data-node-context="Architecture component">
+          <title>Gateway de Ingestão · API Gateway + Lambda · Architecture component · platform</title>
+          <rect x="300" y="556" width="170" height="70" rx="6" class="c-mask"/>
+          <rect x="300" y="556" width="170" height="70" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(306 562) scale(0.6875)">
+            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
+            <path d="m5.8 8 1.5 1.5 3-3"/>
+          </g>
+          <text data-detail-anchor x="385" y="589" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Gateway de Ingestão</text>
+        <text data-detail="context" x="385" y="605" class="t-muted" font-size="9" text-anchor="middle">API Gateway + Lambda</text>
+        <text data-detail="fine" x="385" y="618" class="t-security" font-size="7" text-anchor="middle">platform</text>
+        </g>
+
+        <g id="node-ing" data-node-id="ing" data-node-label="BC Ingestão &amp; Identificação" tabindex="0" role="button" aria-label="Focus BC Ingestão &amp; Identificação, spec 001 · Fase 01, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="spec 001 · Fase 01" data-node-tag="core" data-node-context="Architecture component">
+          <title>BC Ingestão &amp; Identificação · spec 001 · Fase 01 · Architecture component · core</title>
+          <rect x="520" y="552" width="180" height="78" rx="6" class="c-mask"/>
+          <rect x="520" y="552" width="180" height="78" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(526 558) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-detail-anchor x="610" y="589" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">BC Ingestão &amp; Identificação</text>
+        <text data-detail="context" x="610" y="605" class="t-muted" font-size="9" text-anchor="middle">spec 001 · Fase 01</text>
+        <text data-detail="fine" x="610" y="622" class="t-backend" font-size="7" text-anchor="middle">core</text>
+        </g>
+
+        <g id="node-ext" data-node-id="ext" data-node-label="BC Extração" tabindex="0" role="button" aria-label="Focus BC Extração, spec 002 · Fase 01, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="spec 002 · Fase 01" data-node-tag="core" data-node-context="Architecture component">
+          <title>BC Extração · spec 002 · Fase 01 · Architecture component · core</title>
+          <rect x="880" y="552" width="180" height="78" rx="6" class="c-mask"/>
+          <rect x="880" y="552" width="180" height="78" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(886 558) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-detail-anchor x="970" y="589" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">BC Extração</text>
+        <text data-detail="context" x="970" y="605" class="t-muted" font-size="9" text-anchor="middle">spec 002 · Fase 01</text>
+        <text data-detail="fine" x="970" y="622" class="t-backend" font-size="7" text-anchor="middle">core</text>
+        </g>
+
+        <g id="node-val" data-node-id="val" data-node-label="BC Validação" tabindex="0" role="button" aria-label="Focus BC Validação, spec 003 · Fase 02, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="spec 003 · Fase 02" data-node-tag="core" data-node-context="Architecture component">
+          <title>BC Validação · spec 003 · Fase 02 · Architecture component · core</title>
+          <rect x="1240" y="552" width="180" height="78" rx="6" class="c-mask"/>
+          <rect x="1240" y="552" width="180" height="78" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1246 558) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-detail-anchor x="1330" y="589" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">BC Validação</text>
+        <text data-detail="context" x="1330" y="605" class="t-muted" font-size="9" text-anchor="middle">spec 003 · Fase 02</text>
+        <text data-detail="fine" x="1330" y="622" class="t-backend" font-size="7" text-anchor="middle">core</text>
+        </g>
+
+        <g id="node-idx" data-node-id="idx" data-node-label="BC Busca &amp; Indexação" tabindex="0" role="button" aria-label="Focus BC Busca &amp; Indexação, spec 004 · Fase 02, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="spec 004 · Fase 02" data-node-tag="core" data-node-context="Architecture component">
+          <title>BC Busca &amp; Indexação · spec 004 · Fase 02 · Architecture component · core</title>
+          <rect x="1600" y="552" width="180" height="78" rx="6" class="c-mask"/>
+          <rect x="1600" y="552" width="180" height="78" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1606 558) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-detail-anchor x="1690" y="589" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">BC Busca &amp; Indexação</text>
+        <text data-detail="context" x="1690" y="605" class="t-muted" font-size="9" text-anchor="middle">spec 004 · Fase 02</text>
+        <text data-detail="fine" x="1690" y="622" class="t-backend" font-size="7" text-anchor="middle">core</text>
+        </g>
+
+        <g id="node-orq" data-node-id="orq" data-node-label="BC Orquestração" tabindex="0" role="button" aria-label="Focus BC Orquestração, spec 005 · Fase 02, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="spec 005 · Fase 02" data-node-tag="core" data-node-context="Architecture component">
+          <title>BC Orquestração · spec 005 · Fase 02 · Architecture component · core</title>
+          <rect x="2020" y="552" width="180" height="78" rx="6" class="c-mask"/>
+          <rect x="2020" y="552" width="180" height="78" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(2026 558) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-detail-anchor x="2110" y="589" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">BC Orquestração</text>
+        <text data-detail="context" x="2110" y="605" class="t-muted" font-size="9" text-anchor="middle">spec 005 · Fase 02</text>
+        <text data-detail="fine" x="2110" y="622" class="t-backend" font-size="7" text-anchor="middle">core</text>
+        </g>
+
+        <g id="node-s3raw" data-node-id="s3raw" data-node-label="S3 nexo-orcamentos-raw" tabindex="0" role="button" aria-label="Focus S3 nexo-orcamentos-raw, bruto imutável · versionado, Architecture component" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="bruto imutável · versionado" data-node-context="Architecture component">
+          <title>S3 nexo-orcamentos-raw · bruto imutável · versionado · Architecture component</title>
+          <rect x="300" y="730" width="170" height="62" rx="6" class="c-mask"/>
+          <rect x="300" y="730" width="170" height="62" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(306 736) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-detail-anchor x="385" y="759" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">S3 nexo-orcamentos-raw</text>
+        <text data-detail="context" x="385" y="775" class="t-muted" font-size="9" text-anchor="middle">bruto imutável · versionado</text>
+        </g>
+
+        <g id="node-bus" data-node-id="bus" data-node-label="EventBridge · nexo-dominio-bus" tabindex="0" role="button" aria-label="Focus EventBridge · nexo-dominio-bus, único acoplamento entre BCs (Princípio II), Architecture component" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="único acoplamento entre BCs (Princípio II)" data-node-context="Architecture component">
+          <title>EventBridge · nexo-dominio-bus · único acoplamento entre BCs (Princípio II) · Architecture component</title>
+          <rect x="1160" y="792" width="360" height="96" rx="6" class="c-mask"/>
+          <rect x="1160" y="792" width="360" height="96" rx="6" class="c-messagebus" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(1166 798) scale(0.6875)">
             <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
             <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
             <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
             <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
           </g>
-          <text data-detail-anchor x="355" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">EventBridge</text>
-        <text data-detail="context" x="355" y="345" class="t-muted" font-size="9" text-anchor="middle">nexo-dominio-bus</text>
+          <text data-detail-anchor x="1340" y="838" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">EventBridge · nexo-dominio-bus</text>
+        <text data-detail="context" x="1340" y="854" class="t-muted" font-size="9" text-anchor="middle">único acoplamento entre BCs (Princípio II)</text>
         </g>
 
-        <g id="node-aurora" data-node-id="aurora" data-node-label="Aurora Postgres" tabindex="0" role="button" aria-label="Focus Aurora Postgres, contexto consolidado, AWS us-east-1 · Nexo" aria-pressed="false" data-node-kind="database" data-node-sublabel="contexto consolidado" data-node-context="AWS us-east-1 · Nexo">
-          <title>Aurora Postgres · contexto consolidado · AWS us-east-1 · Nexo</title>
-          <rect x="280" y="480" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="280" y="480" width="150" height="62" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(286 486) scale(0.6875)">
+        <g id="node-aurora" data-node-id="aurora" data-node-label="Aurora Serverless v2" tabindex="0" role="button" aria-label="Focus Aurora Serverless v2, schema por BC · pgvector (Indexação), Isolamento multi-tenant · TenantId (Shared Kernel) + RLS" aria-pressed="false" data-node-kind="database" data-node-sublabel="schema por BC · pgvector (Indexação)" data-node-tag="state" data-node-context="Isolamento multi-tenant · TenantId (Shared Kernel) + RLS">
+          <title>Aurora Serverless v2 · schema por BC · pgvector (Indexação) · Isolamento multi-tenant · TenantId (Shared Kernel) + RLS · state</title>
+          <rect x="550" y="1000" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="550" y="1000" width="180" height="64" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(556 1006) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-detail-anchor x="355" y="509" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Aurora Postgres</text>
-        <text data-detail="context" x="355" y="525" class="t-muted" font-size="9" text-anchor="middle">contexto consolidado</text>
+          <text data-detail-anchor x="640" y="1030" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Aurora Serverless v2</text>
+        <text data-detail="context" x="640" y="1046" class="t-muted" font-size="9" text-anchor="middle">schema por BC · pgvector (Indexação)</text>
+        <text data-detail="fine" x="640" y="1056" class="t-database" font-size="7" text-anchor="middle">state</text>
         </g>
 
-        <g id="node-consumidores" data-node-id="consumidores" data-node-label="Consumidores Externos" tabindex="0" role="button" aria-label="Focus Consumidores Externos, sistema de compras + frontend/API, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="sistema de compras + frontend/API" data-node-context="Architecture component">
-          <title>Consumidores Externos · sistema de compras + frontend/API · Architecture component</title>
-          <rect x="280" y="120" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="280" y="120" width="150" height="62" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(286 126) scale(0.6875)">
-            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
-            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
-          </g>
-          <text data-detail-anchor x="355" y="149" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Consumidores Externos</text>
-        <text data-detail="context" x="355" y="165" class="t-muted" font-size="9" text-anchor="middle">sistema de compras + frontend/API</text>
-        </g>
-
-        <g id="node-orquestrador" data-node-id="orquestrador" data-node-label="Agente Orquestrador" tabindex="0" role="button" aria-label="Focus Agente Orquestrador, Bedrock, AWS us-east-1 · Nexo › BC: Orquestração" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Bedrock" data-node-context="AWS us-east-1 · Nexo › BC: Orquestração">
-          <title>Agente Orquestrador · Bedrock · AWS us-east-1 · Nexo › BC: Orquestração</title>
-          <rect x="520" y="300" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="520" y="300" width="150" height="62" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(526 306) scale(0.6875)">
+        <g id="node-acomp" data-node-id="acomp" data-node-label="BC Acompanhamento" tabindex="0" role="button" aria-label="Focus BC Acompanhamento, spec 007 · auditoria (append-only), Isolamento multi-tenant · TenantId (Shared Kernel) + RLS" aria-pressed="false" data-node-kind="backend" data-node-sublabel="spec 007 · auditoria (append-only)" data-node-tag="core" data-node-context="Isolamento multi-tenant · TenantId (Shared Kernel) + RLS">
+          <title>BC Acompanhamento · spec 007 · auditoria (append-only) · Isolamento multi-tenant · TenantId (Shared Kernel) + RLS · core</title>
+          <rect x="920" y="1000" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="920" y="1000" width="180" height="64" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(926 1006) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-detail-anchor x="595" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Agente Orquestrador</text>
-        <text data-detail="context" x="595" y="345" class="t-muted" font-size="9" text-anchor="middle">Bedrock</text>
+          <text data-detail-anchor x="1010" y="1030" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">BC Acompanhamento</text>
+        <text data-detail="context" x="1010" y="1046" class="t-muted" font-size="9" text-anchor="middle">spec 007 · auditoria (append-only)</text>
+        <text data-detail="fine" x="1010" y="1056" class="t-backend" font-size="7" text-anchor="middle">core</text>
         </g>
 
-        <g id="node-fila" data-node-id="fila" data-node-label="Fila de Escalonamento" tabindex="0" role="button" aria-label="Focus Fila de Escalonamento, própria da Orquestração, AWS us-east-1 · Nexo › BC: Orquestração" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="própria da Orquestração" data-node-context="AWS us-east-1 · Nexo › BC: Orquestração">
-          <title>Fila de Escalonamento · própria da Orquestração · AWS us-east-1 · Nexo › BC: Orquestração</title>
-          <rect x="760" y="300" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="760" y="300" width="150" height="62" rx="6" class="c-cloud" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(766 306) scale(0.6875)">
-            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+        <g id="node-conf" data-node-id="conf" data-node-label="Conformidade LGPD" tabindex="0" role="button" aria-label="Focus Conformidade LGPD, spec 008 · src/platform, Isolamento multi-tenant · TenantId (Shared Kernel) + RLS" aria-pressed="false" data-node-kind="security" data-node-sublabel="spec 008 · src/platform" data-node-tag="platform" data-node-context="Isolamento multi-tenant · TenantId (Shared Kernel) + RLS">
+          <title>Conformidade LGPD · spec 008 · src/platform · Isolamento multi-tenant · TenantId (Shared Kernel) + RLS · platform</title>
+          <rect x="1290" y="1000" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="1290" y="1000" width="180" height="64" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(1296 1006) scale(0.6875)">
+            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
+            <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-detail-anchor x="835" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Fila de Escalonamento</text>
-        <text data-detail="context" x="835" y="345" class="t-muted" font-size="9" text-anchor="middle">própria da Orquestração</text>
+          <text data-detail-anchor x="1380" y="1030" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Conformidade LGPD</text>
+        <text data-detail="context" x="1380" y="1046" class="t-muted" font-size="9" text-anchor="middle">spec 008 · src/platform</text>
+        <text data-detail="fine" x="1380" y="1056" class="t-security" font-size="7" text-anchor="middle">platform</text>
         </g>
 
-        <g id="node-humano" data-node-id="humano" data-node-label="Comprador Responsável" tabindex="0" role="button" aria-label="Focus Comprador Responsável, confirmação explícita, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="confirmação explícita" data-node-context="Architecture component">
-          <title>Comprador Responsável · confirmação explícita · Architecture component</title>
-          <rect x="1000" y="300" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="1000" y="300" width="150" height="62" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1006 306) scale(0.6875)">
+        <g id="node-fornecedores" data-node-id="fornecedores" data-node-label="Cadastro de Fornecedores" tabindex="0" role="button" aria-label="Focus Cadastro de Fornecedores, sistema externo, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="sistema externo" data-node-context="Architecture component">
+          <title>Cadastro de Fornecedores · sistema externo · Architecture component</title>
+          <rect x="1660" y="1000" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="1660" y="1000" width="180" height="64" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1666 1006) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-detail-anchor x="1075" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Comprador Responsável</text>
-        <text data-detail="context" x="1075" y="345" class="t-muted" font-size="9" text-anchor="middle">confirmação explícita</text>
+          <text data-detail-anchor x="1750" y="1030" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Cadastro de Fornecedores</text>
+        <text data-detail="context" x="1750" y="1046" class="t-muted" font-size="9" text-anchor="middle">sistema externo</text>
+        </g>
+
+        <g id="node-compras" data-node-id="compras" data-node-label="Sistema de Compras" tabindex="0" role="button" aria-label="Focus Sistema de Compras, rede varejista, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="rede varejista" data-node-context="Architecture component">
+          <title>Sistema de Compras · rede varejista · Architecture component</title>
+          <rect x="2020" y="1000" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="2020" y="1000" width="180" height="64" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(2026 1006) scale(0.6875)">
+            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
+            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
+          </g>
+          <text data-detail-anchor x="2110" y="1030" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Sistema de Compras</text>
+        <text data-detail="context" x="2110" y="1046" class="t-muted" font-size="9" text-anchor="middle">rede varejista</text>
         </g>
 
         <!-- Connection labels -->
-        <g data-detail="context" data-edge-from="upstreams" data-edge-to="bus" data-edge-label="3 eventos upstream" data-edge-key="0">
-          <rect x="186.8" y="286" width="96.39999999999999" height="14" rx="3" class="c-mask"/>
-          <text x="235" y="296" class="t-backend" font-size="8" text-anchor="middle">3 eventos upstream</text>
+
+
+        <g data-detail="context" data-edge-from="gateway" data-edge-to="s3raw" data-edge-label="grava bruto imutável" data-edge-key="2">
+          <rect x="332" y="630" width="106" height="14" rx="3" class="c-mask"/>
+          <text x="385" y="640" class="t-security" font-size="8" text-anchor="middle">grava bruto imutável</text>
         </g>
-        <g data-detail="context" data-edge-from="bus" data-edge-to="orquestrador" data-edge-label="decide roteamento" data-edge-key="1">
-          <rect x="429.2" y="311" width="91.6" height="14" rx="3" class="c-mask"/>
-          <text x="475" y="321" class="t-muted" font-size="8" text-anchor="middle">decide roteamento</text>
+        <g data-detail="context" data-edge-from="ing" data-edge-to="class" data-edge-label="ACL · InvokeModel" data-edge-key="3">
+          <rect x="564.2" y="532" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="610" y="542" class="t-backend" font-size="8" text-anchor="middle">ACL · InvokeModel</text>
         </g>
-        <g data-detail="context" data-edge-from="orquestrador" data-edge-to="fila" data-edge-label="baixa confiança → comprador" data-edge-key="2">
-          <rect x="645.2" y="277" width="139.6" height="14" rx="3" class="c-mask"/>
-          <text x="715" y="287" class="t-muted" font-size="8" text-anchor="middle">baixa confiança → comprador</text>
+        <g data-detail="context" data-edge-from="ext" data-edge-to="extag" data-edge-label="ACL · InvokeModel" data-edge-key="4">
+          <rect x="924.2" y="532" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="970" y="542" class="t-backend" font-size="8" text-anchor="middle">ACL · InvokeModel</text>
         </g>
-        <g data-detail="context" data-edge-from="fila" data-edge-to="humano" data-edge-label="confirmação" data-edge-key="3">
-          <rect x="923.6" y="311" width="62.8" height="14" rx="3" class="c-mask"/>
-          <text x="955" y="321" class="t-muted" font-size="8" text-anchor="middle">confirmação</text>
+        <g data-detail="context" data-edge-from="val" data-edge-to="cat" data-edge-label="ACL · InvokeModel" data-edge-key="5">
+          <rect x="1284.2" y="532" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="1330" y="542" class="t-backend" font-size="8" text-anchor="middle">ACL · InvokeModel</text>
         </g>
-        <g data-detail="context" data-edge-from="bus" data-edge-to="aurora" data-edge-label="persiste contexto" data-edge-key="4">
-          <rect x="309.2" y="366" width="91.6" height="14" rx="3" class="c-mask"/>
-          <text x="355" y="376" class="t-messagebus" font-size="8" text-anchor="middle">persiste contexto</text>
+        <g data-detail="context" data-edge-from="idx" data-edge-to="emb" data-edge-label="ACL · embedding" data-edge-key="6">
+          <rect x="1600.5" y="425" width="82" height="14" rx="3" class="c-mask"/>
+          <text x="1641.5" y="435" class="t-backend" font-size="8" text-anchor="middle">ACL · embedding</text>
         </g>
-        <g data-detail="context" data-edge-from="bus" data-edge-to="consumidores" data-edge-label="decisão + integração externa" data-edge-key="5">
-          <rect x="282.8" y="280" width="144.4" height="14" rx="3" class="c-mask"/>
-          <text x="355" y="290" class="t-messagebus" font-size="8" text-anchor="middle">decisão + integração externa</text>
+        <g data-detail="context" data-edge-from="idx" data-edge-to="qry" data-edge-label="ACL · consulta" data-edge-key="7">
+          <rect x="1714.9" y="425" width="77.2" height="14" rx="3" class="c-mask"/>
+          <text x="1753.5" y="435" class="t-backend" font-size="8" text-anchor="middle">ACL · consulta</text>
+        </g>
+        <g data-detail="context" data-edge-from="orq" data-edge-to="orqag" data-edge-label="ACL · InvokeModel" data-edge-key="8">
+          <rect x="2064.2" y="532" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="2110" y="542" class="t-backend" font-size="8" text-anchor="middle">ACL · InvokeModel</text>
+        </g>
+        <g data-detail="context" data-edge-from="ing" data-edge-to="bus" data-edge-label="OrcamentoClassificado" data-edge-key="9">
+          <rect x="668.6" y="692" width="110.8" height="14" rx="3" class="c-mask"/>
+          <text x="724" y="702" class="t-muted" font-size="8" text-anchor="middle">OrcamentoClassificado</text>
+        </g>
+        <g data-detail="context" data-edge-from="ext" data-edge-to="bus" data-edge-label="OrcamentoExtraido" data-edge-key="10">
+          <rect x="1064.2" y="685" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="1110" y="695" class="t-muted" font-size="8" text-anchor="middle">OrcamentoExtraido</text>
+        </g>
+        <g data-detail="context" data-edge-from="val" data-edge-to="bus" data-edge-label="OrcamentoValidado" data-edge-key="11">
+          <rect x="1297.2" y="634" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="1343" y="644" class="t-muted" font-size="8" text-anchor="middle">OrcamentoValidado</text>
+        </g>
+        <g data-detail="context" data-edge-from="idx" data-edge-to="bus" data-edge-label="OrcamentoIndexado" data-edge-key="12">
+          <rect x="1514.2" y="685" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="1560" y="695" class="t-muted" font-size="8" text-anchor="middle">OrcamentoIndexado</text>
+        </g>
+        <g data-detail="context" data-edge-from="orq" data-edge-to="bus" data-edge-label="decisões de workflow" data-edge-key="13">
+          <rect x="1943" y="692" width="106" height="14" rx="3" class="c-mask"/>
+          <text x="1996" y="702" class="t-muted" font-size="8" text-anchor="middle">decisões de workflow</text>
+        </g>
+        <g data-detail="context" data-edge-from="bus" data-edge-to="aurora" data-edge-label="materializa estado" data-edge-key="14">
+          <rect x="705.8" y="926.5" width="96.39999999999999" height="14" rx="3" class="c-mask"/>
+          <text x="754" y="936.5" class="t-muted" font-size="8" text-anchor="middle">materializa estado</text>
+        </g>
+        <g data-detail="context" data-edge-from="bus" data-edge-to="acomp" data-edge-label="consome TODOS os eventos" data-edge-key="15">
+          <rect x="1067.4" y="919.5" width="125.19999999999999" height="14" rx="3" class="c-mask"/>
+          <text x="1130" y="929.5" class="t-backend" font-size="8" text-anchor="middle">consome TODOS os eventos</text>
+        </g>
+        <g data-detail="context" data-edge-from="bus" data-edge-to="conf" data-edge-label="eventos LGPD" data-edge-key="16">
+          <rect x="1326.2" y="924" width="67.6" height="14" rx="3" class="c-mask"/>
+          <text x="1360" y="934" class="t-security" font-size="8" text-anchor="middle">eventos LGPD</text>
+        </g>
+        <g data-detail="context" data-edge-from="bus" data-edge-to="fornecedores" data-edge-label="consulta síncrona" data-edge-key="17">
+          <rect x="1544.2" y="926.5" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="1590" y="936.5" class="t-messagebus" font-size="8" text-anchor="middle">consulta síncrona</text>
+        </g>
+        <g data-detail="context" data-edge-from="bus" data-edge-to="compras" data-edge-label="IntegracaoExternaSolicitada" data-edge-key="18">
+          <rect x="1926.2" y="919.5" width="139.6" height="14" rx="3" class="c-mask"/>
+          <text x="1996" y="929.5" class="t-muted" font-size="8" text-anchor="middle">IntegracaoExternaSolicitada</text>
         </g>
 
         <!-- Legend -->
         <g data-legend-bridge>
-          <text x="40" y="601" class="t-primary" font-size="9" font-weight="600">Legend</text>
+          <text x="40" y="1123" class="t-primary" font-size="9" font-weight="600">Legend</text>
+          <g data-legend-kind="cloud">
+            <rect x="40" y="1128" width="14" height="9" rx="2" class="c-cloud" stroke-width="1"/>
+            <text x="60" y="1136" class="t-muted" font-size="8">Cloud</text>
+          </g>
           <g data-legend-kind="external">
-            <rect x="40" y="606" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
-            <text x="60" y="614" class="t-muted" font-size="8">External</text>
+            <rect x="129" y="1128" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
+            <text x="149" y="1136" class="t-muted" font-size="8">External</text>
           </g>
-          <g data-legend-kind="messagebus">
-            <rect x="144" y="606" width="14" height="9" rx="2" class="c-messagebus" stroke-width="1"/>
-            <text x="164" y="614" class="t-muted" font-size="8">Message bus</text>
-          </g>
-          <g data-legend-kind="database">
-            <rect x="263" y="606" width="14" height="9" rx="2" class="c-database" stroke-width="1"/>
-            <text x="283" y="614" class="t-muted" font-size="8">Database</text>
+          <g data-legend-kind="security">
+            <rect x="233" y="1128" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
+            <text x="253" y="1136" class="t-muted" font-size="8">Security</text>
           </g>
           <g data-legend-kind="backend">
-            <rect x="367" y="606" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
-            <text x="387" y="614" class="t-muted" font-size="8">Backend</text>
+            <rect x="337" y="1128" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
+            <text x="357" y="1136" class="t-muted" font-size="8">Backend</text>
           </g>
-          <g data-legend-kind="cloud">
-            <rect x="466" y="606" width="14" height="9" rx="2" class="c-cloud" stroke-width="1"/>
-            <text x="486" y="614" class="t-muted" font-size="8">Cloud</text>
+          <g data-legend-kind="messagebus">
+            <rect x="436" y="1128" width="14" height="9" rx="2" class="c-messagebus" stroke-width="1"/>
+            <text x="456" y="1136" class="t-muted" font-size="8">Message bus</text>
+          </g>
+          <g data-legend-kind="database">
+            <rect x="555" y="1128" width="14" height="9" rx="2" class="c-database" stroke-width="1"/>
+            <text x="575" y="1136" class="t-muted" font-size="8">Database</text>
           </g>
         </g>
       </svg>
@@ -4904,44 +5127,45 @@
     <div class="cards">
       <div class="card">
         <div class="card-header">
-          <div class="card-dot rose"></div>
-          <h3>Maior risco financeiro da cadeia</h3>
+          <div class="card-dot cyan"></div>
+          <h3>Integrações Core ↔ Bedrock</h3>
         </div>
         <ul>
-          <li>&bull; Nunca aprova automaticamente sem confiança suficiente</li>
-          <li>&bull; 3 desfechos possíveis: aprovar, encaminhar, reenviar</li>
-          <li>&bull; Reenvio nunca sem fundamento de dado ausente</li>
+          <li>&bull; 6 pontos de invocação, cada um atrás de ACL própria</li>
+          <li>&bull; Saída estruturada (tool-use / JSON Schema), nunca texto livre</li>
+          <li>&bull; Papéis fixos apenas; baixa confiança escala direto p/ revisão humana (sem agente revisor de IA)</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <div class="card-dot cyan"></div>
-          <h3>Customer de 3 suppliers</h3>
+          <div class="card-dot rose"></div>
+          <h3>Acoplamento &amp; Estado</h3>
         </div>
         <ul>
-          <li>&bull; Consolida Classificação + Extração + Validação</li>
-          <li>&bull; Cópia própria e imutável do contexto, nunca payload expandido</li>
-          <li>&bull; Nenhum upstream é alterado por esta decisão</li>
+          <li>&bull; EventBridge nexo-dominio-bus é o único acoplamento entre BCs</li>
+          <li>&bull; S3 raw imutável e versionado (Princípio III)</li>
+          <li>&bull; Aurora v2 com schema isolado por BC + pgvector na Indexação</li>
+          <li>&bull; DynamoDB (TTL) cacheia identificação de fornecedor na Ingestão</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot emerald"></div>
-          <h3>Integração desacoplada</h3>
+          <h3>Plataforma &amp; Externos</h3>
         </div>
         <ul>
-          <li>&bull; Evento de integração nunca conhece o protocolo do parceiro</li>
-          <li>&bull; Orquestrador em baixa confiança escala direto ao comprador</li>
-          <li>&bull; Escalonamento só avança por confirmação humana explícita</li>
+          <li>&bull; TenantId Shared Kernel + RLS isolam cada tenant</li>
+          <li>&bull; Conformidade LGPD orquestra esquecimento/anonimização por evento</li>
+          <li>&bull; Fornecedores é leitura síncrona; Compras consome IntegracaoExternaSolicitada</li>
         </ul>
       </div>
     </div>
 
     <!-- Footer -->
     <p class="footer">
-      Architecture diagram &bull; Built with Archify<span class="no-print"> &bull; <a class="artifact-start-link" href="https://tt-a1i.github.io/archify/start.html?type=architecture&amp;source=artifact" target="_blank" rel="noopener noreferrer">Create yours &nearr;</a> &bull; Hover to trace &bull; <kbd>R</kbd> route &bull; Click to focus &bull; <kbd>+</kbd>/<kbd>&minus;</kbd> zoom &bull; <kbd>M</kbd> radar &bull; <kbd>T</kbd> theme &bull; <kbd>E</kbd> export</span>
+      Architecture diagram &bull; Built with Archify<span class="no-print"> &bull; <a class="artifact-start-link" href="https://tt-a1i.github.io/archify/start.html?type=architecture&amp;source=artifact" target="_blank" rel="noopener noreferrer">Create yours &nearr;</a> &bull; Hover to trace &bull; <kbd>R</kbd> route &bull; Click to focus &bull; <kbd>+</kbd>/<kbd>&minus;</kbd> zoom &bull; <kbd>M</kbd> radar &bull; <kbd>[</kbd>/<kbd>]</kbd> views &bull; <kbd>P</kbd> play story &bull; <kbd>T</kbd> theme &bull; <kbd>E</kbd> export</span>
     </p>
   </div>
 

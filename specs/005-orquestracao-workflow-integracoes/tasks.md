@@ -16,13 +16,14 @@
 
 - [ ] T001 Criar estrutura de pastas `src/bounded-contexts/orquestracao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/orquestracao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pelas specs 001–003 — não repetir setup daquelas specs).
 - [ ] T002 [P] Migração Drizzle Kit: schema inicial do BC Orquestração (tabelas vazias, baseline) — ADR-001 da spec 001, herdado.
-- [ ] T003 [P] Provisionar 4 filas SQS (`contexto-classificacao-queue`, `contexto-extracao-queue`, `decisao-workflow-queue`, `revisor-workflow-queue`), cada uma com DLQ própria + alarme CloudWatch em mensagem na DLQ (IaC — Ricardo/DevOps).
+- [ ] T003 [P] Provisionar 3 filas SQS (`contexto-classificacao-queue`, `contexto-extracao-queue`, `decisao-workflow-queue`), cada uma com DLQ própria + alarme CloudWatch em mensagem na DLQ (IaC — Ricardo/DevOps).
 - [ ] T004 [P] Provisionar regra EventBridge no bus `nexo-dominio-bus` roteando `detail-type: OrcamentoClassificado`, `source: nexo.ingestao-identificacao` → `contexto-classificacao-queue`.
 - [ ] T005 [P] Provisionar regra EventBridge roteando `detail-type: OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, `source: nexo.extracao` → `contexto-extracao-queue`.
 - [ ] T006 [P] Provisionar regra EventBridge roteando `detail-type: OrcamentoValidado`/`OrcamentoValidadoComRessalva`, `source: nexo.validacao` → `decisao-workflow-queue`.
-- [ ] T007 [P] Provisionar regra EventBridge roteando `detail-type: DecisaoWorkflowBaixaConfiancaDetectada` (interno, `source: nexo.orquestracao`) → `revisor-workflow-queue`.
 
-**Checkpoint**: estrutura pronta, 4 filas e 4 regras de roteamento provisionadas, CI verde.
+> **Nota (revisão)**: T007 (regra EventBridge `DecisaoWorkflowBaixaConfiancaDetectada` → `revisor-workflow-queue`) foi **removida** — o Agente Revisor de Workflow deixou de existir. A fila `revisor-workflow-queue` também foi removida (T003). O ID T007 não existe mais; os demais IDs foram mantidos estáveis para preservar a rastreabilidade das issues do GitHub.
+
+**Checkpoint**: estrutura pronta, 3 filas e 3 regras de roteamento provisionadas, CI verde.
 
 ---
 
@@ -34,11 +35,11 @@
 - [ ] T009 [P] Domain: implementar VOs `ContextoClassificacao`, `ContextoExtracao`, `ContextoValidacao` (cópias imutáveis traduzidas dos payloads upstream, ver `plan.md` seção Domain).
 - [ ] T010 Domain: implementar VO `DecisaoRoteamento` com as invariantes estruturais críticas — construtor rejeita: `acao === 'APROVAR'` sem `contextoValidacao.resultado` em `VALIDADO`/`VALIDADO_COM_RESSALVA`; `acao === 'SOLICITAR_REENVIO'` sem `motivoDadoAusente` não vazio referenciando inconsistência/pendência concreta; qualquer decisão automática (`agenteOrigem !== 'HUMANO'`) sem `criterio` não vazio. Critério de aceite: unit test para cada uma das 3 rejeições, mapeando diretamente as "Ações proibidas" e critérios de aceite do `spec.md`.
 - [ ] T011 [P] Domain: implementar VO `TentativaDecisaoWorkflow` (histórico imutável).
-- [ ] T012 Domain: implementar agregado `DecisaoWorkflow` (`decisao-workflow.aggregate.ts`) com `registrarContextoClassificacao/Extracao/Validacao` (idempotentes, lançam `ContextoImutavelError` em reentrega divergente), `consolidarContexto()` (lança `ContextoIncompletoError` se algum dos 3 contextos ausente), `registrarTentativaOrquestrador`, `registrarTentativaRevisor`, `registrarDecisaoHumana`, histórico append-only. Critério: unit test que tenta consolidar/decidir com contexto incompleto e espera `ContextoIncompletoError`, nunca uma decisão parcial.
-- [ ] T013 [P] Domain: definir os 6 Domain Events (`orcamento-aprovado-para-processamento`, `orcamento-encaminhado-para-comprador`, `orcamento-reenvio-solicitado`, `integracao-externa-solicitada`, `decisao-workflow-baixa-confianca-detectada`, `decisao-workflow-escalonada-para-comprador`) com `schemaVersion: 1`, `source: nexo.orquestracao`, conforme convenção do `plan.md`.
-- [ ] T014 [P] Domain: definir interfaces de repositório/gateway (`decisao-workflow.repository.ts`, `agente-orquestrador.gateway.ts`, `agente-revisor-workflow.gateway.ts`, `orcamento-classificado-event.acl.ts`, `orcamento-extraido-event.acl.ts`, `orcamento-validado-event.acl.ts`) — sem implementação, apenas contratos TypeScript.
+- [ ] T012 Domain: implementar agregado `DecisaoWorkflow` (`decisao-workflow.aggregate.ts`) com `registrarContextoClassificacao/Extracao/Validacao` (idempotentes, lançam `ContextoImutavelError` em reentrega divergente), `consolidarContexto()` (lança `ContextoIncompletoError` se algum dos 3 contextos ausente), `registrarTentativaOrquestrador` (confiança insuficiente → transita direto para `PENDENTE_REVISAO_HUMANA`), `registrarDecisaoHumana`, histórico append-only. Critério: unit test que tenta consolidar/decidir com contexto incompleto e espera `ContextoIncompletoError`, nunca uma decisão parcial.
+- [ ] T013 [P] Domain: definir os 5 Domain Events (`orcamento-aprovado-para-processamento`, `orcamento-encaminhado-para-comprador`, `orcamento-reenvio-solicitado`, `integracao-externa-solicitada`, `decisao-workflow-escalonada-para-comprador`) com `schemaVersion: 1`, `source: nexo.orquestracao`, conforme convenção do `plan.md`. `decisao-workflow-escalonada-para-comprador` é publicado diretamente quando o Orquestrador não atinge confiança suficiente.
+- [ ] T014 [P] Domain: definir interfaces de repositório/gateway (`decisao-workflow.repository.ts`, `agente-orquestrador.gateway.ts`, `orcamento-classificado-event.acl.ts`, `orcamento-extraido-event.acl.ts`, `orcamento-validado-event.acl.ts`) — sem implementação, apenas contratos TypeScript.
 - [ ] T015 Infrastructure: schema Drizzle das tabelas `decisoes_workflow` (estado atual, contextos/decisão em colunas JSONB) e `decisoes_workflow_historico` (append-only, sem UPDATE/DELETE) + migração.
-- [ ] T016 Infrastructure: `DrizzleDecisaoWorkflowRepository` implementando `DecisaoWorkflowRepository`, traduzindo linha↔agregado; expõe `buscarDecisoesAnterioresPorFornecedor(fornecedorIdentificado)` para o contexto adicional do Revisor.
+- [ ] T016 Infrastructure: `DrizzleDecisaoWorkflowRepository` implementando `DecisaoWorkflowRepository`, traduzindo linha↔agregado.
 - [ ] T017 [P] Infrastructure: `OrcamentoClassificadoEventACL`, `OrcamentoExtraidoEventACL`, `OrcamentoValidadoEventACL` traduzindo os 3 payloads de evento upstream — nunca importam tipos de domínio dos BCs de origem.
 - [ ] T018 Infrastructure: `EventBridgePublisher` implementando `EventPublisher` (instância própria deste BC, mesmo bus `nexo-dominio-bus`).
 - [ ] T019 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta das specs 001–003).
@@ -76,30 +77,30 @@
 
 ---
 
-## Phase 4: User Story 2 — Governança de baixa confiança: Revisor de IA e escalonamento humano (Priority: P1) 🎯 MVP
+## Phase 4: User Story 2 — Governança de baixa confiança: escalonamento humano ao comprador (Priority: P1) 🎯 MVP
 
-**Goal**: quando o Orquestrador não atinge confiança suficiente, o Agente Revisor de Workflow tenta decidir automaticamente com contexto adicional; se também não atingir confiança suficiente, o orçamento vai para a fila de escalonamento assíncrona do comprador — nunca há aprovação automática por exaustão/tempo/volume, e a decisão humana explícita (qualquer uma das 3 ações) é registrada com o mesmo peso de uma decisão automática.
+**Goal**: quando o Orquestrador não atinge confiança suficiente, o orçamento vai diretamente para a fila de escalonamento assíncrona do comprador (sem agente revisor de IA) — nunca há aprovação automática por exaustão/tempo/volume, e a decisão humana explícita (qualquer uma das 3 ações) é registrada com o mesmo peso de uma decisão automática.
 
-**Independent Test**: publicar cenário de contexto consolidado com resultado de baixa confiança simulado no `AgenteOrquestradorGateway` (mock); verificar que (a) `DecisaoWorkflowBaixaConfiancaDetectada` é publicado, (b) `AgenteRevisorWorkflowGateway` é acionado automaticamente, (c) se o Revisor também reporta baixa confiança, `DecisaoWorkflowEscalonadaParaComprador` é publicado e o agregado permanece em `PENDENTE_REVISAO_HUMANA` indefinidamente até decisão humana via API — critério de aceite spec.md "nenhum orçamento é aprovado automaticamente sem que Orquestrador ou Agente Revisor tenham reportado confiança suficiente" e "só avança mediante confirmação explícita do comprador... nunca por tempo de espera, volume da fila, ou exaustão de tentativas".
+**Independent Test**: publicar cenário de contexto consolidado com resultado de baixa confiança simulado no `AgenteOrquestradorGateway` (mock); verificar que (a) `DecisaoWorkflowEscalonadaParaComprador` é publicado diretamente, (b) o agregado permanece em `PENDENTE_REVISAO_HUMANA` indefinidamente até decisão humana via API — critério de aceite spec.md "nenhum orçamento é aprovado automaticamente sem que o Orquestrador tenha reportado confiança suficiente" e "só avança mediante confirmação explícita do comprador... nunca por tempo de espera, volume da fila, ou exaustão de tentativas".
 
 ### Tests (US2)
 
-- [ ] T033 [P] [US2] Unit test `DecisaoWorkflow.registrarTentativaOrquestrador` com confiança insuficiente → transita para `EM_REVISAO_AUTOMATICA`, nunca para `DECIDIDO`.
-- [ ] T034 [P] [US2] Unit test `DecisaoWorkflow.registrarTentativaRevisor` — confiança insuficiente → transita para `PENDENTE_REVISAO_HUMANA` (nunca uma segunda tentativa automática); confiança suficiente → mesmas invariantes de negócio de `registrarTentativaOrquestrador` (T010/T022) se aplicam igualmente ao Revisor.
+- [ ] T033 [P] [US2] Unit test `DecisaoWorkflow.registrarTentativaOrquestrador` com confiança insuficiente → transita direto para `PENDENTE_REVISAO_HUMANA` (publica `DecisaoWorkflowEscalonadaParaComprador`), nunca para `DECIDIDO`.
 - [ ] T035 [P] [US2] Unit test `DecisaoWorkflow.registrarDecisaoHumana` — só válido a partir de `PENDENTE_REVISAO_HUMANA`; aceita qualquer uma das 3 ações sem exigir `nivelConfianca`, mas exige `criterio`/justificativa não vazia; histórico nunca sobrescrito, apenas anexado.
+
+> **Nota (revisão)**: T034 (unit test de `registrarTentativaRevisor`) foi **removido** — o Agente Revisor de Workflow deixou de existir. O ID T034 não existe mais.
 - [ ] T036 [P] [US2] Unit test explícito: nenhuma transição do agregado permite `acao: 'APROVAR'` publicado automaticamente sem `nivelConfianca` presente e suficiente (agente) ou sem decisão humana explícita — teste negativo cobrindo "nunca autoaprova por exaustão/tempo/volume" (não há nenhum caminho de código que decida por timeout).
 - [ ] T037 [P] [US2] Contract test `POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana` (aceito em `PENDENTE_REVISAO_HUMANA`; 409 Problem Details em qualquer outro status).
-- [ ] T038 [P] [US2] Integration test: contexto consolidado com baixa confiança simulada no Orquestrador e no Revisor → `DecisaoWorkflowEscalonadaParaComprador` publicado → decisão humana via API → evento de desfecho correspondente publicado com `agenteOrigem: 'HUMANO'`; status reflete `PENDENTE_REVISAO_HUMANA` durante a espera, sem bloquear outros orçamentos.
+- [ ] T038 [P] [US2] Integration test: contexto consolidado com baixa confiança simulada no Orquestrador → `DecisaoWorkflowEscalonadaParaComprador` publicado diretamente (sem revisor de IA) → decisão humana via API → evento de desfecho correspondente publicado com `agenteOrigem: 'HUMANO'`; status reflete `PENDENTE_REVISAO_HUMANA` durante a espera, sem bloquear outros orçamentos.
 
 ### Implementation (US2)
 
-- [ ] T039 [US2] Infrastructure: `BedrockRevisorWorkflowGateway` + ACL própria (mesma disciplina de saída estruturada do T025), com contexto adicional (histórico de decisões anteriores do fornecedor via `buscarDecisoesAnterioresPorFornecedor`, resultado completo de validação, decisões similares).
-- [ ] T040 [US2] Application: completar `ConsolidarEDecidirWorkflow` (T028) para o caminho de baixa confiança — publicar `DecisaoWorkflowBaixaConfiancaDetectada` quando o Orquestrador não atinge confiança suficiente.
-- [ ] T041 [US2] Application: caso de uso `RevisarDecisaoWorkflowComIA` (consome `DecisaoWorkflowBaixaConfiancaDetectada`, invoca `AgenteRevisorWorkflowGateway`, aplica `registrarTentativaRevisor`, publica evento de desfecho ou `DecisaoWorkflowEscalonadaParaComprador`).
+- [ ] T040 [US2] Application: completar `ConsolidarEDecidirWorkflow` (T028) para o caminho de baixa confiança — transitar o agregado para `PENDENTE_REVISAO_HUMANA` e publicar `DecisaoWorkflowEscalonadaParaComprador` diretamente quando o Orquestrador não atinge confiança suficiente.
 - [ ] T042 [US2] Application: caso de uso `RegistrarDecisaoHumanaWorkflow` (valida status `PENDENTE_REVISAO_HUMANA`, aplica `registrarDecisaoHumana`, publica evento de desfecho com `agenteOrigem: 'HUMANO'`).
-- [ ] T043 [US2] Interface: handler Lambda consumidor de `revisor-workflow-queue`, invocando `RevisarDecisaoWorkflowComIA`.
 - [ ] T044 [US2] Interface: controller `POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana`, Zod schema (`acao`, `justificativa` obrigatória, `motivoDadoAusente` obrigatório quando `acao === 'SOLICITAR_REENVIO'`), papel "comprador responsável" via Cognito, Problem Details para 409.
-- [ ] T045 [US2] IAM: roles dedicadas `RevisarDecisaoWorkflowComIALambdaRole`, `RegistrarDecisaoHumanaWorkflowLambdaRole`, least privilege.
+- [ ] T045 [US2] IAM: role dedicada `RegistrarDecisaoHumanaWorkflowLambdaRole`, least privilege.
+
+> **Nota (revisão)**: T039 (`BedrockRevisorWorkflowGateway`), T041 (caso de uso `RevisarDecisaoWorkflowComIA`) e T043 (handler consumidor de `revisor-workflow-queue`) foram **removidos** — o Agente Revisor de Workflow deixou de existir. O caminho de baixa confiança agora é publicado diretamente pelo `ConsolidarEDecidirWorkflow` (T040). Os IDs T039, T041 e T043 não existem mais; os demais foram mantidos estáveis para preservar a rastreabilidade das issues do GitHub.
 
 **Checkpoint**: US2 funcional isoladamente — nenhuma decisão de aprovação é tomada sem confiança suficiente reportada ou decisão humana explícita, em nenhum cenário; pipeline nunca trava; fila de escalonamento nunca autoaprova.
 
@@ -119,7 +120,7 @@
 
 ### Implementation (US3)
 
-- [ ] T049 [US3] Application: estender `ConsolidarEDecidirWorkflow` e `RevisarDecisaoWorkflowComIA` para publicar `IntegracaoExternaSolicitada` em conjunto com o evento de desfecho quando `requerIntegracaoExterna === true` (ADR-003 do `plan.md`).
+- [ ] T049 [US3] Application: estender `ConsolidarEDecidirWorkflow` e `RegistrarDecisaoHumanaWorkflow` para publicar `IntegracaoExternaSolicitada` em conjunto com o evento de desfecho quando `requerIntegracaoExterna === true` (ADR-003 do `plan.md`).
 - [ ] T050 [US3] Domain: garantir que `ReenvioSemFundamentoError` inclui referência legível ao que faltou validar/preencher (nunca mensagem genérica) — mesma disciplina de `InconsistenciaDetectada.detalhe` da spec 003.
 
 **Checkpoint**: todas as user stories funcionais e testáveis independentemente; reenvio sempre fundamentado; integração externa sempre desacoplada de protocolo específico.
@@ -129,9 +130,9 @@
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [ ] T051 [P] Documentação OpenAPI gerada a partir dos schemas Zod dos 2 endpoints REST deste BC (status, decisão humana).
-- [ ] T052 Medir p95 real end-to-end (validação disponível → decisão de workflow publicada) em ambiente de teste; decidir se `AgenteOrquestradorGateway`/`AgenteRevisorWorkflowGateway` exigem Provisioned Concurrency, dado ser a decisão de maior risco financeiro da cadeia (ver Constraints do `plan.md`).
-- [ ] T053 Security review: `npm audit`/`pnpm audit`, Semgrep, revisão de prompt injection no prompt do Orquestrador/Revisor (texto de itens vindo do `contextoExtracao` é entrada não confiável, mesma disciplina de bloco delimitado das specs 001–003), revisão específica de que nenhuma resposta do Bedrock sem `criterio` não vazio é aceita pela ACL.
-- [ ] T054 [P] Métrica de observabilidade: "distribuição das 3 decisões por camada decisora", "percentual de decisões resolvidas pelo Revisor sem chegar à fila", "taxa e idade da fila de escalonamento", conforme "Métricas de Avaliação Contínua" do spec.md.
+- [ ] T052 Medir p95 real end-to-end (validação disponível → decisão de workflow publicada) em ambiente de teste; decidir se `AgenteOrquestradorGateway` exige Provisioned Concurrency, dado ser a decisão de maior risco financeiro da cadeia (ver Constraints do `plan.md`).
+- [ ] T053 Security review: `npm audit`/`pnpm audit`, Semgrep, revisão de prompt injection no prompt do Orquestrador (texto de itens vindo do `contextoExtracao` é entrada não confiável, mesma disciplina de bloco delimitado das specs 001–003), revisão específica de que nenhuma resposta do Bedrock sem `criterio` não vazio é aceita pela ACL.
+- [ ] T054 [P] Métrica de observabilidade: "distribuição das 3 decisões por camada decisora (Orquestrador / comprador)", "percentual de decisões escalonadas ao comprador por baixa confiança", "taxa e idade da fila de escalonamento", conforme "Métricas de Avaliação Contínua" do spec.md.
 - [ ] T055 Coordenar com owner do futuro BC Acompanhamento o cálculo da métrica "taxa de decisão de aprovação automática revertida posteriormente por um comprador" — métrica de maior criticidade de negócio da spec, dependente de dado cross-BC (decisão automática × reversão humana futura), fora do escopo de implementação deste BC (ver Riscos remanescentes do `plan.md`).
 - [ ] T056 Coordenar com owners das specs 002/003 a garantia de que o payload de `OrcamentoExtraido`/`OrcamentoValidado` contém dado suficiente para montar `ContextoExtracao`/`ContextoValidacao` sem reabertura de contrato — dependência registrada como risco remanescente no `plan.md` (ADR-001).
 - [ ] T057 Runbook operacional para a DLQ de `decisao-workflow-queue`: mensagem na DLQ dessa fila específica significa "contexto nunca se consolidou" (ver ADR-001) — procedimento de investigação (verificar se `OrcamentoClassificado`/`OrcamentoExtraido` foram de fato publicados para o `orcamentoId`) distinto do runbook genérico de DLQ das specs 001–003.
@@ -154,14 +155,14 @@
 
 - **US1 (P1)**: nenhuma dependência de outra story.
 - **US2 (P1)**: nenhuma dependência de código de US1, mas compartilha o caso de uso `ConsolidarEDecidirWorkflow` (T028) como ponto de entrada — mesmo padrão de compartilhamento já usado entre US1/US2 da spec 003.
-- **US3 (P2)**: requer T010/T028 (US1) e T041 (US2, para cobrir também o caminho do Revisor) como ponto de integração das regras de fundamento/integração, mas a validação estrutural em si (T010) já está em Foundational — os testes de US3 podem ser escritos e passar assim que Foundational estiver completo, mesmo antes de US1/US2 estarem "prontas" para produção.
+- **US3 (P2)**: requer T010/T028 (US1) como ponto de integração das regras de fundamento/integração, mas a validação estrutural em si (T010) já está em Foundational — os testes de US3 podem ser escritos e passar assim que Foundational estiver completo, mesmo antes de US1/US2 estarem "prontas" para produção.
 
 ### Parallel Opportunities
 
 - Todos os T0XX marcados [P] na mesma fase podem rodar em paralelo (arquivos distintos, sem dependência).
 - VOs (T008–T011) em paralelo entre si; agregado (T012) depende de todos os VOs, especialmente T010.
 - Os 3 ACLs de evento upstream (T017) são implementáveis em paralelo entre si (arquivos distintos, sem dependência mútua).
-- Gateways Bedrock de US1 e US2 (T025 e T039) podem ser implementados em paralelo por desenvolvedores distintos, desde que Foundational esteja completo.
+- O gateway Bedrock do Orquestrador (T025) pode ser implementado assim que Foundational estiver completo.
 
 ---
 

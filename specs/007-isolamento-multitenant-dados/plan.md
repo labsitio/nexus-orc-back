@@ -94,7 +94,7 @@ Relação entre contextos: **Customer/Supplier** — Acompanhamento é estritame
 
 - **Novo atributo**: `tenantId: TenantId`, obrigatório, definido na criação (mesmo ponto onde `OrcamentoId` é gerado), imutável.
 - **Nova invariante**: qualquer tentativa de sobrescrever `tenantId` após criação lança `TenantIdImutavelError` (mesmo padrão de `ReferenciaBrutaImutavelError`).
-- **Evento afetado**: todos os 5 eventos de 001 (`OrcamentoRecebido`, `OrcamentoClassificado`, `OrcamentoBaixaConfiancaDetectada`, `OrcamentoEscalonadoParaRevisaoHumana`, `OrcamentoReclassificadoPorRevisaoHumana`) passam a incluir `tenantId` no payload, `schemaVersion: 2`.
+- **Evento afetado**: todos os 4 eventos de 001 (`OrcamentoRecebido`, `OrcamentoClassificado`, `OrcamentoEscalonadoParaRevisaoHumana`, `OrcamentoReclassificadoPorRevisaoHumana`) passam a incluir `tenantId` no payload, `schemaVersion: 2`.
 
 ### BC Acompanhamento (novo, escopo tático: Auditoria/Exportação)
 
@@ -106,7 +106,7 @@ Relação entre contextos: **Customer/Supplier** — Acompanhamento é estritame
 
 ### BC Ingestão & Identificação (ajuste aos casos de uso já existentes em 001)
 
-- `ReceberOrcamento(tenantId, canal, arquivo, referenciaExternaOpcional)` — `tenantId` passa a ser parâmetro obrigatório, resolvido pela Interface a partir do JWT (ou do mapeamento SFTP), nunca do corpo da requisição. Demais casos de uso de 001 (`ClassificarOrcamento`, `RevisarOrcamentoComIA`, `ConfirmarRevisaoHumana`, `ConsultarStatusOrcamento`) passam a receber/propagar `tenantId` (lido do agregado já persistido nos 3 primeiros; explícito por parâmetro no último, vindo do JWT do solicitante — e MUST validar que o `tenantId` do JWT corresponde ao `tenantId` do agregado antes de retornar qualquer dado, retornando 404 Problem Details, nunca 403 revelador de existência cross-tenant, se não corresponder).
+- `ReceberOrcamento(tenantId, canal, arquivo, referenciaExternaOpcional)` — `tenantId` passa a ser parâmetro obrigatório, resolvido pela Interface a partir do JWT (ou do mapeamento SFTP), nunca do corpo da requisição. Demais casos de uso de 001 (`ClassificarOrcamento`, `ConfirmarRevisaoHumana`, `ConsultarStatusOrcamento`) passam a receber/propagar `tenantId` (lido do agregado já persistido nos 3 primeiros; explícito por parâmetro no último, vindo do JWT do solicitante — e MUST validar que o `tenantId` do JWT corresponde ao `tenantId` do agregado antes de retornar qualquer dado, retornando 404 Problem Details, nunca 403 revelador de existência cross-tenant, se não corresponder).
 
 ### BC Acompanhamento (novo)
 
