@@ -68,7 +68,15 @@ Gere **uma vez** por sessão e guarde no scratchpad (`$PPID` muda entre chamadas
 AGENT_ID="$(hostname)/$(basename "$(git rev-parse --show-toplevel)")/${CLAUDE_SESSION_ID:-$PPID}"
 ```
 
-`hostname` é o que separa as máquinas — o resto do repositório é idêntico em todas. Se as máquinas puderem ter hostname repetido (containers com `--hostname` fixo, imagens clonadas), o `AGENT_ID` deixa de ser único e o desempate quebra: nesse caso troque `$(hostname)` por um identificador único e estável da máquina, por exemplo `cat /etc/machine-id`.
+No Windows, rode a skill pelo **Git Bash** (vem com o Git for Windows) — aí o bloco acima e todos os outros funcionam sem alteração. Em PowerShell, o equivalente:
+
+```powershell
+$AGENT_ID = "$(hostname)/$(Split-Path -Leaf (git rev-parse --show-toplevel))/$(if ($env:CLAUDE_SESSION_ID) { $env:CLAUDE_SESSION_ID } else { $PID })"
+```
+
+`cmd.exe` não serve: não tem `basename`, nem `$(...)`, nem aspas simples como literal — os `--jq '...'` desta skill quebram.
+
+`hostname` é o que separa as máquinas — o resto do repositório é idêntico em todas. Se as máquinas puderem ter hostname repetido (containers com `--hostname` fixo, imagens clonadas), o `AGENT_ID` deixa de ser único e o desempate quebra: nesse caso troque `$(hostname)` por um identificador único e estável da máquina — `cat /etc/machine-id` no Linux, `(Get-CimInstance Win32_ComputerSystemProduct).UUID` no Windows.
 
 Não guarde o lock no scratchpad: máquinas diferentes não compartilham filesystem, o scratchpad serve só para reusar o `AGENT_ID` dentro da sessão. A verdade do lock está sempre no GitHub.
 
@@ -100,14 +108,16 @@ Não guarde o lock no scratchpad: máquinas diferentes não compartilham filesys
 4. **Postar o claim** — operação que decide o vencedor:
 
    ```bash
-   gh issue comment <N> --body "🔒 claim: $AGENT_ID"
+   gh issue comment <N> --body "[claim] $AGENT_ID"
    ```
+
+   O marcador é ASCII puro de propósito. Com emoji, um agente em Windows/PowerShell pode gravar o corpo com o caractere mutilado pela code page; o `startswith` do passo 5 então não casa, o claim fica **invisível** para o desempate, e os dois agentes se consideram vencedores — exatamente a falha que a skill existe para evitar. Não troque `[claim]`/`[released]` por emoji.
 
 5. **Ler o vencedor** — menor `id` ganha:
 
    ```bash
    gh api "repos/{owner}/{repo}/issues/<N>/comments" \
-     --jq '[.[] | select(.body | startswith("🔒 claim:"))] | sort_by(.id) | .[0].body'
+     --jq '[.[] | select(.body | startswith("[claim]"))] | sort_by(.id) | .[0].body'
    ```
 
    Se a saída **não contiver o seu `AGENT_ID` em nenhum comentário da lista**, o seu próprio claim ainda não propagou (read-after-write). Não conclua que perdeu: releia uma vez antes de decidir. Só decida com o seu claim visível na lista.
@@ -117,7 +127,7 @@ Não guarde o lock no scratchpad: máquinas diferentes não compartilham filesys
    - É de outro agente → você perdeu. Marque só o **seu** comentário e volte ao passo 1 com a próxima issue:
 
      ```bash
-     gh issue comment <N> --body "↩️ released: $AGENT_ID (perdeu corrida de claim)"
+     gh issue comment <N> --body "[released] $AGENT_ID (perdeu corrida de claim)"
      ```
 
      Comentário novo, não edição do anterior: o claim do perdedor continua na thread com o `id` dele, e isso é irrelevante para o desempate — o vencedor é sempre o de **menor** `id`, então claims perdedores acumulados nunca mudam o resultado.
@@ -138,7 +148,7 @@ gh issue edit <N> --add-label done --remove-label in-progress
 Abandonado sem concluir — só faça isso se **você** é o vencedor do claim:
 
 ```bash
-gh issue comment <N> --body "↩️ released: $AGENT_ID"
+gh issue comment <N> --body "[released] $AGENT_ID"
 gh issue edit <N> --add-label ready --remove-label in-progress --remove-assignee @me
 ```
 
