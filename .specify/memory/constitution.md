@@ -1,33 +1,37 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.0.0 → 1.1.0
-Rationale: MINOR bump — Princípio IV ("Exceção Nunca É Silenciosa") teve sua redação
-expandida para reconhecer explicitamente que "acionar revisão humana" pode ser satisfeito por
-uma cadeia de (a) agente revisor de IA como primeira linha automática e (b) fila de
-escalonamento assíncrona como retaguarda humana — em vez de exigir humano em tempo real como
-única implementação válida. O princípio em si NÃO foi enfraquecido: a garantia vinculante de
-"nunca autoaprovação silenciosa, nunca descarte, nunca bloqueio dos demais documentos"
-permanece intacta e agora explícita para ambos os padrões de implementação. Motivado pela
-spec `specs/001-ingestao-classificacao-orcamentos/spec.md` v3, onde não há humano disponível
-em tempo real na operação real.
+Version change: 1.1.0 → 1.2.0
+Rationale: MINOR bump — duas novas Additional Constraints vinculantes: (1) o time é
+exclusivamente backend, nenhuma spec deste time MUST especificar comportamento de UI/frontend
+(Portal Web ou qualquer outro), apenas o contrato de API/evento/dado que uma interface externa
+consumiria; (2) a etapa de conversão de documento bruto para texto/markdown MUST preferir
+biblioteca open-source auto-hospedada (Microsoft MarkItDown) a serviço pago gerenciado
+(Amazon Textract), por economia de custo — serviço pago só como exceção justificada por
+escrito. Nenhum princípio existente foi redefinido ou enfraquecido.
 
-Modified principles:
-- IV. Exceção Nunca É Silenciosa — redação expandida (não redefinida) para cobrir "agente
-  revisor de IA + fila de escalonamento assíncrona" como implementação válida do requisito de
-  humano-no-loop residual.
+Modified principles: nenhum.
 
-Added sections: nenhuma nova seção.
+Added sections:
+- Additional Constraints — "Escopo do time é exclusivamente backend".
+- Additional Constraints — "Extração de documento prefere biblioteca open-source a serviço
+  pago".
+
 Removed sections: nenhuma.
 
 Templates requiring updates:
 - .specify/templates/plan-template.md ✅ nenhuma mudança necessária.
 - .specify/templates/spec-template.md ✅ nenhuma mudança necessária.
 - .specify/templates/tasks-template.md ⚠ pending — mesmo status da v1.0.0, ainda não revisado.
-- specs/001-ingestao-classificacao-orcamentos/spec.md ✅ já atualizado para v3, consistente
-  com esta emenda.
+- specs/002-extracao-dados-orcamento/spec.md ⚠ pending — precisa referenciar MarkItDown no
+  lugar de qualquer menção a serviço pago de OCR/extração.
+- specs/006-portal-gestor-mvp/spec.md, specs/007-portal-gestor-multi-tenant/spec.md
+  ⚠ pending — conteúdo de UI/frontend fora do escopo deste time, remover ou reduzir ao
+  contrato de backend.
 
-Follow-up TODOs: nenhum novo.
+Follow-up TODOs:
+- Auditar specs 001–009 quanto a conteúdo de frontend remanescente e remover/reduzir ao
+  contrato de API/evento/dado.
 -->
 
 # Nexo Constitution
@@ -156,6 +160,23 @@ feature devem se encaixar nesse sequenciamento, não redefini-lo.
 - **Multi-tenant é requisito de Fase 03**: nenhuma decisão de modelagem de dados na Fase 01/02
   MUST impedir a introdução de isolamento por rede varejista (tenant) na Fase 03 — mas
   implementar multi-tenancy completo antes da Fase 03 não é obrigatório.
+- **Escopo do time é exclusivamente backend**: este time entrega API, pipeline de eventos,
+  agentes de IA e dados — nunca interface visual (Portal Web de Acompanhamento ou qualquer
+  outro frontend). Toda spec de feature MUST se limitar ao contrato observável de
+  API/evento/dado; comportamento de UI (tela, navegação, layout) MUST NOT ser especificado
+  como entrega deste time. Onde a documentação macro descreve uma capacidade com componente de
+  UI (ex.: Portal do Gestor), a spec correspondente MUST cobrir apenas o alicerce de
+  dados/eventos/API que uma interface — construída por outro time ou fornecedor externo —
+  consumiria depois.
+- **Extração de documento prefere biblioteca open-source a serviço pago**: a conversão do
+  documento bruto do orçamento (PDF, planilha, imagem etc.) para texto/markdown estruturável
+  MUST preferir uma biblioteca open-source auto-hospedada (ex.: Microsoft MarkItDown) a um
+  serviço de OCR/extração gerenciado e cobrado por uso (ex.: Amazon Textract), por economia de
+  custo operacional. O entendimento semântico do conteúdo já convertido continua sendo
+  responsabilidade da IA generativa (Princípio V) — esta regra é sobre a etapa de conversão
+  bruta, não sobre quem interpreta o conteúdo. Uso de serviço pago equivalente é aceitável
+  apenas como exceção justificada por escrito (ex.: formato de documento não suportado pela
+  biblioteca open-source), seguindo o mesmo padrão de exceção do Princípio VI.
 
 ## Development Workflow
 
@@ -187,4 +208,4 @@ compliance antes de aprovação.
 "Constitution Check" que valide a feature contra os princípios acima antes de avançar para
 desenho detalhado.
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-29 | **Last Amended**: 2026-07-29
+**Version**: 1.2.0 | **Ratified**: 2026-07-29 | **Last Amended**: 2026-07-29
