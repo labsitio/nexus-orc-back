@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Busca & Indexação — Embeddings e Busca Híbrida",
+    "subtitle": "Enriquecimento assíncrono, nunca bloqueia o pipeline principal",
+    "output": "specs/004-indexacao-busca-semantica-orcamentos/diagrams/arquitetura.html",
+    "visual_preset": "blueprint",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "bc_validacao", "type": "external", "label": "BC Validação", "sublabel": "upstream · spec 003", "pos": [40, 300], "size": [150, 62] },
+    { "id": "bus", "type": "messagebus", "label": "EventBridge", "sublabel": "nexo-dominio-bus", "pos": [280, 300], "size": [150, 62] },
+    { "id": "embeddings", "type": "backend", "label": "Gerador de Embeddings", "sublabel": "Bedrock Titan", "pos": [520, 300], "size": [150, 62] },
+    { "id": "retry", "type": "cloud", "label": "Fila de Retry Técnico", "sublabel": "redrive/backoff", "pos": [520, 480], "size": [150, 62] },
+    { "id": "aurora", "type": "database", "label": "Aurora + pgvector", "sublabel": "índice HNSW", "pos": [760, 300], "size": [150, 62] },
+    { "id": "interpretador", "type": "backend", "label": "Interpretador", "sublabel": "consulta NL · Bedrock", "pos": [760, 120], "size": [150, 62] },
+    { "id": "consumidor_busca", "type": "external", "label": "Consumidor Externo", "sublabel": "POST /v1/orcamentos/busca", "pos": [1000, 120], "size": [150, 62] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "AWS us-east-1 · Nexo", "wraps": ["bus", "embeddings", "retry", "aurora", "interpretador"] },
+    { "kind": "security-group", "label": "BC: Busca & Indexação", "wraps": ["embeddings", "retry", "aurora", "interpretador"], "pad": 16 }
+  ],
+  "connections": [
+    { "from": "bc_validacao", "to": "bus", "label": "OrcamentoValidado(+Ressalva)", "variant": "emphasis", "labelDy": -25 },
+    { "from": "bus", "to": "embeddings", "label": "gera embedding" },
+    { "from": "embeddings", "to": "aurora", "label": "OrcamentoIndexado" },
+    { "from": "embeddings", "to": "retry", "label": "falha técnica", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "from": "interpretador", "to": "aurora", "label": "busca híbrida", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "from": "consumidor_busca", "to": "interpretador", "label": "consulta NL" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Enriquecimento, nunca decisão", "items": ["Nenhum BC downstream depende desta capacidade", "Falha de indexação nunca bloqueia o pipeline principal", "Retry técnico com backoff, nunca fila de revisão humana"] },
+    { "dot": "cyan", "title": "Busca híbrida", "items": ["IA só traduz consulta em critérios + vetor", "Filtro SQL determinístico decide quais orçamentos existem", "Similaridade pgvector nunca substitui o filtro estruturado"] },
+    { "dot": "rose", "title": "Nunca omite por relevância", "items": ["Assina OrcamentoValidado E ComRessalva", "Só falha técnica tira orçamento do índice", "Nunca reinterpreta valor já validado"] }
+  ]
+}
