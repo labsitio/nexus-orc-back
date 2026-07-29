@@ -15,7 +15,7 @@ metricas:
     alvo: até 5 minutos (p95) para decisões resolvidas por Orquestrador ou Agente Revisor
 personas: [gestor-de-compras, comprador-responsavel, fornecedor, sistema-orquestrador]
 depende_de: [validacao-consistencia-orcamentos]
-versao: 2
+versao: 3
 ---
 
 # Spec: Orquestração de Workflow e Integrações (Agente Orquestrador)
@@ -29,9 +29,9 @@ versao: 2
   comprador responsável avaliar, ou solicitar reenvio ao fornecedor quando faltar algum dado
   — e mantém o registro de decisão para auditoria"; também "decide... acionar uma integração
   externa").
-- `specs/001-ingestao-classificacao-orcamentos/spec.md` v3 e `.specify/memory/constitution.md`
-  v1.1.0 (Princípio IV) — padrão de humano-no-loop reaproveitado nesta spec, ver "Nota de
-  revisão" abaixo.
+- `specs/001-ingestao-classificacao-orcamentos/spec.md` v4 e `.specify/memory/constitution.md`
+  v1.2.0 (Princípio IV, Additional Constraints) — padrão de humano-no-loop reaproveitado nesta
+  spec e escopo exclusivamente backend, ver "Nota de revisão" abaixo.
 
 ## Nota de revisão (versão 2)
 
@@ -44,6 +44,14 @@ retaguarda humana. Isso substitui as três alternativas antes levantadas (nunca 
 limite de valor / fornecedor confiável): nenhuma delas foi escolhida isoladamente; a régua de
 decisão passa a ser **confiança do resultado de roteamento**, não uma regra de negócio fixa
 sobre o conteúdo do orçamento. Status alterado de `draft` para `clarified`.
+
+## Nota de revisão (versão 3)
+
+Escopo do time confirmado como exclusivamente backend (constituição v1.2.0). A referência a
+"consumo do Portal do Gestor (specs 006/007)" em "Fora de escopo" apontava para specs de
+frontend que foram retiradas/reduzidas do catálogo deste time — generalizada para "consumidor
+externo de frontend", sem apontar para arquivo específico. Nenhum comportamento de backend
+foi alterado.
 
 ## Comportamento esperado (dado-quando-então)
 
@@ -81,9 +89,10 @@ sobre o conteúdo do orçamento. Status alterado de `draft` para `clarified`.
 - Então o orçamento é encaminhado para a fila de escalonamento assíncrona de revisão humana
   (comprador responsável) — nunca descartado e nunca travado silenciosamente
 - E esse encaminhamento não bloqueia o processamento de nenhum outro orçamento no pipeline
-- E o comprador, ao revisar e confirmar explicitamente a ação correta, tem essa decisão
-  registrada com o mesmo peso de uma decisão automática, preservando o histórico das tentativas
-  anteriores (Orquestrador e Agente Revisor)
+- E o comprador, ao revisar e confirmar explicitamente a ação correta (por qualquer canal que
+  consuma o contrato de API/evento desta spec), tem essa decisão registrada com o mesmo peso
+  de uma decisão automática, preservando o histórico das tentativas anteriores (Orquestrador e
+  Agente Revisor)
 
 ### Solicitação de reenvio ao fornecedor
 
@@ -141,8 +150,9 @@ sobre o conteúdo do orçamento. Status alterado de `draft` para `clarified`.
   documentação macro; tratado como integração genérica via evento.
 - Canal e formato da notificação de reenvio ao fornecedor (e-mail, portal, notificação push) —
   spec própria se necessário.
-- Interface do comprador para avaliar orçamentos encaminhados ou resolver itens da fila de
-  escalonamento — consumo do Portal do Gestor (specs 006/007), não desta spec.
+- Qualquer interface visual para o comprador avaliar orçamentos encaminhados ou resolver itens
+  da fila de escalonamento — responsabilidade de um consumidor externo de frontend, fora do
+  escopo deste time; esta spec entrega apenas o dado/evento consultável dessas decisões.
 - Aprendizado/ajuste automático do limiar de confiança ao longo do tempo — tratado como
   parâmetro de configuração operacional, não como comportamento a especificar aqui (mesmo
   padrão de decisão já adotado nas specs 001–002 para o limiar do Classificador/Extrator).
@@ -202,7 +212,7 @@ sobre o conteúdo do orçamento. Status alterado de `draft` para `clarified`.
   constituição).
 - **Consistência normativa**: esta cadeia de duas linhas (Agente Revisor + fila de
   escalonamento assíncrona) é o mesmo padrão já estabelecido na spec 001 e explicitamente
-  permitido pelo Princípio IV da constituição v1.1.0 como implementação válida de
+  permitido pelo Princípio IV da constituição v1.2.0 como implementação válida de
   humano-no-loop — nenhuma nova capacidade de governança fora desse padrão foi introduzida.
 
 ## Métricas de Avaliação Contínua
@@ -234,6 +244,6 @@ sobre o conteúdo do orçamento. Status alterado de `draft` para `clarified`.
   contexto adicional; se também não atingir confiança suficiente, a decisão vai para a fila de
   escalonamento assíncrona do comprador responsável. Nunca há aprovação automática por
   exaustão de tentativas, tempo ou volume de fila. Este é o mesmo padrão de duas linhas já
-  vinculante na spec 001 e no Princípio IV da constituição v1.1.0 — não exigiu nova emenda de
+  vinculante na spec 001 e no Princípio IV da constituição — não exigiu nova emenda de
   constituição, pois o princípio já foi redigido de forma genérica o suficiente para cobrir
   este caso.

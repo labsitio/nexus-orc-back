@@ -15,7 +15,7 @@ metricas:
     alvo: a definir após operação real; monitorado como leading indicator, sem meta rígida nesta spec
 personas: [gestor-de-compras, fornecedor, sistema-orquestrador]
 depende_de: []
-versao: 3
+versao: 4
 ---
 
 # Spec: Pipeline de Ingestão e Classificação de Orçamentos
@@ -28,6 +28,9 @@ versao: 3
 - Esta é a primeira spec de feature do roadmap. Corresponde ao recorte explicitamente
   identificado no briefing como primeiro fluxo ponta a ponta da Fase 01 · Fundação:
   "Gateway de Ingestão + Agente Classificador".
+- `.specify/memory/constitution.md` v1.2.0 — Additional Constraint "Escopo do time é
+  exclusivamente backend": esta spec cobre apenas o contrato de API/evento/dado; qualquer
+  interface visual é responsabilidade de um consumidor externo de frontend.
 
 ## Nota de revisão (versão 3)
 
@@ -41,6 +44,15 @@ primeira instância, não a garantia de que ela é sempre tratada e nunca autoap
 silenciosamente. Nenhum critério de aceite relacionado a rastreabilidade, imutabilidade do
 bruto, ou proibição de decisão arriscada silenciosa foi invalidado — apenas os cenários e
 critérios que descreviam reprocessamento "só por ação humana explícita" foram reescritos.
+
+## Nota de revisão (versão 4)
+
+Escopo do time confirmado como exclusivamente backend (constituição v1.2.0). Esta spec nunca
+descrevia comportamento de UI diretamente, mas referenciava o Portal do Gestor como possível
+consumidor específico em alguns pontos de "Fora de escopo"; essas referências foram
+generalizadas para "consumidor externo de frontend, fora do escopo deste time", sem apontar
+para nenhuma spec de portal específica (que pode não existir mais como spec própria deste
+time). Nenhum comportamento de backend foi alterado nesta revisão.
 
 ## Clarifications
 
@@ -135,8 +147,9 @@ critérios que descreviam reprocessamento "só por ação humana explícita" for
 ### Rastreamento de status
 
 - Dado qualquer orçamento já recebido pelo Gateway de Ingestão
-- Quando alguém consulta o status desse orçamento (via API/consulta, sem necessidade de UI
-  própria nesta fase)
+- Quando alguém consulta o status desse orçamento via API (esta spec entrega apenas o
+  contrato de dado/evento consultável; qualquer interface própria de exibição é
+  responsabilidade de um consumidor externo de frontend, fora do escopo deste time)
 - Então é possível obter o status atual — recebido / classificado / em revisão automática
   (Agente Revisor) / pendente de revisão humana (escalonado) — e o histórico de timestamps de
   cada etapa já concluída, incluindo qual agente (Classificador ou Revisor) produziu cada
@@ -151,7 +164,8 @@ critérios que descreviam reprocessamento "só por ação humana explícita" for
 - Dado um orçamento que chegou à fila de escalonamento assíncrona (Agente Revisor também sem
   sucesso)
 - Quando uma pessoa revisa, corrige e confirma explicitamente a informação de fornecedor e/ou
-  formato para esse orçamento
+  formato para esse orçamento (por qualquer canal que consuma o contrato de API/evento desta
+  spec — o mecanismo de apresentação dessa ação é responsabilidade de um consumidor externo)
 - Então o orçamento retorna ao fluxo normal preservando o histórico de status anterior — a
   correção gera uma nova entrada no histórico, sem apagar o registro de nenhuma tentativa
   anterior (Classificador, Agente Revisor, ou ambos)
@@ -174,7 +188,7 @@ critérios que descreviam reprocessamento "só por ação humana explícita" for
       explícita de pendência na fila de escalonamento assíncrona de revisão humana, quando nem
       Classificador nem Revisor atingem confiança suficiente.
 - [ ] Nenhum orçamento recebido permanece sem status consultável — 100% dos orçamentos
-      recebidos possuem status rastreável em qualquer momento após o recebimento.
+      recebidos possuem status rastreável via API em qualquer momento após o recebimento.
 - [ ] A consulta de status de um orçamento retorna o histórico de timestamps de cada etapa já
       concluída, identificando qual agente (Classificador ou Revisor) produziu cada resultado,
       quando aplicável.
@@ -202,10 +216,12 @@ critérios que descreviam reprocessamento "só por ação humana explícita" for
   para comprador, solicitar reenvio ao fornecedor) — esta spec cobre apenas o disparo
   automático do pipeline até a classificação (incluindo a linha de revisão automática e o
   escalonamento assíncrono), não a decisão de roteamento de negócio pós-classificação.
-- Portal Web de Acompanhamento (interface visual para o gestor de compras) — Fase 02 MVP;
-  esta spec entrega apenas o alicerce de dados/eventos que o portal consumirá depois,
-  incluindo a fila de escalonamento assíncrona (a UI de trabalho dessa fila para humanos é
-  fora de escopo aqui — apenas o estado e o evento existem nesta spec).
+- Qualquer interface visual (Portal Web de Acompanhamento ou outro frontend) — fora do escopo
+  deste time por definição de produto (constituição v1.2.0, Additional Constraints); esta spec
+  entrega apenas o alicerce de dados/eventos que um consumidor externo de frontend consumirá
+  depois, incluindo o estado e o evento da fila de escalonamento assíncrona — o mecanismo de
+  trabalho humano sobre essa fila (seja via interface visual ou outro canal) é responsabilidade
+  desse consumidor externo, fora do escopo deste time.
 - Integrações externas via SNS/EventBridge com sistemas parceiros da rede varejista.
 - Multi-tenancy (isolamento por rede varejista) — Fase 03.
 - Exportação de relatórios de auditoria/compliance para usuário final.
@@ -215,8 +231,8 @@ critérios que descreviam reprocessamento "só por ação humana explícita" for
 - Recalibração do limiar de 80% de confiança com base em dado real de produção — tratado como
   ajuste de parâmetro futuro (ver Métricas de Avaliação Contínua), não como decisão desta spec.
 - SLA/prazo máximo de permanência na fila de escalonamento assíncrona antes de intervenção
-  humana — não definido nesta spec; recomenda-se tratar em spec futura ou como parte do
-  desenho do Portal do Gestor (Fase 02), quando a UI de trabalho da fila existir.
+  humana — não definido nesta spec; recomenda-se tratar em spec futura de backend (ex.:
+  política de aging/SLA da fila), sem depender de nenhuma interface visual para ser definido.
 
 ## Camada de IA / Governança
 
@@ -233,7 +249,7 @@ critérios que descreviam reprocessamento "só por ação humana explícita" for
 - Referência de fornecedor autodeclarada pelo emissor nunca pode, isoladamente, elevar
   artificialmente a confiança reportada.
 
-### Agente Revisor de IA (nova capacidade de governança introduzida nesta revisão)
+### Agente Revisor de IA (nova capacidade de governança introduzida na versão 3)
 
 - **Papel**: atua como primeira linha automática de tratamento de baixa confiança, sempre que
   o Classificador reporta confiança inferior a 80%. Recebe o mesmo orçamento e contexto

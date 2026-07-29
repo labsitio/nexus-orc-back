@@ -12,7 +12,7 @@ metricas:
     alvo: 100% (com tolerância de atraso definida pela métrica de tempo acima)
 personas: [gestor-de-compras]
 depende_de: [validacao-consistencia-orcamentos]
-versao: 1
+versao: 2
 ---
 
 # Spec: Indexação e Busca Semântica de Orçamentos
@@ -23,6 +23,15 @@ versao: 1
 - `docs/apresentacao-time.html` (Agente 4 · Indexação e Busca Semântica: gera embeddings do
   conteúdo do orçamento e dos itens extraídos; Camada de Busca: consulta em linguagem natural,
   ex. "orçamentos de embalagens recebidos abaixo de R$10 mil nos últimos 30 dias").
+- `.specify/memory/constitution.md` v1.2.0 — Additional Constraint "Escopo do time é
+  exclusivamente backend": esta spec entrega a capacidade de busca via API/evento; qualquer
+  interface visual de busca é responsabilidade de um consumidor externo.
+
+## Nota de revisão (versão 2)
+
+Escopo confirmado como exclusivamente backend. As referências a "Portal do Gestor" como
+consumidor específico foram generalizadas para "consumidor externo de frontend", sem apontar
+para nenhuma spec de portal específica. Nenhum comportamento de backend foi alterado.
 
 ## Comportamento esperado (dado-quando-então)
 
@@ -37,8 +46,8 @@ versao: 1
 ### Busca em linguagem natural
 
 - Dado um conjunto de orçamentos já indexados
-- Quando alguém formula uma consulta em linguagem natural combinando critérios (ex.: categoria
-  de produto, faixa de preço, período de recebimento)
+- Quando uma consulta em linguagem natural combinando critérios (ex.: categoria de produto,
+  faixa de preço, período de recebimento) é submetida via API
 - Então o sistema retorna os orçamentos relevantes à consulta, ordenados por relevância
 
 ### Falha de indexação não bloqueia o restante do pipeline
@@ -56,8 +65,8 @@ versao: 1
 ## Critérios de aceite (testáveis)
 
 - [ ] Um orçamento validado torna-se pesquisável por linguagem natural em até 5 minutos (p95).
-- [ ] Uma consulta combinando categoria, faixa de preço e período retorna os orçamentos
-      relevantes, sem exigir correspondência exata de texto.
+- [ ] Uma consulta via API combinando categoria, faixa de preço e período retorna os
+      orçamentos relevantes, sem exigir correspondência exata de texto.
 - [ ] Falha de indexação de um orçamento específico nunca impede que esse orçamento continue
       disponível como "validado" nem impede o processamento dos demais orçamentos.
 - [ ] Toda falha de indexação gera evento de exceção rastreável (visível no histórico do
@@ -65,8 +74,9 @@ versao: 1
 
 ## Fora de escopo desta spec
 
-- Interface de busca para o usuário final (Portal do Gestor consome esta capacidade via API/
-  evento, mas a UI de busca é spec própria do Portal).
+- Qualquer interface visual de busca para o usuário final — responsabilidade de um consumidor
+  externo de frontend, fora do escopo deste time; esta spec entrega apenas a capacidade de
+  busca via API/evento.
 - Ranking avançado personalizado por usuário, sinônimos de domínio customizados, suporte
   multilíngue — não mencionados na documentação macro, assumidos fora de escopo até haver
   demanda registrada.
@@ -85,8 +95,8 @@ versao: 1
   negócio de "relevância" deve excluir um orçamento da possibilidade de ser encontrado.
 - **Dados sensíveis**: mesmas considerações de dado comercial sensível das specs anteriores
   (Princípio VII); a busca semântica não deve expor dado de um orçamento a quem não tem
-  permissão de visualizá-lo (autorização é responsabilidade do Portal/API que consome esta
-  capacidade, não desta spec).
+  permissão de visualizá-lo (autorização é responsabilidade da camada de API/consumidor
+  externo que expõe esta capacidade, não desta spec).
 
 ## Métricas de Avaliação Contínua
 
