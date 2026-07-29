@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="generator" content="archify 2.12.0">
-  <title>Extração — Agente Extrator e Revisor de Extração Diagram</title>
+  <title>Extração — Agente Extrator Diagram</title>
   <script>
     // Resolve the theme before first paint so light-preference users don't
     // see a dark flash. The toolbar script below re-applies with UI state.
@@ -4496,7 +4496,7 @@
     <div class="header">
       <div class="header-row">
         <div class="pulse-dot"></div>
-        <h1>Extração — Agente Extrator e Revisor de Extração</h1>
+        <h1>Extração — Agente Extrator</h1>
       </div>
       <p class="subtitle">Transforma documento classificado em itens e condições estruturadas</p>
     </div>
@@ -4544,8 +4544,8 @@
 
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read">
-      <svg viewBox="0 0 1430 630" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="blueprint" data-quality-profile="showcase">
-        <title id="archify-diagram-title">Extração — Agente Extrator e Revisor de Extração</title>
+      <svg viewBox="0 0 1190 630" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="blueprint" data-quality-profile="showcase">
+        <title id="archify-diagram-title">Extração — Agente Extrator</title>
         <desc id="archify-diagram-description">Transforma documento classificado em itens e condições estruturadas</desc>
         <!-- Definitions -->
         <defs>
@@ -4570,21 +4570,20 @@
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" x="250" y="270" width="930" height="292" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" x="250" y="270" width="690" height="292" rx="12" class="c-region" stroke-width="1"/>
         <text x="258" y="288" class="t-cloud" font-size="9" font-weight="600">AWS us-east-1 · Nexo</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="1" x="504" y="284" width="662" height="278" rx="8" class="c-security-group" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="1" x="504" y="284" width="422" height="278" rx="8" class="c-security-group" stroke-width="1"/>
         <text x="512" y="302" class="t-security" font-size="9" font-weight="600">BC: Extração</text>
 
         <!-- Connection paths (before components for correct z-order) -->
         <path data-edge-from="bc_ingestao" data-edge-to="bus" data-edge-label="OrcamentoClassificado" data-edge-key="0" data-composition-points="190,331;280,331" d="M 190 331 L 280 331" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="bus" data-edge-to="extrator" data-edge-label="aciona extração" data-edge-key="1" data-composition-points="430,331;520,331" d="M 430 331 L 520 331" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="extrator" data-edge-to="s3_raw" data-edge-label="lê bruto" data-edge-key="2" data-composition-points="595,362;595,480" d="M 595 362 L 595 480" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="extrator" data-edge-to="revisor" data-edge-label="campo não extraído" data-edge-key="3" data-composition-points="670,331;760,331" d="M 670 331 L 760 331" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="revisor" data-edge-to="fila" data-edge-label="sem sucesso" data-edge-key="4" data-composition-points="910,331;1000,331" d="M 910 331 L 1000 331" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="fila" data-edge-to="humano" data-edge-label="revisão" data-edge-key="5" data-composition-points="1150,331;1240,331" d="M 1150 331 L 1240 331" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="bus" data-edge-to="aurora" data-edge-label="persiste itens" data-edge-key="6" data-composition-points="355,362;355,480" d="M 355 362 L 355 480" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="bus" data-edge-to="consumidores" data-edge-label="OrcamentoExtraido" data-edge-key="7" data-composition-points="355,300;355,182" d="M 355 300 L 355 182" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="extrator" data-edge-to="fila" data-edge-label="campo não extraído → humano" data-edge-key="3" data-composition-points="670,331;760,331" d="M 670 331 L 760 331" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="fila" data-edge-to="humano" data-edge-label="revisão" data-edge-key="4" data-composition-points="910,331;1000,331" d="M 910 331 L 1000 331" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="bus" data-edge-to="aurora" data-edge-label="persiste itens" data-edge-key="5" data-composition-points="355,362;355,480" d="M 355 362 L 355 480" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="bus" data-edge-to="consumidores" data-edge-label="OrcamentoExtraido" data-edge-key="6" data-composition-points="355,300;355,182" d="M 355 300 L 355 182" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
         <!-- Components -->
         <g id="node-bc_ingestao" data-node-id="bc_ingestao" data-node-label="BC Ingestão" tabindex="0" role="button" aria-label="Focus BC Ingestão, upstream · spec 001, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="upstream · spec 001" data-node-context="Architecture component">
@@ -4660,38 +4659,27 @@
         <text data-detail="context" x="595" y="525" class="t-muted" font-size="9" text-anchor="middle">leitura read-only</text>
         </g>
 
-        <g id="node-revisor" data-node-id="revisor" data-node-label="Revisor de Extração" tabindex="0" role="button" aria-label="Focus Revisor de Extração, Bedrock, AWS us-east-1 · Nexo › BC: Extração" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Bedrock" data-node-context="AWS us-east-1 · Nexo › BC: Extração">
-          <title>Revisor de Extração · Bedrock · AWS us-east-1 · Nexo › BC: Extração</title>
-          <rect x="760" y="300" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="760" y="300" width="150" height="62" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(766 306) scale(0.6875)">
-            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
-          </g>
-          <text data-detail-anchor x="835" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Revisor de Extração</text>
-        <text data-detail="context" x="835" y="345" class="t-muted" font-size="9" text-anchor="middle">Bedrock</text>
-        </g>
-
         <g id="node-fila" data-node-id="fila" data-node-label="Fila de Escalonamento" tabindex="0" role="button" aria-label="Focus Fila de Escalonamento, própria da Extração, AWS us-east-1 · Nexo › BC: Extração" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="própria da Extração" data-node-context="AWS us-east-1 · Nexo › BC: Extração">
           <title>Fila de Escalonamento · própria da Extração · AWS us-east-1 · Nexo › BC: Extração</title>
-          <rect x="1000" y="300" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="1000" y="300" width="150" height="62" rx="6" class="c-cloud" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(1006 306) scale(0.6875)">
+          <rect x="760" y="300" width="150" height="62" rx="6" class="c-mask"/>
+          <rect x="760" y="300" width="150" height="62" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(766 306) scale(0.6875)">
             <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
           </g>
-          <text data-detail-anchor x="1075" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Fila de Escalonamento</text>
-        <text data-detail="context" x="1075" y="345" class="t-muted" font-size="9" text-anchor="middle">própria da Extração</text>
+          <text data-detail-anchor x="835" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Fila de Escalonamento</text>
+        <text data-detail="context" x="835" y="345" class="t-muted" font-size="9" text-anchor="middle">própria da Extração</text>
         </g>
 
         <g id="node-humano" data-node-id="humano" data-node-label="Revisão Humana" tabindex="0" role="button" aria-label="Focus Revisão Humana, comprador / gestor, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="comprador / gestor" data-node-context="Architecture component">
           <title>Revisão Humana · comprador / gestor · Architecture component</title>
-          <rect x="1240" y="300" width="150" height="62" rx="6" class="c-mask"/>
-          <rect x="1240" y="300" width="150" height="62" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1246 306) scale(0.6875)">
+          <rect x="1000" y="300" width="150" height="62" rx="6" class="c-mask"/>
+          <rect x="1000" y="300" width="150" height="62" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1006 306) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-detail-anchor x="1315" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Revisão Humana</text>
-        <text data-detail="context" x="1315" y="345" class="t-muted" font-size="9" text-anchor="middle">comprador / gestor</text>
+          <text data-detail-anchor x="1075" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Revisão Humana</text>
+        <text data-detail="context" x="1075" y="345" class="t-muted" font-size="9" text-anchor="middle">comprador / gestor</text>
         </g>
 
         <!-- Connection labels -->
@@ -4707,23 +4695,19 @@
           <rect x="570.8" y="366" width="48.4" height="14" rx="3" class="c-mask"/>
           <text x="595" y="376" class="t-muted" font-size="8" text-anchor="middle">lê bruto</text>
         </g>
-        <g data-detail="context" data-edge-from="extrator" data-edge-to="revisor" data-edge-label="campo não extraído" data-edge-key="3">
-          <rect x="666.8" y="286" width="96.39999999999999" height="14" rx="3" class="c-mask"/>
-          <text x="715" y="296" class="t-muted" font-size="8" text-anchor="middle">campo não extraído</text>
+        <g data-detail="context" data-edge-from="extrator" data-edge-to="fila" data-edge-label="campo não extraído → humano" data-edge-key="3">
+          <rect x="645.2" y="277" width="139.6" height="14" rx="3" class="c-mask"/>
+          <text x="715" y="287" class="t-muted" font-size="8" text-anchor="middle">campo não extraído → humano</text>
         </g>
-        <g data-detail="context" data-edge-from="revisor" data-edge-to="fila" data-edge-label="sem sucesso" data-edge-key="4">
-          <rect x="923.6" y="311" width="62.8" height="14" rx="3" class="c-mask"/>
-          <text x="955" y="321" class="t-muted" font-size="8" text-anchor="middle">sem sucesso</text>
+        <g data-detail="context" data-edge-from="fila" data-edge-to="humano" data-edge-label="revisão" data-edge-key="4">
+          <rect x="933.2" y="311" width="43.6" height="14" rx="3" class="c-mask"/>
+          <text x="955" y="321" class="t-muted" font-size="8" text-anchor="middle">revisão</text>
         </g>
-        <g data-detail="context" data-edge-from="fila" data-edge-to="humano" data-edge-label="revisão" data-edge-key="5">
-          <rect x="1173.2" y="311" width="43.6" height="14" rx="3" class="c-mask"/>
-          <text x="1195" y="321" class="t-muted" font-size="8" text-anchor="middle">revisão</text>
-        </g>
-        <g data-detail="context" data-edge-from="bus" data-edge-to="aurora" data-edge-label="persiste itens" data-edge-key="6">
+        <g data-detail="context" data-edge-from="bus" data-edge-to="aurora" data-edge-label="persiste itens" data-edge-key="5">
           <rect x="316.4" y="366" width="77.2" height="14" rx="3" class="c-mask"/>
           <text x="355" y="376" class="t-messagebus" font-size="8" text-anchor="middle">persiste itens</text>
         </g>
-        <g data-detail="context" data-edge-from="bus" data-edge-to="consumidores" data-edge-label="OrcamentoExtraido" data-edge-key="7">
+        <g data-detail="context" data-edge-from="bus" data-edge-to="consumidores" data-edge-label="OrcamentoExtraido" data-edge-key="6">
           <rect x="309.2" y="280" width="91.6" height="14" rx="3" class="c-mask"/>
           <text x="355" y="290" class="t-messagebus" font-size="8" text-anchor="middle">OrcamentoExtraido</text>
         </g>
@@ -4965,8 +4949,8 @@
           <h3>Governança replicada</h3>
         </div>
         <ul>
-          <li>&bull; Mesmo padrão Classificador/Revisor/Fila da spec 001</li>
-          <li>&bull; Revisor e fila são instâncias próprias deste BC</li>
+          <li>&bull; Mesmo padrão da spec 001: Extrator → escalonamento humano</li>
+          <li>&bull; Fila é instância própria deste BC</li>
           <li>&bull; Nunca autoaprovação por tempo ou volume</li>
         </ul>
       </div>

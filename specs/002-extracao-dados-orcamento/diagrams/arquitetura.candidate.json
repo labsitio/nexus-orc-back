@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Extração — Agente Extrator e Revisor de Extração",
+    "title": "Extração — Agente Extrator",
     "subtitle": "Transforma documento classificado em itens e condições estruturadas",
     "output": "specs/002-extracao-dados-orcamento/diagrams/arquitetura.html",
     "visual_preset": "blueprint",
@@ -15,20 +15,18 @@
     { "id": "consumidores", "type": "external", "label": "Consumidores Externos", "sublabel": "BC Validação + frontend/API", "pos": [280, 120], "size": [150, 62] },
     { "id": "extrator", "type": "backend", "label": "Agente Extrator", "sublabel": "Bedrock", "pos": [520, 300], "size": [150, 62] },
     { "id": "s3_raw", "type": "database", "label": "S3 Raw", "sublabel": "leitura read-only", "pos": [520, 480], "size": [150, 62] },
-    { "id": "revisor", "type": "backend", "label": "Revisor de Extração", "sublabel": "Bedrock", "pos": [760, 300], "size": [150, 62] },
-    { "id": "fila", "type": "cloud", "label": "Fila de Escalonamento", "sublabel": "própria da Extração", "pos": [1000, 300], "size": [150, 62] },
-    { "id": "humano", "type": "external", "label": "Revisão Humana", "sublabel": "comprador / gestor", "pos": [1240, 300], "size": [150, 62] }
+    { "id": "fila", "type": "cloud", "label": "Fila de Escalonamento", "sublabel": "própria da Extração", "pos": [760, 300], "size": [150, 62] },
+    { "id": "humano", "type": "external", "label": "Revisão Humana", "sublabel": "comprador / gestor", "pos": [1000, 300], "size": [150, 62] }
   ],
   "boundaries": [
-    { "kind": "region", "label": "AWS us-east-1 · Nexo", "wraps": ["bus", "aurora", "extrator", "s3_raw", "revisor", "fila"] },
-    { "kind": "security-group", "label": "BC: Extração", "wraps": ["extrator", "s3_raw", "revisor", "fila"], "pad": 16 }
+    { "kind": "region", "label": "AWS us-east-1 · Nexo", "wraps": ["bus", "aurora", "extrator", "s3_raw", "fila"] },
+    { "kind": "security-group", "label": "BC: Extração", "wraps": ["extrator", "s3_raw", "fila"], "pad": 16 }
   ],
   "connections": [
     { "from": "bc_ingestao", "to": "bus", "label": "OrcamentoClassificado", "variant": "emphasis", "labelDy": -25 },
     { "from": "bus", "to": "extrator", "label": "aciona extração" },
     { "from": "extrator", "to": "s3_raw", "label": "lê bruto", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
-    { "from": "extrator", "to": "revisor", "label": "campo não extraído", "labelDy": -25 },
-    { "from": "revisor", "to": "fila", "label": "sem sucesso" },
+    { "from": "extrator", "to": "fila", "label": "campo não extraído → humano", "labelDy": -34 },
     { "from": "fila", "to": "humano", "label": "revisão" },
     { "from": "bus", "to": "aurora", "label": "persiste itens", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
     { "from": "bus", "to": "consumidores", "label": "OrcamentoExtraido", "variant": "dashed", "fromSide": "top", "toSide": "bottom" }
@@ -36,6 +34,6 @@
   "cards": [
     { "dot": "cyan", "title": "Nunca inventar valor", "items": ["Campo sem confiança suficiente nunca recebe valor estimado", "Marcado explicitamente como não extraído", "Garantido por Value Object, não por convenção"] },
     { "dot": "emerald", "title": "Agregado próprio", "items": ["ExtracaoOrcamento nunca reaproveita Orcamento da Ingestão", "Read-only sobre o bruto — nunca escreve no bucket da Ingestão", "MarkItDown como conversão padrão, Textract só exceção"] },
-    { "dot": "rose", "title": "Governança replicada", "items": ["Mesmo padrão Classificador/Revisor/Fila da spec 001", "Revisor e fila são instâncias próprias deste BC", "Nunca autoaprovação por tempo ou volume"] }
+    { "dot": "rose", "title": "Governança replicada", "items": ["Mesmo padrão da spec 001: Extrator → escalonamento humano", "Fila é instância própria deste BC", "Nunca autoaprovação por tempo ou volume"] }
   ]
 }

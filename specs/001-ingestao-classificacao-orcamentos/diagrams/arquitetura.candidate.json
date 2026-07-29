@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "Ingestão & Identificação — Pipeline de Classificação de Orçamentos",
-    "subtitle": "Gateway multi-canal, Agente Classificador, Agente Revisor de IA e fila de escalonamento assíncrona",
+    "subtitle": "Gateway multi-canal, Agente Classificador e escalonamento humano assíncrono",
     "output": "specs/001-ingestao-classificacao-orcamentos/diagrams/arquitetura.html",
     "visual_preset": "blueprint",
     "quality_profile": "showcase"
@@ -16,27 +16,25 @@
     { "id": "aurora", "type": "database", "label": "Aurora Postgres", "sublabel": "estado + histórico", "pos": [520, 480], "size": [150, 62] },
     { "id": "consumidores", "type": "external", "label": "Consumidores Externos", "sublabel": "BC Extração + frontend/API", "pos": [520, 120], "size": [150, 62] },
     { "id": "classificador", "type": "backend", "label": "Agente Classificador", "sublabel": "Bedrock", "pos": [760, 300], "size": [150, 62] },
-    { "id": "revisor", "type": "backend", "label": "Agente Revisor IA", "sublabel": "Bedrock", "pos": [1000, 300], "size": [150, 62] },
-    { "id": "fila", "type": "cloud", "label": "Fila de Escalonamento", "sublabel": "assíncrona", "pos": [1240, 300], "size": [150, 62] },
-    { "id": "humano", "type": "external", "label": "Revisão Humana", "sublabel": "comprador / gestor", "pos": [1480, 300], "size": [150, 62] }
+    { "id": "fila", "type": "cloud", "label": "Fila de Escalonamento", "sublabel": "assíncrona", "pos": [1000, 300], "size": [150, 62] },
+    { "id": "humano", "type": "external", "label": "Revisão Humana", "sublabel": "comprador / gestor", "pos": [1240, 300], "size": [150, 62] }
   ],
   "boundaries": [
-    { "kind": "region", "label": "AWS us-east-1 · Nexo", "wraps": ["gateway", "s3_raw", "bus", "aurora", "classificador", "revisor", "fila"] },
-    { "kind": "security-group", "label": "BC: Ingestão & Identificação", "wraps": ["gateway", "s3_raw", "classificador", "revisor", "fila"], "pad": 16 }
+    { "kind": "region", "label": "AWS us-east-1 · Nexo", "wraps": ["gateway", "s3_raw", "bus", "aurora", "classificador", "fila"] },
+    { "kind": "security-group", "label": "BC: Ingestão & Identificação", "wraps": ["gateway", "s3_raw", "classificador", "fila"], "pad": 16 }
   ],
   "connections": [
     { "from": "fornecedor", "to": "gateway", "label": "4 canais", "variant": "emphasis" },
     { "from": "gateway", "to": "s3_raw", "label": "grava bruto", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
     { "from": "gateway", "to": "bus", "label": "OrcamentoRecebido" },
     { "from": "bus", "to": "classificador", "label": "classifica" },
-    { "from": "classificador", "to": "revisor", "label": "<80% confiança" },
-    { "from": "revisor", "to": "fila", "label": "sem sucesso" },
+    { "from": "classificador", "to": "fila", "label": "<80% escala p/ humano", "labelDy": -34 },
     { "from": "fila", "to": "humano", "label": "revisão" },
     { "from": "bus", "to": "aurora", "label": "persiste histórico", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
     { "from": "bus", "to": "consumidores", "label": "eventos + status API", "variant": "dashed", "fromSide": "top", "toSide": "bottom" }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Governança de Exceção", "items": ["Classificador < 80% aciona Revisor automaticamente", "Revisor sem sucesso escala para fila assíncrona", "Nenhuma linha autoaprova por tempo ou volume"] },
+    { "dot": "cyan", "title": "Governança de Exceção", "items": ["Classificador < 80% escala direto para revisão humana", "Sem segundo agente de IA no caminho de exceção", "Nenhuma linha autoaprova por tempo ou volume"] },
     { "dot": "emerald", "title": "Desacoplamento", "items": ["Todo componente só se comunica via EventBridge", "Bus é compartilhado por todos os Bounded Contexts", "Consumidores externos assinam evento, nunca chamam direto"] },
     { "dot": "rose", "title": "Dado Bruto", "items": ["S3 versionado, deny-overwrite/deny-delete", "Aurora guarda estado + histórico append-only", "Nenhuma etapa sobrescreve tentativa anterior"] }
   ]

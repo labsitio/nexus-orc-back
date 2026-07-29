@@ -25,7 +25,7 @@ versao: 2
 - `docs/apresentacao-time.html` (Agente 2 · Extrator de Dados: entrada/saída, combinação de
   conversão de documento + LLM).
 - Depende da spec 001 (`ingestao-classificacao-orcamentos`): só processa orçamentos já
-  classificados com confiança suficiente (por Classificador ou Agente Revisor).
+  classificados com confiança suficiente pelo Classificador.
 - `.specify/memory/constitution.md` v1.2.0 — Additional Constraint "Extração de documento
   prefere biblioteca open-source a serviço pago": ver "Nota de revisão" abaixo.
 
@@ -68,8 +68,8 @@ Duas mudanças de escopo/custo decididas pelo produto, refletidas nesta revisão
   extraídos com confiança suficiente
 - Então o Extrator NUNCA preenche o campo com um valor inventado/estimado — o campo é marcado
   explicitamente como "não extraído" e o orçamento segue o mesmo padrão de exceção já
-  estabelecido na spec 001 (linha automática de revisão + fila de escalonamento assíncrona
-  como retaguarda humana), reaproveitando o mesmo mecanismo de governança, não um novo
+  estabelecido na spec 001 (escalonamento direto para a fila de revisão humana assíncrona,
+  sem um segundo agente de IA), reaproveitando o mesmo mecanismo de governança, não um novo
 - E esse estado fica visível na consulta de status do documento
 
 ### Preservação do vínculo com a classificação e o bruto
@@ -86,7 +86,7 @@ Duas mudanças de escopo/custo decididas pelo produto, refletidas nesta revisão
       exceção).
 - [ ] Nenhum campo obrigatório extraído é preenchido com valor inventado/estimado quando a
       confiança é insuficiente — o único comportamento aceitável é marcar como "não extraído"
-      e acionar o fluxo de exceção da spec 001.
+      e escalonar diretamente para a fila de revisão humana (mesmo padrão da spec 001).
 - [ ] O resultado de extração preserva vínculo rastreável com o orçamento bruto e com o
       resultado da classificação, sem sobrescrever nenhum dos dois.
 - [ ] A consulta de status de um orçamento passa a refletir a etapa "extraído" (ou pendência
@@ -121,9 +121,9 @@ Duas mudanças de escopo/custo decididas pelo produto, refletidas nesta revisão
   — dado comercial errado neste ponto tem risco financeiro direto para a decisão de compra.
   "Não extraído" é sempre preferível a um valor plausível porém incorreto.
 - **Reaproveitamento de governança**: esta spec reaproveita, sem redefinir, o mecanismo de
-  exceção já estabelecido na spec 001 (Agente Revisor + fila de escalonamento assíncrona) —
-  decisão autônoma de consistência, já que a constituição (Princípio IV) já permite essa cadeia
-  como implementação válida de humano-no-loop.
+  exceção já estabelecido na spec 001 (escalonamento direto para fila de revisão humana
+  assíncrona, sem agente revisor de IA) — o campo obrigatório sem confiança suficiente leva o
+  orçamento direto para a fila humana, satisfazendo o Princípio IV (exceção nunca silenciosa).
 - **Dados sensíveis**: mesmas considerações de PII/dado comercial sensível da spec 001
   (Princípio VII da constituição).
 
@@ -142,10 +142,10 @@ Duas mudanças de escopo/custo decididas pelo produto, refletidas nesta revisão
 ## Perguntas resolvidas (decisão autônoma, não-bloqueante)
 
 - P: O tratamento de baixa confiança em campo extraído deve criar um novo mecanismo de
-  exceção próprio desta spec? R: Não — reaproveita o mecanismo já estabelecido e aprovado na
-  spec 001 (Agente Revisor + fila de escalonamento assíncrona), por consistência de produto e
-  porque a constituição já permite essa cadeia como padrão válido. Decisão de baixo risco e
-  reversível (é reuso de padrão, não invenção de novo).
+  exceção próprio desta spec? R: Não — reaproveita o mecanismo já estabelecido na spec 001
+  (escalonamento direto para fila de revisão humana assíncrona, sem agente revisor de IA), por
+  consistência de produto. Decisão de baixo risco e reversível (é reuso de padrão, não invenção
+  de novo).
 
 ## Perguntas resolvidas (speckit-clarify — versão 2)
 

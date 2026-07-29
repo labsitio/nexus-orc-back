@@ -8,9 +8,9 @@
 
 ## Summary
 
-Requisito primário: 4 canais de ingestão (portal web, API REST, SFTP, app mobile) convergem para um único Gateway de Ingestão que grava o orçamento bruto de forma imutável, gera identificador canônico, e publica evento de domínio que dispara classificação automática de fornecedor/formato via IA generativa (Bedrock), com cadeia de governança de baixa confiança (Agente Revisor de IA → fila de escalonamento assíncrona humana), sem nunca autoaprovar silenciosamente e sem nunca bloquear o pipeline de outros documentos.
+Requisito primário: 4 canais de ingestão (portal web, API REST, SFTP, app mobile) convergem para um único Gateway de Ingestão que grava o orçamento bruto de forma imutável, gera identificador canônico, e publica evento de domínio que dispara classificação automática de fornecedor/formato via IA generativa (Bedrock), com escalonamento direto de baixa confiança para uma fila de revisão humana assíncrona, sem nunca autoaprovar silenciosamente e sem nunca bloquear o pipeline de outros documentos.
 
-Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API Gateway + Lambda + EventBridge + SQS + S3 + Aurora Serverless v2 Postgres), com DDD tático aplicado ao Bounded Context "Ingestão & Identificação" — um agregado raiz (`Orcamento`, escopo deste contexto), Value Objects para os conceitos de canal/confiança/resultado, e Domain Events como único mecanismo de acoplamento entre Gateway → Classificador → Revisor → Escalonamento, conforme Princípio II da constituição.
+Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API Gateway + Lambda + EventBridge + SQS + S3 + Aurora Serverless v2 Postgres), com DDD tático aplicado ao Bounded Context "Ingestão & Identificação" — um agregado raiz (`Orcamento`, escopo deste contexto), Value Objects para os conceitos de canal/confiança/resultado, e Domain Events como único mecanismo de acoplamento entre Gateway → Classificador → Escalonamento humano, conforme Princípio II da constituição.
 
 ## Technical Context
 
@@ -26,11 +26,11 @@ Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API 
 
 **Project Type**: Web service (API + pipeline de eventos assíncrono), monorepo único (sem frontend neste time, por Additional Constraint da constituição v1.2.0).
 
-**Performance Goals**: p95 ≤ 5 minutos entre "orçamento recebido" e resultado de classificação disponível (Classificador, Revisor, ou marcação de escalonamento) — meta definida na spec, não medida ainda (produto novo).
+**Performance Goals**: p95 ≤ 5 minutos entre "orçamento recebido" e resultado de classificação disponível (Classificador ou marcação de escalonamento) — meta definida na spec, não medida ainda (produto novo).
 
-**Constraints**: cold start Lambda é variável real de design para o Classificador/Revisor (chamada síncrona a Bedrock pode levar segundos) — considerar Provisioned Concurrency se p95 real ultrapassar a meta após medição; MarkItDown roda fora do event loop de I/O do Lambda de conversão (é CPU-bound sobre parsing de documento) — isolar em Lambda dedicado com memória dimensionada, nunca dentro do handler síncrono do Gateway de Ingestão.
+**Constraints**: cold start Lambda é variável real de design para o Classificador (chamada síncrona a Bedrock pode levar segundos) — considerar Provisioned Concurrency se p95 real ultrapassar a meta após medição; MarkItDown roda fora do event loop de I/O do Lambda de conversão (é CPU-bound sobre parsing de documento) — isolar em Lambda dedicado com memória dimensionada, nunca dentro do handler síncrono do Gateway de Ingestão.
 
-**Scale/Scope**: 1 Bounded Context (Ingestão & Identificação), 1 agregado raiz, 4 canais de entrada, 2 agentes de IA (Classificador + Revisor), 1 fila de escalonamento. Escala de volume não informada na spec — dimensionamento de concorrência SQS/Lambda a validar com Ricardo/produto antes de definir throughput de fila.
+**Scale/Scope**: 1 Bounded Context (Ingestão & Identificação), 1 agregado raiz, 4 canais de entrada, 1 agente de IA (Classificador), 1 fila de escalonamento humano. Escala de volume não informada na spec — dimensionamento de concorrência SQS/Lambda a validar com Ricardo/produto antes de definir throughput de fila.
 
 ## Constitution Check
 
@@ -39,15 +39,15 @@ Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API 
 | Princípio | Verificação | Status |
 |---|---|---|
 | I. Rastreabilidade ponta a ponta | Tabela `orcamento_historico` append-only grava origem, timestamp e agente de cada etapa; reconstruível por `OrcamentoId` sem depender de log efêmero | PASS |
-| II. Desacoplamento por eventos | Gateway → Classificador → Revisor → Escalonamento comunicam-se exclusivamente via EventBridge; nenhum componente chama implementação interna de outro; SQS por consumidor evita bloqueio entre documentos | PASS |
+| II. Desacoplamento por eventos | Gateway → Classificador → Escalonamento humano comunicam-se exclusivamente via EventBridge; nenhum componente chama implementação interna de outro; SQS por consumidor evita bloqueio entre documentos | PASS |
 | III. Dado bruto imutável | S3 versionado + bucket policy deny-overwrite/deny-delete; cada etapa grava novo registro/versão, nunca sobrescreve o objeto raw | PASS |
-| IV. Exceção nunca silenciosa | Cadeia Classificador → Revisor → fila de escalonamento assíncrona implementa Princípio IV(b) explicitamente; nenhum agente pode reportar confiança artificial (ACL valida faixa 0–100 e exige `NivelConfianca` como VO, nunca número solto do LLM sem validação); fila nunca autoaprova por tempo/volume | PASS |
-| V. IA generativa como motor de entendimento | Classificador e Revisor são 100% Bedrock, sem regra fixa por fornecedor; heurística de negócio (limiar 80%) fica na camada de Application/Domain, não como substituto do entendimento de conteúdo | PASS |
+| IV. Exceção nunca silenciosa | Cadeia Classificador → fila de escalonamento humano assíncrona implementa Princípio IV(b) explicitamente; o agente não pode reportar confiança artificial (ACL valida faixa 0–100 e exige `NivelConfianca` como VO, nunca número solto do LLM sem validação); fila nunca autoaprova por tempo/volume | PASS |
+| V. IA generativa como motor de entendimento | Classificador é 100% Bedrock, sem regra fixa por fornecedor; heurística de negócio (limiar 80%) fica na camada de Application/Domain, não como substituto do entendimento de conteúdo | PASS |
 | VI. Serverless-first | Toda a stack é Lambda/managed (API Gateway, EventBridge, SQS, S3, Aurora Serverless v2); nenhum servidor fixo ocioso introduzido | PASS |
 | VII. Segurança e LGPD desde o desenho | Ver seção Segurança do Relatório Final; dado de contato de fornecedor tratado com least-privilege IAM, criptografia em repouso (SSE-KMS) e em trânsito (TLS), retenção via S3 lifecycle | PASS |
 | VIII. Roadmap em 3 fases vinculante | Esta spec não depende de Extração (002), Validação (003), Indexação (004), Orquestrador completo (005) ou Multi-tenant (007) — todos tratados como "Fora de escopo" já na própria spec | PASS |
 | Additional Constraint — 4 canais fixos, gateway único | Todos os 4 canais convergem para o mesmo caso de uso `ReceberOrcamento` e o mesmo evento `OrcamentoRecebido` | PASS |
-| Additional Constraint — 5 agentes, papéis fixos | Classificador e Revisor mapeados aos papéis previstos; Revisor é o "agente adicional explícito" já autorizado pela própria constituição para tratamento de exceção | PASS |
+| Additional Constraint — 5 agentes, papéis fixos | Apenas o Classificador (papel fixo) é usado nesta spec; o tratamento de exceção de baixa confiança é escalonamento humano direto, sem agente de IA adicional | PASS |
 | Additional Constraint — escopo exclusivamente backend | Nenhum componente de UI especificado; Portal do Gestor tratado como consumidor externo do contrato de API/evento | PASS |
 | Additional Constraint — MarkItDown antes de serviço pago | Conversão bruta do documento para texto usa MarkItDown open-source; nenhum uso de Textract nesta spec | PASS |
 
@@ -69,36 +69,35 @@ Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API 
                                      |                } BC: Ingestão & Identificação
                               OrcamentoRecebido        } (agregado Orcamento, escopo local)
                                      v                }
-                          [Agente Classificador] --(<80%)--> [Agente Revisor de IA]
-                                     |                                |
-                        (>=80%) OrcamentoClassificado      (>=80%) OrcamentoClassificadoPorRevisor
-                                     |                                |
-                                     v                     (<80%) OrcamentoEscalonadoParaRevisaoHumana
-                     [Fila de escalonamento assíncrona] <-------------+
+                          [Agente Classificador]
                                      |
-                     (confirmação humana explícita, via API)
-                                     v
-                     OrcamentoReclassificadoPorRevisaoHumana
+                        (>=80%) OrcamentoClassificado
+                                     |
+                                     v          (<80%) OrcamentoEscalonadoParaRevisaoHumana
+                                     +--------------------------> [Fila de escalonamento assíncrona]
+                                                                           |
+                                                       (confirmação humana explícita, via API)
+                                                                           v
+                                                       OrcamentoReclassificadoPorRevisaoHumana
 
 Consumidores externos (fora deste BC, apenas via evento/API — nunca chamada direta):
-  - BC Extração (spec 002): assina OrcamentoClassificado(PorRevisor) para iniciar extração de itens.
+  - BC Extração (spec 002): assina OrcamentoClassificado para iniciar extração de itens.
   - BC Acompanhamento / consumidor de frontend externo: assina todos os eventos + consulta GET /orcamentos/{id}/status.
 ```
 
 Relação entre contextos: **Customer/Supplier** — Ingestão & Identificação é upstream (supplier) de Extração e de Acompanhamento; nenhum destes contextos MUST alterar o modelo de dado de Ingestão diretamente, apenas consumir seus eventos/API.
 
-**Anti-Corruption Layer obrigatória**: entre o Domain deste contexto e (a) a resposta bruta do Bedrock (Classificador/Revisor) e (b) a saída do MarkItDown. Nenhuma dessas respostas cruza para dentro do Domain sem passar por um tradutor explícito (`BedrockClassificacaoACL`, `MarkItDownConversaoACL`) que produz Value Objects validados — nunca o JSON/texto bruto do fornecedor ou do modelo.
+**Anti-Corruption Layer obrigatória**: entre o Domain deste contexto e (a) a resposta bruta do Bedrock (Classificador) e (b) a saída do MarkItDown. Nenhuma dessas respostas cruza para dentro do Domain sem passar por um tradutor explícito (`BedrockClassificacaoACL`, `MarkItDownConversaoACL`) que produz Value Objects validados — nunca o JSON/texto bruto do fornecedor ou do modelo.
 
 ## Domain — Agregados, VOs, Domain Events
 
 ### Agregado raiz: `Orcamento` (escopo: Ingestão & Identificação)
 
 - **Identidade**: `OrcamentoId` (UUID v7).
-- **Atributos**: `canal` (VO `Canal`: PORTAL_WEB | API_REST | SFTP | APP_MOBILE), `recebidoEm` (timestamp), `referenciaBruta` (VO `ReferenciaS3`: bucket+key+versionId, imutável), `referenciaExterna` (opcional, string livre, nunca identidade), `status` (VO `StatusOrcamento`: RECEBIDO | CLASSIFICADO | EM_REVISAO_AUTOMATICA | PENDENTE_REVISAO_HUMANA), `resultadoAtual` (VO `ResultadoClassificacao`, opcional até haver decisão com confiança suficiente), `historico` (lista imutável de `TentativaClassificacao`, append-only).
+- **Atributos**: `canal` (VO `Canal`: PORTAL_WEB | API_REST | SFTP | APP_MOBILE), `recebidoEm` (timestamp), `referenciaBruta` (VO `ReferenciaS3`: bucket+key+versionId, imutável), `referenciaExterna` (opcional, string livre, nunca identidade), `status` (VO `StatusOrcamento`: RECEBIDO | CLASSIFICADO | PENDENTE_REVISAO_HUMANA), `resultadoAtual` (VO `ResultadoClassificacao`, opcional até haver decisão com confiança suficiente), `historico` (lista imutável de `TentativaClassificacao`, append-only).
 - **Invariantes** (aplicadas nos métodos do agregado, nunca na Application):
   - Só transita para `CLASSIFICADO` se `resultadoAtual.nivelConfianca >= LIMIAR_CONFIANCA (80)`.
-  - `registrarTentativaClassificador(resultado)`: se confiança < 80, transita para `EM_REVISAO_AUTOMATICA`, nunca para `CLASSIFICADO`.
-  - `registrarTentativaRevisor(resultado)`: se confiança < 80, transita para `PENDENTE_REVISAO_HUMANA`, nunca reabre uma segunda tentativa automática (regra de negócio explícita da spec — Revisor só tenta uma vez).
+  - `registrarTentativaClassificador(resultado)`: se confiança < 80, transita diretamente para `PENDENTE_REVISAO_HUMANA`, nunca para `CLASSIFICADO` (não há reprocessamento automático por IA — o Agente Revisor foi removido na versão 5 da spec).
   - `registrarConfirmacaoHumana(resultado)`: só é uma transição válida a partir de `PENDENTE_REVISAO_HUMANA`; nunca apaga `historico`, apenas anexa.
   - Qualquer tentativa de sobrescrever `referenciaBruta` após criação lança erro de domínio (`ReferenciaBrutaImutavelError`).
 
@@ -107,7 +106,7 @@ Relação entre contextos: **Customer/Supplier** — Ingestão & Identificação
 - `OrcamentoId` — UUID v7, valida formato.
 - `Canal` — enum fechado, rejeita qualquer valor fora dos 4 canais fixos.
 - `NivelConfianca` — inteiro 0–100, lança erro de domínio fora da faixa; nunca aceita `number` primitivo sem essa validação em nenhum ponto do sistema.
-- `ResultadoClassificacao` — `{ fornecedorIdentificado, formatoIdentificado, nivelConfianca: NivelConfianca, agenteOrigem: 'CLASSIFICADOR' | 'REVISOR' | 'HUMANO' }`.
+- `ResultadoClassificacao` — `{ fornecedorIdentificado, formatoIdentificado, nivelConfianca: NivelConfianca, agenteOrigem: 'CLASSIFICADOR' | 'HUMANO' }`.
 - `TentativaClassificacao` — entrada de histórico imutável: `{ agente, resultado ou motivoInsucesso, timestamp }`.
 - `ReferenciaS3` — `{ bucket, key, versionId }`, garante que toda leitura de bruto referencia uma versão específica e imutável.
 - `ReferenciaFornecedorAutodeclarada` — VO opcional, explicitamente marcado como "nunca base suficiente isolada" via type system (não é aceito como parâmetro de nenhum construtor de `ResultadoClassificacao` com confiança implícita).
@@ -115,18 +114,16 @@ Relação entre contextos: **Customer/Supplier** — Ingestão & Identificação
 ### Domain Events (payload sempre com `schemaVersion: 1`, `orcamentoId`, `ocorreuEm`)
 
 1. `OrcamentoRecebido` — publicado pelo caso de uso `ReceberOrcamento`. Payload: canal, referenciaBruta (ponteiro, não o arquivo), referenciaExterna opcional.
-2. `OrcamentoClassificado` — publicado quando Classificador OU Revisor atinge confiança ≥ 80% (campo `agenteOrigem` distingue). Consumido pelo futuro BC Extração.
-3. `OrcamentoBaixaConfiancaDetectada` — publicado internamente pelo caso de uso de classificação quando Classificador < 80%; único gatilho para acionar o Revisor (nunca chamada direta).
-4. `OrcamentoEscalonadoParaRevisaoHumana` — publicado quando Revisor também < 80%. Consumido pelo Acompanhamento/consumidor externo para exibir "pendente".
-5. `OrcamentoReclassificadoPorRevisaoHumana` — publicado após confirmação humana explícita via API; reaproveita o mesmo shape de `OrcamentoClassificado` com `agenteOrigem: 'HUMANO'` mais um evento próprio para auditoria da correção manual.
+2. `OrcamentoClassificado` — publicado quando o Classificador atinge confiança ≥ 80% (`agenteOrigem: 'CLASSIFICADOR'`). Consumido pelo futuro BC Extração.
+3. `OrcamentoEscalonadoParaRevisaoHumana` — publicado quando o Classificador fica < 80%. Consumido pelo Acompanhamento/consumidor externo para exibir "pendente" e alimentar a fila de escalonamento humano.
+4. `OrcamentoReclassificadoPorRevisaoHumana` — publicado após confirmação humana explícita via API; reaproveita o mesmo shape de `OrcamentoClassificado` com `agenteOrigem: 'HUMANO'` mais um evento próprio para auditoria da correção manual.
 
-Nota: `OrcamentoClassificado` é o único evento que a Extração (002) precisa assinar — o histórico interno de tentativas (`OrcamentoBaixaConfiancaDetectada`) é um detalhe de implementação deste BC, não um contrato externo estável; specs futuras MUST assinar apenas os eventos de saída documentados no Context Map acima, nunca eventos internos de transição intermediária.
+Nota: `OrcamentoClassificado` é o único evento que a Extração (002) precisa assinar; specs futuras MUST assinar apenas os eventos de saída documentados no Context Map acima, nunca eventos internos de transição intermediária.
 
 ## Application — Casos de uso
 
 - `ReceberOrcamento(canal, arquivo, referenciaExternaOpcional)` — grava bruto no S3 (via `ArmazenamentoBrutoGateway`), cria agregado, persiste, publica `OrcamentoRecebido`. Idempotência: aceita `Idempotency-Key` opcional na borda REST; se repetida dentro de 24h, retorna o `OrcamentoId` já existente sem duplicar o registro (tabela `idempotency_keys` com TTL).
-- `ClassificarOrcamento(orcamentoId)` — consumidor do evento `OrcamentoRecebido` (via SQS). Busca arquivo bruto, converte via `MarkItDownConversaoACL`, invoca `AgenteClassificadorGateway`, aplica `Orcamento.registrarTentativaClassificador`, persiste, publica `OrcamentoClassificado` ou `OrcamentoBaixaConfiancaDetectada`.
-- `RevisarOrcamentoComIA(orcamentoId)` — consumidor de `OrcamentoBaixaConfiancaDetectada`. Mesmo fluxo com `AgenteRevisorGateway` + contexto adicional (histórico de fornecedores conhecidos). Publica `OrcamentoClassificado` (agenteOrigem REVISOR) ou `OrcamentoEscalonadoParaRevisaoHumana`.
+- `ClassificarOrcamento(orcamentoId)` — consumidor do evento `OrcamentoRecebido` (via SQS). Busca arquivo bruto, converte via `MarkItDownConversaoACL`, invoca `AgenteClassificadorGateway`, aplica `Orcamento.registrarTentativaClassificador`, persiste, publica `OrcamentoClassificado` (≥80%) ou `OrcamentoEscalonadoParaRevisaoHumana` (<80%).
 - `ConfirmarRevisaoHumana(orcamentoId, resultadoConfirmado)` — caso de uso síncrono acionado pelo endpoint REST de confirmação. Valida que o agregado está em `PENDENTE_REVISAO_HUMANA`, aplica `registrarConfirmacaoHumana`, publica `OrcamentoReclassificadoPorRevisaoHumana`.
 - `ConsultarStatusOrcamento(orcamentoId)` — query, retorna status atual + histórico completo (nunca escreve).
 
@@ -135,12 +132,12 @@ Todos os casos de uso publicam evento via interface `EventPublisher` (implementa
 ## Infrastructure
 
 - `S3ArmazenamentoBrutoGateway` — implementa `ArmazenamentoBrutoGateway`; bucket `nexo-orcamentos-raw`, versionamento + Object Lock em modo governance (ou bucket policy deny `s3:DeleteObject`/`s3:PutObject` sobre chave existente), SSE-KMS.
-- `BedrockClassificadorGateway` / `BedrockRevisorGateway` — implementam os dois gateways de agente; cada um com seu próprio `ACL` de parsing de resposta (structured output/tool-use do Bedrock, nunca parsing de texto livre por regex).
+- `BedrockClassificadorGateway` — implementa o gateway do agente Classificador, com seu `ACL` de parsing de resposta (structured output/tool-use do Bedrock, nunca parsing de texto livre por regex).
 - `MarkItDownConversaoACL` — invoca MarkItDown (processo isolado/Lambda Layer, CPU-bound, timeout e memória dimensionados) para gerar texto leve do documento; sanitiza o texto antes de compor o prompt do Classificador (ver Segurança).
 - `EventBridgePublisher` — implementa `EventPublisher`, publica no bus `nexo-dominio-bus`.
 - `DrizzleOrcamentoRepository` — traduz linha↔agregado sobre Aurora Serverless v2 Postgres; tabelas `orcamentos` (estado atual) e `orcamentos_historico` (append-only, nunca UPDATE/DELETE, apenas INSERT).
-- Filas SQS por consumidor: `classificador-queue`, `revisor-queue`, cada uma com DLQ própria + alarme CloudWatch em mensagem na DLQ (Princípio IV — exceção de infraestrutura também nunca silenciosa).
-- IAM: uma role por Lambda (`ReceberOrcamentoLambdaRole`, `ClassificadorLambdaRole`, `RevisorLambdaRole`, `ConfirmarRevisaoHumanaLambdaRole`, `ConsultaStatusLambdaRole`), least privilege — ex.: `ClassificadorLambdaRole` tem `bedrock:InvokeModel` restrito ao ARN do(s) modelo(s) aprovado(s), `s3:GetObject` restrito ao prefixo do bucket raw, sem `s3:DeleteObject` em nenhuma role.
+- Filas SQS por consumidor: `classificador-queue`, com DLQ própria + alarme CloudWatch em mensagem na DLQ (Princípio IV — exceção de infraestrutura também nunca silenciosa).
+- IAM: uma role por Lambda (`ReceberOrcamentoLambdaRole`, `ClassificadorLambdaRole`, `ConfirmarRevisaoHumanaLambdaRole`, `ConsultaStatusLambdaRole`), least privilege — ex.: `ClassificadorLambdaRole` tem `bedrock:InvokeModel` restrito ao ARN do(s) modelo(s) aprovado(s), `s3:GetObject` restrito ao prefixo do bucket raw, sem `s3:DeleteObject` em nenhuma role.
 
 ## Interface
 
@@ -154,7 +151,7 @@ Todos os casos de uso publicam evento via interface `EventPublisher` (implementa
 
 ## Segurança (riscos específicos desta spec)
 
-- **Prompt injection via documento de fornecedor**: o texto convertido pelo MarkItDown é entrada não confiável. Prompt do Classificador/Revisor MUST isolar esse texto em um bloco delimitado de "conteúdo do documento", nunca concatenado como instrução de sistema; resposta do Bedrock MUST usar saída estruturada (tool-use/JSON Schema) validada pelo ACL — texto livre do modelo nunca é interpretado como comando.
+- **Prompt injection via documento de fornecedor**: o texto convertido pelo MarkItDown é entrada não confiável. Prompt do Classificador MUST isolar esse texto em um bloco delimitado de "conteúdo do documento", nunca concatenado como instrução de sistema; resposta do Bedrock MUST usar saída estruturada (tool-use/JSON Schema) validada pelo ACL — texto livre do modelo nunca é interpretado como comando.
 - **Dado bruto imutável e criptografado**: SSE-KMS no bucket raw, chave dedicada, rotação gerenciada.
 - **LGPD**: orçamento pode conter dado de contato do fornecedor (não dado pessoal de consumidor final) — retenção via lifecycle policy do S3 (categoria "orçamento", política a parametrizar; SLA de retenção fica pendente de decisão de produto/compliance, registrar como risco remanescente).
 - **Least privilege**: ver seção Infrastructure/IAM acima — sem role compartilhada ampla entre os 5 Lambdas deste contexto.
@@ -179,15 +176,15 @@ src/
         ├── domain/
         │   ├── orcamento.aggregate.ts
         │   ├── value-objects/ (orcamento-id, canal, nivel-confianca, resultado-classificacao, referencia-s3, tentativa-classificacao)
-        │   ├── events/ (orcamento-recebido, orcamento-classificado, orcamento-baixa-confianca-detectada, orcamento-escalonado-revisao-humana, orcamento-reclassificado-revisao-humana)
+        │   ├── events/ (orcamento-recebido, orcamento-classificado, orcamento-escalonado-revisao-humana, orcamento-reclassificado-revisao-humana)
         │   ├── repositories/ (orcamento.repository.ts — interface)
-        │   └── gateways/ (agente-classificador.gateway.ts, agente-revisor.gateway.ts, armazenamento-bruto.gateway.ts, markitdown-conversao.acl.ts — interfaces)
+        │   └── gateways/ (agente-classificador.gateway.ts, armazenamento-bruto.gateway.ts, markitdown-conversao.acl.ts — interfaces)
         ├── application/
-        │   └── use-cases/ (receber-orcamento, classificar-orcamento, revisar-orcamento-com-ia, confirmar-revisao-humana, consultar-status-orcamento)
+        │   └── use-cases/ (receber-orcamento, classificar-orcamento, confirmar-revisao-humana, consultar-status-orcamento)
         ├── infrastructure/
         │   ├── persistence/ (drizzle-orcamento.repository.ts, schema/)
         │   ├── aws/ (s3-armazenamento-bruto.gateway.ts, eventbridge.publisher.ts)
-        │   ├── bedrock/ (bedrock-classificador.gateway.ts, bedrock-revisor.gateway.ts, acl/)
+        │   ├── bedrock/ (bedrock-classificador.gateway.ts, acl/)
         │   └── markitdown/ (markitdown-conversao.acl.ts)
         └── interface/
             ├── http/ (controllers REST + Zod schemas)

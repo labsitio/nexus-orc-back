@@ -14,7 +14,7 @@
 
 - [ ] T001 Criar estrutura de pastas `src/bounded-contexts/extracao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/extracao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pela spec 001 — não repetir T001/T002/T003 daquela spec).
 - [ ] T002 [P] Migração Drizzle Kit: schema inicial do BC Extração (tabelas vazias, baseline) — ADR-001 herdado da spec 001.
-- [ ] T003 [P] Provisionar filas SQS `extrator-queue` e `revisor-extracao-queue`, cada uma com DLQ própria + alarme CloudWatch (IaC — Ricardo/DevOps).
+- [ ] T003 [P] Provisionar fila SQS `extrator-queue`, com DLQ própria + alarme CloudWatch (IaC — Ricardo/DevOps).
 - [ ] T004 [P] Provisionar regra EventBridge no bus `nexo-dominio-bus` roteando `detail-type: OrcamentoClassificado`, `source: nexo.ingestao-identificacao` → `extrator-queue`.
 
 **Checkpoint**: estrutura pronta, filas e regra de roteamento provisionadas, CI verde.
@@ -29,9 +29,9 @@
 - [ ] T006 Domain: implementar VO genérico `CampoExtraido<T>` — construtor MUST garantir `extraido === false ⟺ valor === null`. Critério de aceite: spec.md "NUNCA preenche o campo com um valor inventado/estimado" — unit test que tenta construir `CampoExtraido` com `extraido: true` e `valor: null` (ou vice-versa) e espera erro de domínio.
 - [ ] T007 [P] Domain: implementar VOs `Dinheiro`, `Quantidade`, `DescricaoProduto`, `PeriodoValidade` (nunca primitivos soltos).
 - [ ] T008 [P] Domain: implementar VOs `ItemOrcamento`, `CondicoesComerciais`, `ReferenciaClassificacao`, `ReferenciaS3` (redefinido localmente), `TentativaExtracao`.
-- [ ] T009 Domain: implementar agregado `ExtracaoOrcamento` (`extracao-orcamento.aggregate.ts`) com métodos `registrarTentativaExtrator`, `registrarTentativaRevisorExtracao`, `registrarConfirmacaoHumana`, invariante de campo obrigatório completo para transitar a `EXTRAIDO`, histórico append-only. Critério: unit test que tenta forçar transição para `EXTRAIDO` com campo obrigatório `extraido: false` e espera erro de domínio.
-- [ ] T010 [P] Domain: definir os 4 Domain Events (`orcamento-extraido`, `extracao-campos-nao-extraidos-detectada`, `extracao-escalonada-revisao-humana`, `orcamento-extraido-pendencia-confirmada`) com `schemaVersion: 1`, `source: nexo.extracao`, conforme convenção do `plan.md`.
-- [ ] T011 [P] Domain: definir interfaces de repositório/gateway (`extracao-orcamento.repository.ts`, `agente-extrator.gateway.ts`, `agente-revisor-extracao.gateway.ts`, `leitura-bruta.gateway.ts`, `markitdown-conversao-extracao.acl.ts`) — sem implementação, apenas contratos TypeScript.
+- [ ] T009 Domain: implementar agregado `ExtracaoOrcamento` (`extracao-orcamento.aggregate.ts`) com métodos `registrarTentativaExtrator` (1+ campo obrigatório sem confiança → transita direto para `PENDENTE_REVISAO_HUMANA`), `registrarConfirmacaoHumana`, invariante de campo obrigatório completo para transitar a `EXTRAIDO`, histórico append-only. Critério: unit test que tenta forçar transição para `EXTRAIDO` com campo obrigatório `extraido: false` e espera erro de domínio.
+- [ ] T010 [P] Domain: definir os 3 Domain Events (`orcamento-extraido`, `extracao-escalonada-revisao-humana`, `orcamento-extraido-pendencia-confirmada`) com `schemaVersion: 1`, `source: nexo.extracao`, conforme convenção do `plan.md`. `extracao-escalonada-revisao-humana` é publicado diretamente quando o Extrator não atinge confiança em 1+ campo obrigatório.
+- [ ] T011 [P] Domain: definir interfaces de repositório/gateway (`extracao-orcamento.repository.ts`, `agente-extrator.gateway.ts`, `leitura-bruta.gateway.ts`, `markitdown-conversao-extracao.acl.ts`) — sem implementação, apenas contratos TypeScript.
 - [ ] T012 Infrastructure: schema Drizzle das tabelas `extracoes_orcamento` (estado atual, `itens`/`condicoes_comerciais` JSONB — ADR-004) e `extracoes_orcamento_historico` (append-only, sem UPDATE/DELETE) + migração.
 - [ ] T013 Infrastructure: `DrizzleExtracaoOrcamentoRepository` implementando `ExtracaoOrcamentoRepository`, traduzindo linha↔agregado, nunca vazando tipo JSONB bruto para fora da Infra.
 - [ ] T014 [P] Infrastructure: `S3LeituraBrutaGateway` implementando `LeituraBrutaGateway` — read-only sobre `nexo-orcamentos-raw`, sem nenhuma permissão de escrita.
@@ -58,7 +58,7 @@
 ### Implementation (US1)
 
 - [ ] T021 [US1] Infrastructure: `BedrockExtratorGateway` + `BedrockExtracaoACL` (structured output/tool-use, nunca parsing de texto livre por regex).
-- [ ] T022 [US1] Application: caso de uso `ExtrairDadosOrcamento` (consome `OrcamentoClassificado`, converte via MarkItDown, invoca Extrator, aplica `registrarTentativaExtrator`, persiste, publica `OrcamentoExtraido` ou `ExtracaoComCamposNaoExtraidosDetectada`).
+- [ ] T022 [US1] Application: caso de uso `ExtrairDadosOrcamento` (consome `OrcamentoClassificado`, converte via MarkItDown, invoca Extrator, aplica `registrarTentativaExtrator`, persiste, publica `OrcamentoExtraido` se todos os campos obrigatórios OK ou `ExtracaoEscalonadaParaRevisaoHumana` se 1+ campo sem confiança).
 - [ ] T023 [US1] Interface: handler Lambda consumidor SQS de `extrator-queue`, invocando `ExtrairDadosOrcamento`.
 - [ ] T024 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/extracao/status` (query, Zod schema de response, Problem Details para erro).
 - [ ] T025 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema da spec 001.
@@ -70,25 +70,18 @@
 
 ## Phase 4: User Story 2 — Campo obrigatório ausente ou de baixa confiança (Priority: P1) 🎯 MVP
 
-**Goal**: campo obrigatório sem confiança suficiente nunca é inventado; aciona Revisor de Extração e, se necessário, fila de escalonamento humana própria deste BC; estado visível na consulta de status.
+**Goal**: campo obrigatório sem confiança suficiente nunca é inventado; escala diretamente para a fila de escalonamento humano própria deste BC (sem revisor de IA); estado visível na consulta de status.
 
-**Independent Test**: publicar `OrcamentoClassificado` referenciando documento com campo ambíguo/ilegível conhecido e verificar que (a) nenhum valor inventado aparece no resultado, (b) `ExtracaoComCamposNaoExtraidosDetectada` e, se aplicável, `ExtracaoEscalonadaParaRevisaoHumana` são publicados, (c) status reflete a pendência — critério de aceite spec.md "Extrator NUNCA preenche o campo com um valor inventado/estimado".
+**Independent Test**: publicar `OrcamentoClassificado` referenciando documento com campo ambíguo/ilegível conhecido e verificar que (a) nenhum valor inventado aparece no resultado, (b) `ExtracaoEscalonadaParaRevisaoHumana` é publicado, (c) status reflete a pendência — critério de aceite spec.md "Extrator NUNCA preenche o campo com um valor inventado/estimado".
 
 ### Tests (US2)
 
-- [ ] T027 [P] [US2] Unit test `ExtracaoOrcamento.registrarTentativaExtrator` com campo obrigatório de confiança insuficiente → transita para `EM_REVISAO_AUTOMATICA`, nunca para `EXTRAIDO`, campo permanece `extraido: false`/`valor: null`.
-- [ ] T028 [P] [US2] Unit test `ExtracaoOrcamento.registrarTentativaRevisorExtracao` — só uma tentativa; se ainda insuficiente, transita para `PENDENTE_REVISAO_HUMANA`, nunca reabre segunda tentativa automática.
-- [ ] T029 [P] [US2] Integration test: campo ambíguo conhecido → `ExtracaoComCamposNaoExtraidosDetectada` publicado → Revisor de Extração processa → `ExtracaoEscalonadaParaRevisaoHumana` publicado (caso o Revisor também não resolva) → status reflete `PENDENTE_REVISAO_HUMANA`.
+- [ ] T027 [P] [US2] Unit test `ExtracaoOrcamento.registrarTentativaExtrator` com campo obrigatório de confiança insuficiente → transita direto para `PENDENTE_REVISAO_HUMANA`, nunca para `EXTRAIDO`, campo permanece `extraido: false`/`valor: null`.
+- [ ] T029 [P] [US2] Integration test: campo ambíguo conhecido → `ExtracaoEscalonadaParaRevisaoHumana` publicado diretamente pelo Extrator (sem revisor de IA) → status reflete `PENDENTE_REVISAO_HUMANA`.
 
-### Implementation (US2)
+> **Nota (revisão)**: T028 (unit test do revisor de extração) e T030–T034 (implementação do `BedrockRevisorExtracaoGateway`, caso de uso `RevisarExtracaoComIA`, fila `revisor-extracao-queue`, regra EventBridge e role `RevisorExtracaoLambdaRole`) foram **removidos** — o Agente Revisor de Extração deixou de existir. O caminho de baixa confiança agora é publicado diretamente pelo `ExtrairDadosOrcamento` (T022) via `registrarTentativaExtrator` (T009). Os IDs T028 e T030–T034 não existem mais; os demais IDs foram mantidos estáveis para preservar a rastreabilidade das issues do GitHub.
 
-- [ ] T030 [US2] Infrastructure: `BedrockRevisorExtracaoGateway` + ACL própria, com contexto adicional (campos já extraídos com sucesso, para focar no que falta).
-- [ ] T031 [US2] Application: caso de uso `RevisarExtracaoComIA` (consome `ExtracaoComCamposNaoExtraidosDetectada`, aplica `registrarTentativaRevisorExtracao`, persiste, publica `OrcamentoExtraido` ou `ExtracaoEscalonadaParaRevisaoHumana`).
-- [ ] T032 [US2] Interface: handler Lambda consumidor SQS de `revisor-extracao-queue`.
-- [ ] T033 [US2] Infrastructure: regra EventBridge roteando `ExtracaoComCamposNaoExtraidosDetectada` (interno, `source: nexo.extracao`) → `revisor-extracao-queue`.
-- [ ] T034 [US2] IAM: role dedicada `RevisorExtracaoLambdaRole`, least privilege, `bedrock:InvokeModel` restrito ao modelo revisor aprovado.
-
-**Checkpoint**: US2 funcional isoladamente — nenhum valor inventado aparece em nenhum cenário, pipeline nunca trava, exceção sempre visível.
+**Checkpoint**: US2 funcional isoladamente — nenhum valor inventado aparece em nenhum cenário, pipeline nunca trava, exceção sempre visível e escalada direto ao humano.
 
 ---
 
@@ -117,9 +110,9 @@
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [ ] T041 [P] Documentação OpenAPI gerada a partir dos schemas Zod dos 2 endpoints REST deste BC.
-- [ ] T042 Medir p95 real end-to-end (classificação disponível → extração disponível) em ambiente de teste; decidir Provisioned Concurrency para `ExtratorLambdaRole`/`RevisorExtracaoLambdaRole` se meta de 5 minutos não for atingida (ver Constraints do `plan.md`).
+- [ ] T042 Medir p95 real end-to-end (classificação disponível → extração disponível) em ambiente de teste; decidir Provisioned Concurrency para `ExtratorLambdaRole` se meta de 5 minutos não for atingida (ver Constraints do `plan.md`).
 - [ ] T043 [P] Monitorar tamanho de payload de `OrcamentoExtraido` contra limite de 256KB do EventBridge (risco registrado no `plan.md`) — alarme se aproximar do limite.
-- [ ] T044 Security review: `npm audit`/`pnpm audit`, Semgrep, revisão de prompt injection nos prompts do Extrator/Revisor de Extração (mesmo checklist da spec 001).
+- [ ] T044 Security review: `npm audit`/`pnpm audit`, Semgrep, revisão de prompt injection no prompt do Extrator (mesmo checklist da spec 001).
 - [ ] T045 [P] Métrica de observabilidade: taxa de campos marcados "não extraído" e taxa de uso de serviço pago como exceção (MarkItDown vs. exceção) — conforme "Métricas de Avaliação Contínua" do spec.md.
 
 ---
@@ -146,7 +139,7 @@
 
 - Todos os T00X marcados [P] na mesma fase podem rodar em paralelo (arquivos distintos, sem dependência).
 - VOs (T005–T008) em paralelo entre si; agregado (T009) depende de todos os VOs.
-- Gateways de Infrastructure de US1 e US2 (T021, T030) podem ser implementados em paralelo por desenvolvedores distintos, desde que Foundational esteja completo.
+- O gateway de Infrastructure do Extrator (T021) pode ser implementado assim que Foundational estiver completo.
 
 ---
 
