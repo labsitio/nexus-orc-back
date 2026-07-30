@@ -1,2 +1,0 @@
-CREATE INDEX "confirmacoes_anonimizacao_solicitacao_id_idx" ON "platform"."confirmacoes_anonimizacao" USING btree ("solicitacao_id");--> statement-breakpoint
-CREATE INDEX "trilha_auditoria_acesso_orcamento_id_idx" ON "platform"."trilha_auditoria_acesso" USING btree ("orcamento_id");

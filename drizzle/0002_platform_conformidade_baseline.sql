@@ -38,4 +38,6 @@ CREATE TABLE "platform"."trilha_auditoria_acesso" (
 	"ocorreu_em" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "platform"."confirmacoes_anonimizacao" ADD CONSTRAINT "confirmacoes_anonimizacao_solicitacao_id_solicitacoes_esquecimento_id_fk" FOREIGN KEY ("solicitacao_id") REFERENCES "platform"."solicitacoes_esquecimento"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "platform"."confirmacoes_anonimizacao" ADD CONSTRAINT "confirmacoes_anonimizacao_solicitacao_id_solicitacoes_esquecimento_id_fk" FOREIGN KEY ("solicitacao_id") REFERENCES "platform"."solicitacoes_esquecimento"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "confirmacoes_anonimizacao_solicitacao_id_idx" ON "platform"."confirmacoes_anonimizacao" USING btree ("solicitacao_id");--> statement-breakpoint
+CREATE INDEX "trilha_auditoria_acesso_orcamento_id_idx" ON "platform"."trilha_auditoria_acesso" USING btree ("orcamento_id");

@@ -5,15 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1785436140902,
-      "tag": "0000_platform_conformidade_baseline",
+      "when": 1785434576223,
+      "tag": "0000_orcamentos_e_historico",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1785436357275,
-      "tag": "0001_platform_conformidade_indices",
+      "when": 1785434593961,
+      "tag": "0001_orcamentos_historico_append_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785436885651,
+      "tag": "0002_platform_conformidade_baseline",
       "breakpoints": true
     }
   ]
