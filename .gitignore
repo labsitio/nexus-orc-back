@@ -6,3 +6,4 @@ dist/
 !.env.example
 coverage/
 .husky/_/
+cdk.out/

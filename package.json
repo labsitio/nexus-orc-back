@@ -9,6 +9,7 @@
   "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "typecheck:infra": "tsc --noEmit -p infra/tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -30,6 +31,7 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.20.0",
+    "aws-cdk": "^2.1133.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
@@ -41,6 +43,8 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "aws-cdk-lib": "^2.262.2",
+    "constructs": "^10.7.2",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.22.0"
   }

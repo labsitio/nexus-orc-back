@@ -1,0 +1,10 @@
+{
+  "app": "node infra/bin/app.ts",
+  "watch": {
+    "include": ["infra/**/*.ts"],
+    "exclude": ["node_modules", "cdk.out"]
+  },
+  "context": {
+    "@aws-cdk/core:newStyleStackSynthesis": true
+  }
+}

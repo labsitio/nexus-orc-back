@@ -32,7 +32,7 @@
 - [ ] T009 [P] Domain: definir interfaces de repositório/gateway (`orcamento.repository.ts`, `agente-classificador.gateway.ts`, `armazenamento-bruto.gateway.ts`, `markitdown-conversao.acl.ts`, `event-publisher.ts`) — sem implementação, apenas contratos TypeScript.
 - [ ] T010 Infrastructure: schema Drizzle das tabelas `orcamentos` (estado atual) e `orcamentos_historico` (append-only, sem UPDATE/DELETE) + migração.
 - [ ] T011 Infrastructure: `DrizzleOrcamentoRepository` implementando `OrcamentoRepository`, traduzindo linha↔agregado, nunca vazando tipo de linha para fora da Infra.
-- [ ] T012 [P] Infrastructure: provisionar bucket S3 `nexo-orcamentos-raw` (IaC — CDK/Terraform a definir por Ricardo/DevOps) com versionamento, SSE-KMS, bucket policy deny-overwrite/deny-delete.
+- [x] T012 [P] Infrastructure: provisionar bucket S3 `nexo-orcamentos-raw` (IaC — CDK/Terraform a definir por Ricardo/DevOps) com versionamento, SSE-KMS, bucket policy deny-overwrite/deny-delete. Decisão registrada na issue/PR: AWS CDK v2 (TypeScript); imutabilidade via S3 Object Lock (GOVERNANCE, retenção 5 anos — pendente de confirmação de compliance) em vez de bucket policy deny-overwrite, para não bloquear o PUT legítimo do gateway de upload.
 - [ ] T013 [P] Infrastructure: provisionar EventBridge custom bus `nexo-dominio-bus` + regras de roteamento para as filas SQS previstas nas fases seguintes.
 - [ ] T014 Infrastructure: `EventBridgePublisher` implementando `EventPublisher`.
 - [ ] T015 Configurar logging estruturado (pino) + OpenTelemetry Node SDK como base transversal de observabilidade para todos os handlers Lambda deste contexto.

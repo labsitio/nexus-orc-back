@@ -34,6 +34,12 @@ jobs:
       - name: Typecheck (tsc --strict)
         run: pnpm run typecheck
 
+      - name: Typecheck infra (CDK)
+        run: pnpm run typecheck:infra
+
+      - name: CDK synth (smoke test)
+        run: pnpm exec cdk synth --quiet
+
       - name: Test
         run: pnpm run test
 
