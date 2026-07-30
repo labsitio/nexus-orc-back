@@ -35,42 +35,41 @@ describe.skipIf(!DATABASE_URL)('DrizzleIdempotencyKeyRepository (Postgres real)'
     await client.end();
   });
 
-  it('registrar + buscarOrcamentoId devolve o OrcamentoId dentro do TTL', async () => {
+  it('reservar chave livre: reservado=true, orcamentoId é o próprio passado', async () => {
     const chave = `teste-${OrcamentoId.novo().toString()}`;
     const orcamentoId = OrcamentoId.novo();
     chavesParaLimpar.push(chave);
 
-    await repo.registrar(chave, orcamentoId, new Date(Date.now() + 60_000));
+    const reserva = await repo.reservar(chave, orcamentoId, new Date(Date.now() + 60_000));
 
-    const encontrado = await repo.buscarOrcamentoId(chave);
-    expect(encontrado?.toString()).toBe(orcamentoId.toString());
+    expect(reserva.reservado).toBe(true);
+    expect(reserva.orcamentoId.toString()).toBe(orcamentoId.toString());
   });
 
-  it('buscarOrcamentoId devolve undefined para chave nunca registrada', async () => {
-    const encontrado = await repo.buscarOrcamentoId('chave-inexistente');
-    expect(encontrado).toBeUndefined();
-  });
-
-  it('buscarOrcamentoId devolve undefined para chave expirada (TTL vencido)', async () => {
-    const chave = `teste-expirada-${OrcamentoId.novo().toString()}`;
-    chavesParaLimpar.push(chave);
-
-    await repo.registrar(chave, OrcamentoId.novo(), new Date(Date.now() - 1000));
-
-    const encontrado = await repo.buscarOrcamentoId(chave);
-    expect(encontrado).toBeUndefined();
-  });
-
-  it('registrar é idempotente para a mesma chave (onConflictDoNothing)', async () => {
+  it('reservar a mesma chave 2x dentro do TTL: 2ª chamada não reserva e devolve o OrcamentoId da 1ª (admission gate)', async () => {
     const chave = `teste-conflito-${OrcamentoId.novo().toString()}`;
     const primeiro = OrcamentoId.novo();
     const segundo = OrcamentoId.novo();
     chavesParaLimpar.push(chave);
 
-    await repo.registrar(chave, primeiro, new Date(Date.now() + 60_000));
-    await repo.registrar(chave, segundo, new Date(Date.now() + 60_000));
+    const reserva1 = await repo.reservar(chave, primeiro, new Date(Date.now() + 60_000));
+    const reserva2 = await repo.reservar(chave, segundo, new Date(Date.now() + 60_000));
 
-    const encontrado = await repo.buscarOrcamentoId(chave);
-    expect(encontrado?.toString()).toBe(primeiro.toString());
+    expect(reserva1.reservado).toBe(true);
+    expect(reserva2.reservado).toBe(false);
+    expect(reserva2.orcamentoId.toString()).toBe(primeiro.toString());
+  });
+
+  it('reservar chave expirada (TTL vencido): reservado=true de novo, sobrescreve com o novo orcamentoId', async () => {
+    const chave = `teste-expirada-${OrcamentoId.novo().toString()}`;
+    const antigo = OrcamentoId.novo();
+    const novo = OrcamentoId.novo();
+    chavesParaLimpar.push(chave);
+
+    await repo.reservar(chave, antigo, new Date(Date.now() - 1000));
+    const reserva = await repo.reservar(chave, novo, new Date(Date.now() + 60_000));
+
+    expect(reserva.reservado).toBe(true);
+    expect(reserva.orcamentoId.toString()).toBe(novo.toString());
   });
 });

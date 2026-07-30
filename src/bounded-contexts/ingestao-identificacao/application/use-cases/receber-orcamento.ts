@@ -46,16 +46,26 @@ export class ReceberOrcamento {
   ) {}
 
   async executar(params: ReceberOrcamentoParams): Promise<OrcamentoId> {
+    const canal = Canal.de(params.canal);
+    const candidatoId = params.orcamentoId ?? OrcamentoId.novo();
+
+    // Gate de admissão atômico (achado MAJOR do backend-reviewer): reserva
+    // ANTES de qualquer persist/publish — nunca "ler se existe" e só depois
+    // escrever, que sob concorrência deixa duas chamadas passarem juntas e
+    // publicarem `OrcamentoRecebido` duplicado para a mesma Idempotency-Key.
     if (params.idempotencyKey) {
-      const existente = await this.idempotencia.buscarOrcamentoId(params.idempotencyKey);
-      if (existente) {
-        return existente;
+      const reserva = await this.idempotencia.reservar(
+        params.idempotencyKey,
+        candidatoId,
+        new Date(Date.now() + IDEMPOTENCY_TTL_MS),
+      );
+      if (!reserva.reservado) {
+        return reserva.orcamentoId;
       }
     }
 
-    const canal = Canal.de(params.canal);
     const orcamento = Orcamento.receber({
-      id: params.orcamentoId ?? OrcamentoId.novo(),
+      id: candidatoId,
       canal,
       referenciaBruta: params.referenciaBruta,
       referenciaExterna: params.referenciaExterna,
@@ -74,14 +84,6 @@ export class ReceberOrcamento {
         params.referenciaExterna,
       ),
     );
-
-    if (params.idempotencyKey) {
-      await this.idempotencia.registrar(
-        params.idempotencyKey,
-        orcamento.id,
-        new Date(Date.now() + IDEMPOTENCY_TTL_MS),
-      );
-    }
 
     return orcamento.id;
   }

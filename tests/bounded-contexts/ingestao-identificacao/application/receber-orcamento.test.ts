@@ -3,7 +3,10 @@ import { ReceberOrcamento } from '../../../../src/bounded-contexts/ingestao-iden
 import type { EventPublisher } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/event-publisher.js';
 import { OrcamentoRecebido } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/events/orcamento-recebido.event.js';
 import { Orcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
-import type { IdempotencyKeyRepository } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/repositories/idempotency-key.repository.js';
+import type {
+  IdempotencyKeyRepository,
+  ReservaIdempotencia,
+} from '../../../../src/bounded-contexts/ingestao-identificacao/domain/repositories/idempotency-key.repository.js';
 import type { OrcamentoRepository } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/repositories/orcamento.repository.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
@@ -16,10 +19,13 @@ function publisherFake(): EventPublisher {
   return { publicar: vi.fn().mockResolvedValue(undefined) };
 }
 
+/** `existente` simula outra tentativa que já venceu a corrida de reserva. */
 function idempotenciaFake(existente?: OrcamentoId): IdempotencyKeyRepository {
   return {
-    buscarOrcamentoId: vi.fn().mockResolvedValue(existente),
-    registrar: vi.fn().mockResolvedValue(undefined),
+    reservar: vi.fn(
+      async (_chave: string, orcamentoId: OrcamentoId): Promise<ReservaIdempotencia> =>
+        existente ? { reservado: false, orcamentoId: existente } : { reservado: true, orcamentoId },
+    ),
   };
 }
 
@@ -51,6 +57,7 @@ describe('ReceberOrcamento', () => {
       key: 'sftp-incoming/x.pdf',
       versionId: 'v-1',
     });
+    expect(idempotencia.reservar).not.toHaveBeenCalled();
   });
 
   it('usa o orcamentoId provisório informado (upload-url -> confirmar-upload) em vez de gerar um novo', async () => {
@@ -69,7 +76,7 @@ describe('ReceberOrcamento', () => {
     expect(orcamentoId.toString()).toBe(provisorio.toString());
   });
 
-  it('com Idempotency-Key repetida dentro do TTL, devolve o OrcamentoId existente sem repetir efeito colateral', async () => {
+  it('com Idempotency-Key já reservada por outra tentativa (perdeu a corrida), devolve o OrcamentoId vencedor sem persistir/publicar', async () => {
     const existente = OrcamentoId.novo();
     const repositorio = repositorioFake();
     const publisher = publisherFake();
@@ -87,7 +94,7 @@ describe('ReceberOrcamento', () => {
     expect(publisher.publicar).not.toHaveBeenCalled();
   });
 
-  it('com Idempotency-Key nova, executa o fluxo normal e registra a chave após publicar', async () => {
+  it('com Idempotency-Key nova, reserva ANTES de persistir/publicar (gate de admissão) e executa o fluxo normal', async () => {
     const referencia = ReferenciaS3.de({ bucket: 'b', key: 'k', versionId: 'v' });
     const repositorio = repositorioFake();
     const publisher = publisherFake();
@@ -100,14 +107,16 @@ describe('ReceberOrcamento', () => {
       idempotencyKey: 'chave-nova',
     });
 
-    expect(idempotencia.registrar).toHaveBeenCalledTimes(1);
-    const [chave, idRegistrado, expiraEm] = vi.mocked(idempotencia.registrar).mock.calls[0]!;
+    expect(idempotencia.reservar).toHaveBeenCalledTimes(1);
+    const [chave, idReservado, expiraEm] = vi.mocked(idempotencia.reservar).mock.calls[0]!;
     expect(chave).toBe('chave-nova');
-    expect((idRegistrado as OrcamentoId).toString()).toBe(orcamentoId.toString());
+    expect((idReservado as OrcamentoId).toString()).toBe(orcamentoId.toString());
     expect((expiraEm as Date).getTime()).toBeGreaterThan(Date.now());
+    expect(repositorio.salvar).toHaveBeenCalledTimes(1);
+    expect(publisher.publicar).toHaveBeenCalledTimes(1);
   });
 
-  it('rejeita canal fora dos 4 fixos sem persistir nem publicar', async () => {
+  it('rejeita canal fora dos 4 fixos sem reservar idempotência, persistir ou publicar', async () => {
     const repositorio = repositorioFake();
     const publisher = publisherFake();
     const idempotencia = idempotenciaFake();
@@ -117,8 +126,10 @@ describe('ReceberOrcamento', () => {
       useCase.executar({
         canal: 'FAX',
         referenciaBruta: ReferenciaS3.de({ bucket: 'b', key: 'k', versionId: 'v' }),
+        idempotencyKey: 'chave-x',
       }),
     ).rejects.toThrow(/Canal inválido/);
+    expect(idempotencia.reservar).not.toHaveBeenCalled();
     expect(repositorio.salvar).not.toHaveBeenCalled();
   });
 });

@@ -26,8 +26,7 @@ function receberOrcamentoReal(): ReceberOrcamento {
   };
   const publisher: EventPublisher = { publicar: vi.fn().mockResolvedValue(undefined) };
   const idempotencia: IdempotencyKeyRepository = {
-    buscarOrcamentoId: vi.fn().mockResolvedValue(undefined),
-    registrar: vi.fn().mockResolvedValue(undefined),
+    reservar: vi.fn(async (_chave, orcamentoId) => ({ reservado: true, orcamentoId })),
   };
   return new ReceberOrcamento(repositorio, publisher, idempotencia);
 }
@@ -102,17 +101,16 @@ describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — controller', ()
   it('repassa Idempotency-Key ao ReceberOrcamento', async () => {
     const orcamentoId = OrcamentoId.novo();
     const referencia = ReferenciaS3.de({ bucket: 'b', key: 'k', versionId: 'v' });
-    const buscarOrcamentoId = vi.fn().mockResolvedValue(undefined);
-    const registrar = vi.fn().mockResolvedValue(undefined);
+    const reservar = vi.fn(async (_chave: string, id: OrcamentoId) => ({
+      reservado: true,
+      orcamentoId: id,
+    }));
     const repositorio: OrcamentoRepository = {
       salvar: vi.fn().mockResolvedValue(undefined),
       buscarPorId: vi.fn(),
     };
     const publisher: EventPublisher = { publicar: vi.fn().mockResolvedValue(undefined) };
-    const receberOrcamento = new ReceberOrcamento(repositorio, publisher, {
-      buscarOrcamentoId,
-      registrar,
-    });
+    const receberOrcamento = new ReceberOrcamento(repositorio, publisher, { reservar });
     app = Fastify();
     registrarRotaConfirmarUpload(app, armazenamentoFake(referencia), receberOrcamento);
 
@@ -123,7 +121,6 @@ describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — controller', ()
       headers: { 'idempotency-key': 'chave-abc' },
     });
 
-    expect(buscarOrcamentoId).toHaveBeenCalledWith('chave-abc');
-    expect(registrar).toHaveBeenCalledWith('chave-abc', expect.anything(), expect.any(Date));
+    expect(reservar).toHaveBeenCalledWith('chave-abc', expect.anything(), expect.any(Date));
   });
 });

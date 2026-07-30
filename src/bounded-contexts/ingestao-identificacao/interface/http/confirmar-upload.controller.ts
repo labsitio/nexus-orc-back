@@ -9,8 +9,13 @@ import {
   confirmarUploadResponseSchema,
 } from './confirmar-upload.schema.js';
 
+// Node normaliza headers HTTP repetidos em uma única string separada por
+// vírgula (RFC 7230) antes de chegar aqui — `string[]` só ocorre para
+// `set-cookie`, nunca para `idempotency-key`; `Array.isArray` é defesa sem
+// caminho real de teste via HTTP, mantida só para não quebrar o tipo.
 function idempotencyKeyDoHeader(valor: string | string[] | undefined): string | undefined {
-  return typeof valor === 'string' ? valor : undefined;
+  if (Array.isArray(valor)) return valor[0];
+  return valor;
 }
 
 /**
@@ -50,6 +55,8 @@ export function registrarRotaConfirmarUpload(
       return;
     }
 
+    const idempotencyKey = idempotencyKeyDoHeader(request.headers['idempotency-key']);
+
     const orcamentoId = OrcamentoId.de(params.data.orcamentoId);
     const referenciaBruta = await armazenamento.obterReferenciaAposUpload(
       orcamentoId,
@@ -70,7 +77,7 @@ export function registrarRotaConfirmarUpload(
       referenciaBruta,
       referenciaExterna: body.data.referenciaExterna,
       orcamentoId,
-      idempotencyKey: idempotencyKeyDoHeader(request.headers['idempotency-key']),
+      idempotencyKey,
     });
 
     await reply
