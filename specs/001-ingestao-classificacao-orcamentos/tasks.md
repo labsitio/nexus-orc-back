@@ -16,7 +16,7 @@
 - [x] T002 [P] Configurar ESLint (`typescript-eslint`) + Prettier + Husky/lint-staged pre-commit. PR #392.
 - [x] T003 [P] Configurar CI (GitHub Actions): lint, `tsc --strict`, testes Vitest, `npm audit`/`pnpm audit`.
 - [ ] T004 Criar estrutura de pastas `src/bounded-contexts/ingestao-identificacao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/ingestao-identificacao/{domain,application,contract}` conforme `plan.md`.
-- [ ] T005 [P] Configurar Drizzle Kit + conexão Aurora Serverless v2 (schema inicial vazio, migração baseline) — ADR-001.
+- [x] T005 [P] Configurar Drizzle Kit + conexão Aurora Serverless v2 (schema inicial vazio, migração baseline) — ADR-001.
 
 **Checkpoint**: estrutura pronta, CI verde em projeto vazio.
 
