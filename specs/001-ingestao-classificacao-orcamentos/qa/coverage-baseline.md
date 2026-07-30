@@ -27,3 +27,15 @@ Statements 92.52% · Branches 91.37% · Functions 90.32% · Lines 92.44%.
 `consultar-status-orcamento.ts` e `status.schema.ts` já em 100%;
 `status.controller.ts` em 94.11% stmt / 75% branch (rethrow de erro
 inesperado, linha 62, não exercitado por nenhum teste do dev-back-end).
+
+---
+
+# Coverage Baseline — T011 (issue #16) — PR #410
+
+Baseline = suíte existente no branch antes desta validação (commit
+`2c65c3b`, sem teste de `DrizzleOrcamentoRepository`), medida com
+`pnpm exec vitest run --coverage` e `DATABASE_URL` setado (74 testes, 13
+arquivos): Statements 81.15% · Branches 55% · Functions 75.67% · Lines
+80.97%. `drizzle-orcamento.repository.ts` (arquivo do diff desta task):
+**0%** statements/branches/functions/lines — arquivo novo, sem nenhum teste
+consumindo-o antes desta validação.

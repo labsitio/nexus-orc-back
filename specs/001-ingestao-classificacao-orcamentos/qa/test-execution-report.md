@@ -190,3 +190,88 @@ integração.
 `DrizzleOrcamentoRepository` real (T011, issue #16) ainda não mergeado —
 sem wiring de produção contra Aurora nesta task; esperado e fora de escopo
 deste PR (confirmado pelo dev-back-end na invocação).
+
+---
+
+# Relatório de execução — T011 (issue #16) — PR #410
+
+Commit testado: `2c65c3b` (PR #410, draft, branch
+`001-t011-drizzle-orcamento-repository`, base `main`). Ambiente: worktree
+dedicado `nexus-orc-back-issue-15` (repositório principal em uso por outro
+agente, não tocado). Node 24.14.0 via `/c/nvm4w/nodejs` direto (node/pnpm/
+corepack não estavam no PATH da sessão), pnpm 11.18.0. Postgres 16
+(`pgvector/pgvector:pg16`) via `docker-compose.yml`, container
+`nexus-orc-back-postgres-1` (estava parado, iniciado com `docker start`).
+
+## Comandos e resultados
+
+```
+$ docker start nexus-orc-back-postgres-1
+$ pnpm install --frozen-lockfile
+Already up to date
+EXIT=0
+
+$ DATABASE_URL=postgresql://nexo:nexo@localhost:5432/nexo pnpm run db:migrate
+[✓] migrations applied successfully!
+EXIT=0
+
+$ pnpm run lint              # eslint .
+EXIT=0 (sem output)
+
+$ pnpm run typecheck        # tsc --noEmit
+EXIT=0 (sem output)
+
+$ DATABASE_URL=... pnpm run test     # vitest run --passWithNoTests
+Test Files  14 passed (14)
+Tests       79 passed (79)
+EXIT=0
+
+$ pnpm run test               # sem DATABASE_URL — confirma skip gracioso
+Test Files  12 passed | 2 skipped (14)
+Tests       68 passed | 10 skipped (78)
+EXIT=0
+
+$ DATABASE_URL=... pnpm exec vitest run --coverage
+Test Files  14 passed (14)
+Tests       79 passed (79)
+Statements 94.2% | Branches 92% | Functions 90.54% | Lines 94.14%
+EXIT=0
+allure-results/ regenerado, 79 arquivos *-result.json, todos passed
+```
+
+## Testes criados por QA (sem alterar produção)
+`tests/bounded-contexts/ingestao-identificacao/infrastructure/persistence/drizzle-orcamento.repository.test.ts`
+— 5 testes de integração contra Postgres real, formalizando os 4 cenários já
+validados manualmente pelo autor do PR + 1 caso adicional (`buscarPorId`
+para id inexistente, fechando o único branch residual que sobrava de
+statements):
+1. `buscarPorId` retorna `undefined` para id inexistente.
+2. `salvar` RECEBIDO → recarregar → classificação de alta confiança → salvar
+   → recarregar confirma `CLASSIFICADO` + 1 entrada de histórico.
+3. Confiança baixa → `PENDENTE_REVISAO_HUMANA` → confirmação humana → salvar
+   → recarregar confirma `CLASSIFICADO` + 2 entradas de histórico (2ª com
+   `agente: HUMANO`).
+4. Re-salvar o mesmo agregado sem transição nova não duplica histórico.
+5. **Duas chamadas concorrentes de `salvar()` para o mesmo `orcamentoId`**
+   (2 conexões Postgres reais e distintas, simulando retry de Lambda +
+   invocação original) resultam em exatamente 1 entrada de histórico — prova
+   automatizada do achado MAJOR corrigido pelo `backend-reviewer` (`SELECT
+   ... FOR UPDATE`).
+
+Nota técnica de limpeza: `salvar()` abre sua própria transação Drizzle, então
+não pode ser aninhada sob um `BEGIN externo revertido ao final (padrão de
+T010) — o `COMMIT` interno comprometeria o `BEGIN` externo. A limpeza por
+teste usa `DELETE` explícito por `orcamentoId`, com
+`session_replication_role = replica` só durante a limpeza para contornar o
+trigger de append-only de `orcamentos_historico` (nunca em produção,
+restaurado para `origin` no `finally`).
+
+## Conclusão
+79/79 testes passando (0 falhas, 0 regressões). `tsc --noEmit` e `eslint .`
+limpos. Suíte sem `DATABASE_URL` pula corretamente as 10 integrações contra
+Postgres (T010 + T011), demais 68 continuam passando — dev local sem Docker
+não quebra. `drizzle-orcamento.repository.ts` sobe de 0%→100%
+statements/lines/functions, 0%→88.09% branch. Nenhum defeito de produção
+encontrado — os 4 cenários de validação manual do PR agora são automação
+repetível e protegem a regressão de concorrência (achado MAJOR da revisão
+anterior) daqui para frente.

@@ -201,3 +201,105 @@ Reaproveitado `allure-vitest` já configurado.
 - Sem teste de carga/concorrência na consulta (query read-only sem estado
   compartilhado — risco considerado baixo, não há escrita concorrente neste
   caso de uso).
+
+---
+
+# Test Plan — T011 (issue #16) — PR #410
+
+## Escopo
+`DrizzleOrcamentoRepository` implementando `OrcamentoRepository` (Domain,
+T009) sobre o schema Drizzle de T010 —
+`src/bounded-contexts/ingestao-identificacao/infrastructure/persistence/drizzle-orcamento.repository.ts`.
+Tradução linha↔agregado (`salvar`, `buscarPorId`), nenhum tipo de linha
+(`LinhaOrcamento`/`LinhaHistorico`) escapando do arquivo.
+
+## Fora de escopo
+Application (`ReceberOrcamento`, `ClassificarOrcamento`,
+`ConfirmarRevisaoHumana` — ainda não existem) e Interface. Schema/migração
+(T010, já mergeado via PR #403, testado em rodada anterior).
+
+## Riscos
+- **MAJOR (já corrigido pelo dev-back-end antes desta validação)**: `salvar`
+  concorrente do mesmo agregado (ex.: retry de Lambda + invocação original)
+  duplicando a mesma tentativa em `orcamentos_historico` — a contagem de
+  linhas já persistidas, lida sem lock, poderia ser lida igual pelas duas
+  transações. Corrigido com `SELECT ... FOR UPDATE` em `orcamentos` como
+  primeira operação da transação de `salvar`. Este é o risco de maior
+  prioridade desta task — o único achado de severidade alta no ciclo de
+  revisão anterior (`backend-reviewer`).
+- `buscarPorId` reconstruindo o agregado com status/histórico incorretos
+  (ex.: histórico fora de ordem, resultado parcial reconstituído como
+  `undefined` quando deveria estar completo).
+- Re-salvar o mesmo agregado sem transição nova duplicando histórico (a
+  lógica de "quantas linhas já persistidas" é a única barreira).
+
+## Níveis e tipos de teste
+Integração contra Postgres real (não mock) — mesmo padrão de T010: schema já
+migrado, `DATABASE_URL` do ambiente, guardado por
+`describe.skipIf(!DATABASE_URL)`.
+
+## Ambientes e dependências
+Node 24.14.0 (via `/c/nvm4w/nodejs` direto, corepack/pnpm não estavam no PATH
+da sessão de QA), pnpm 11.18.0, Postgres 16 (`pgvector/pgvector:pg16`) via
+`docker-compose.yml`, container `nexus-orc-back-postgres-1` (compartilhado
+entre worktrees — estava parado, iniciado com `docker start`).
+
+## Estratégia de dados
+Agregados reais construídos via `Orcamento.receber`/`registrarTentativa-
+Classificador`/`registrarConfirmacaoHumana` (Domain real, não fixture de
+linha). `OrcamentoId.novo()` por teste, cleanup explícito por id em
+`afterEach` (ver Limitações — não é possível envolver `salvar()` em
+`BEGIN`/`ROLLBACK` externo, a transação interna do Drizzle commitaria a
+externa).
+
+## Estratégia de mocks/fakes
+Nenhum mock — Postgres real, mesma decisão de T010 (dev-back-end já validou
+manualmente contra o mesmo banco; QA formaliza os mesmos 4 cenários como
+suíte automatizada).
+
+## Critérios de entrada
+PR #410 (draft), branch `001-t011-drizzle-orcamento-repository`, commit
+`2c65c3b`, base `main`. `backend-reviewer` já aprovou (APPROVE WITH NITS,
+após 1 rodada CHANGES REQUESTED por causa do lock de concorrência).
+
+## Critérios de saída
+Suíte completa passando (nenhuma regressão), os 4 cenários de validação
+manual do autor do PR formalizados como teste automatizado repetível — em
+especial o cenário de concorrência (retry de Lambda), que é a regressão que
+mais importa proteger daqui para frente. `tsc --noEmit`/`eslint .` limpos.
+Sem defeito crítico/alto aberto.
+
+## Abordagem Allure
+Reaproveitado `allure-vitest` já configurado.
+
+## Ordem de execução
+1. `docker start nexus-orc-back-postgres-1` (ou `docker compose up -d postgres`)
+2. `pnpm install --frozen-lockfile`
+3. `pnpm run db:migrate` (`DATABASE_URL` setado)
+4. `pnpm run lint`
+5. `pnpm run typecheck`
+6. `pnpm exec vitest run --coverage` (`DATABASE_URL` setado)
+7. `pnpm run test` sem `DATABASE_URL` (confirma skip gracioso)
+
+## Limitações
+- `salvar()` abre sua própria transação Drizzle — não pode ser aninhada sob
+  um `BEGIN` externo revertido ao final (o `COMMIT` interno do
+  `db.transaction()` comprometeria o `BEGIN` externo). Diferente do padrão
+  de T010 (schema test, sem transação própria no código testado), a limpeza
+  de linhas é explícita por `orcamentoId` em `afterEach`, incluindo
+  desativar temporariamente os triggers de append-only da sessão
+  (`session_replication_role = replica`) só para o `DELETE` de limpeza —
+  nunca em produção.
+- Cenário de concorrência usa 2 conexões `pg.Client` reais (sessões
+  distintas) — única forma de exercitar o `SELECT ... FOR UPDATE` de fato
+  serializando duas transações, não apenas 2 chamadas sequenciais na mesma
+  conexão.
+- `TentativaClassificacao.insucesso()` (branch `motivoInsucesso`) nunca é
+  produzido pelo Domain hoje (`registrarTentativaClassificador` sempre usa
+  `.sucesso()`, mesmo para confiança baixa) — mesma observação já registrada
+  na rodada de T044–T047. O caminho de tradução `tentativaDaLinha` para
+  insucesso (linhas 55-60 do repositório) e os campos `?? null` associados
+  ficam sem cobertura de teste de integração por não serem alcançáveis via
+  Domain real; classificado como **risco ainda não testado por ser
+  inalcançável no comportamento atual do sistema**, não como lacuna de teste
+  de T011.

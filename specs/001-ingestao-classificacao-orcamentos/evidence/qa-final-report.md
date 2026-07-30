@@ -267,6 +267,21 @@ APROVADO PELO QA
 
 ---
 
+# QA Final Report — T011 (issue #16) — PR #410
+
+Ver detalhe completo em `specs/001-ingestao-classificacao-orcamentos/evidence/qa-T011.md`.
+Resumo: `DrizzleOrcamentoRepository` (T011) validado por 5 testes de
+integração contra Postgres real, incluindo o cenário de concorrência que
+protege o achado MAJOR já corrigido pelo `backend-reviewer` (lock `SELECT
+... FOR UPDATE`). 79/79 testes passando, sem regressão. Cobertura do arquivo
+do diff: 0%→100% statements/lines/functions, 0%→88.09% branch. Nenhum
+defeito de produção encontrado.
+
+## Parecer final
+APROVADO PELO QA
+
+---
+
 # QA Final Report — T044–T047 (issues #49–#52) — PR #404
 
 ## SPEC_ID e versão testada
