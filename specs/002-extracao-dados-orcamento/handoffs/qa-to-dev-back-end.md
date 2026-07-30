@@ -1,6 +1,29 @@
 # Handoff QA → dev-back-end — SPEC 002
 
-## Leva atual — T012 (issue #77, PR #423, branch `feat/002-t012-extracao-schema-drizzle`, commit `27409c6`)
+## Reteste — T012 (issue #77, PR #423, branch `feat/002-t012-extracao-schema-drizzle`, commit `97bf2fc`)
+
+### Bugs
+- CRÍTICA: `specs/002-extracao-dados-orcamento/bugs/BUG-003.md` — **VALIDADO** no
+  reteste do commit `97bf2fc`. Correção troca o `ALTER COLUMN ... SET DATA TYPE
+  bigserial` inválido pela expansão manual real (`bigint` + sequência própria +
+  `DEFAULT nextval(...)` + `NOT NULL`). Reproduzido do zero em Postgres 16 real
+  (container avulso, sem tocar `docker-compose.yml`): migrações 0000-0006
+  aplicam sem erro; `extracao-orcamento.schema.test.ts` 7/7 passando; `drizzle-kit
+  generate` sem diff pendente; suíte completa 176 passed/19 skipped, sem
+  regressão.
+
+Nenhum outro bug (CRÍTICO/ALTO/MÉDIO/BAIXO) identificado nesta leva.
+
+### Parecer
+APROVADO PELO QA — commit `97bf2fc` (PR #423) liberado para o próximo passo do
+pipeline (revisão/merge). Libera T013 (repositório), antes bloqueada.
+
+### Commit/versão testada
+`97bf2fc` (PR #423) — reteste validado
+
+---
+
+## Leva anterior — T012 (issue #77, PR #423, branch `feat/002-t012-extracao-schema-drizzle`, commit `27409c6`)
 
 ### Bugs
 - CRÍTICA: `specs/002-extracao-dados-orcamento/bugs/BUG-003.md` — `drizzle/0005_small_captain_america.sql`

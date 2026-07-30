@@ -1,6 +1,66 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
-## Leva atual — T012 (issue #77)
+## Reteste — T012 (issue #77), BUG-003 corrigido
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #423 (draft), branch `feat/002-t012-extracao-schema-drizzle`, commit `97bf2fc`
+
+### Resumo executivo
+Correção da migração `drizzle/0005_small_captain_america.sql` (BUG-003):
+`ALTER COLUMN "id" SET DATA TYPE bigserial` (SQL inválido) substituído pela
+expansão manual real de `bigserial` — `DROP DEFAULT` → `ALTER COLUMN ... TYPE
+bigint USING NULL` → `CREATE SEQUENCE` própria → `SET DEFAULT nextval(...)` →
+`SET NOT NULL`. Constraint de PK original não foi tocada. Único arquivo de
+produção alterado é a migração; schema TS e teste de integração não mudaram.
+
+### Reteste independente do QA (não baseado no relato do dev-back-end)
+```bash
+docker run -d --name qa-bug003-pg -e POSTGRES_USER=nexo -e POSTGRES_PASSWORD=nexo \
+  -e POSTGRES_DB=nexo -p 0:5432 pgvector/pgvector:pg16
+for f in drizzle/000{0,1,2,3,4,5,6}*.sql; do
+  psql -h localhost -p <porta> -U nexo -d nexo -v ON_ERROR_STOP=1 -f "$f"
+done
+# todas as 7 migrações aplicaram sem erro
+
+DATABASE_URL=postgresql://nexo:nexo@localhost:<porta>/nexo \
+  npx vitest run tests/bounded-contexts/extracao/infrastructure/persistence/schema/extracao-orcamento.schema.test.ts
+# Test Files 1 passed (1) / Tests 7 passed (7)
+
+DATABASE_URL=... npx drizzle-kit generate
+# "No schema changes, nothing to migrate"
+
+npx vitest run
+# Test Files 38 passed | 4 skipped (42) / Tests 176 passed | 19 skipped (195)
+```
+`\d extracao.extracoes_orcamento_historico` confirmado: `id bigint not null
+default nextval('extracao.extracoes_orcamento_historico_id_seq'::regclass)`,
+PK `extracoes_orcamento_historico_pkey` intacta.
+
+### Resultado: aprovados, falhos, ignorados e instáveis
+7/7 no teste de integração alvo (antes: 2 passed/5 failed). 176 passed/19
+skipped na suíte completa, sem `DATABASE_URL` — mesma baseline da leva
+anterior, sem regressão.
+
+### Bugs por severidade e status
+- CRÍTICA (1): BUG-003 — **VALIDADO** pelo QA neste reteste.
+- Herdados, não relacionados a esta correção: BUG-001 (BAIXA, PRONTO PARA
+  RETESTE), BUG-002 (VALIDADO).
+
+### Riscos residuais
+Nenhum novo. BUG-001 (nit de encapsulamento, severidade BAIXA) segue aberto
+para reteste em leva futura, fora do escopo desta correção.
+
+### Parecer final
+**APROVADO PELO QA**
+
+Motivo: BUG-003 corrigido e validado de forma independente contra Postgres 16
+real, reproduzindo o cenário exato que causava a falha original (baseline T002
+→ aplicar 0005+0006). Sem regressão na suíte completa. Libera T013.
+
+---
+
+## Leva anterior (REPROVADA) — T012 (issue #77)
 
 ### SPEC_ID e versão testada
 SPEC_ID: 002-extracao-dados-orcamento
