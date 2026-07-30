@@ -10,3 +10,4 @@ cdk.out/
 .claude/worktrees/
 allure-results/
 allure-report/
+.tmp-bin/
