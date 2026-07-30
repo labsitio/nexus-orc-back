@@ -130,6 +130,19 @@ describe('ExtracaoOrcamento.registrarConfirmacaoHumana', () => {
   });
 });
 
+describe('ExtracaoOrcamento — encapsulamento (BUG-001)', () => {
+  it('mutar o array retornado por historico/itens não altera o estado interno do agregado', () => {
+    const extracao = novaExtracao();
+    extracao.registrarTentativaExtrator([itemCompleto()], condicoesCompletas());
+
+    (extracao.historico as unknown[]).length = 0;
+    (extracao.itens as unknown[]).length = 0;
+
+    expect(extracao.historico).toHaveLength(1);
+    expect(extracao.itens).toHaveLength(1);
+  });
+});
+
 describe('ExtracaoOrcamento — imutabilidade de referências', () => {
   it('atualizarReferenciaClassificacao sempre lança erro de domínio', () => {
     expect(() => novaExtracao().atualizarReferenciaClassificacao()).toThrow(
