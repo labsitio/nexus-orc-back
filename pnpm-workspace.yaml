@@ -1,2 +1,10 @@
 allowBuilds:
   esbuild: false
+
+# GHSA-67mh-4wv8-2f99 (esbuild <= 0.24.2): drizzle-kit depende do
+# @esbuild-kit/esm-loader, deprecado ("merged into tsx") e preso ao
+# esbuild 0.18.x, embora o próprio drizzle-kit já dependa de tsx e de
+# esbuild ^0.25.4. Sobe só esse ramo transitivo para a linha corrigida.
+# Remover quando drizzle-kit largar @esbuild-kit (0.31.10 é a última).
+overrides:
+  '@esbuild-kit/core-utils>esbuild': '^0.25.0'
