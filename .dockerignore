@@ -1,0 +1,11 @@
+node_modules
+dist
+cdk.out
+coverage
+allure-results
+allure-report
+.git
+.env
+.env.*
+!.env.example
+*.log

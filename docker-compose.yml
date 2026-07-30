@@ -1,0 +1,45 @@
+services:
+  postgres:
+    # pgvector é usado pelo BC Busca & Indexação (spec 004); imagem oficial
+    # já traz a extensão compilada, só falta habilitar via init script.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nexo}
+      POSTGRES_USER: ${POSTGRES_USER:-nexo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexo}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-nexo} -d ${POSTGRES_DB:-nexo}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # LocalStack: S3 (bucket nexo-orcamentos-raw), EventBridge (bus
+  # nexo-dominio-bus) e SQS/SNS (fila por consumidor, README) para
+  # integração local sem custo/latência de conta AWS real.
+  localstack:
+    image: localstack/localstack:3.8.1
+    restart: unless-stopped
+    environment:
+      SERVICES: s3,events,sqs,sns
+      DEBUG: ${LOCALSTACK_DEBUG:-0}
+      DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+    ports:
+      - '${LOCALSTACK_PORT:-4566}:4566'
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+  localstack-data:
