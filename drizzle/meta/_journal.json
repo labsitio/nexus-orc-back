@@ -29,6 +29,13 @@
       "when": 1785441882732,
       "tag": "0003_extracao_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785451601545,
+      "tag": "0004_validacao_baseline",
+      "breakpoints": true
     }
   ]
 }
