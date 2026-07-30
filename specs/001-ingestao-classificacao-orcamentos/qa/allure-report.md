@@ -86,3 +86,20 @@ identificacao'`). Nenhum token/JWT real presente — `logger.ts` já redige
 `req.headers.authorization` por design (T015), confirmado por revisão do
 código, não exercitado nos testes atuais (nenhum handler HTTP usa
 `criarLogger` ainda).
+
+---
+
+# Allure — T050–T055 (issues #55–#60) — PR #416
+
+Reaproveitado `allure-vitest` + `vitest.config.ts` já configurados.
+`corepack pnpm exec vitest run --coverage` gerou `allure-results/` (raiz do
+worktree, git-ignorado) com resultado por teste da suíte inteira (38
+arquivos executados, 176 casos + 3 arquivos/12 casos de integração
+Drizzle/Postgres pulados sem `DATABASE_URL`), todos `"status":"passed"`.
+
+Relatório HTML não gerado (requer CLI Java `allure`, mesma limitação
+registrada em todas as rodadas anteriores).
+
+Nenhum dado sensível anexado — fixtures sintéticas (UUIDs gerados por
+`OrcamentoId.novo()`, `'Distribuidora ABC Ltda'`/`'Fornecedor Incerto'`,
+bucket `nexo-orcamentos-raw` fictício).

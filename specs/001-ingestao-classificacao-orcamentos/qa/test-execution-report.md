@@ -275,3 +275,99 @@ statements/lines/functions, 0%→88.09% branch. Nenhum defeito de produção
 encontrado — os 4 cenários de validação manual do PR agora são automação
 repetível e protegem a regressão de concorrência (achado MAJOR da revisão
 anterior) daqui para frente.
+
+---
+
+# Relatório de execução — T050–T055 (issues #55–#60) — PR #416
+
+Commit testado: `62339a1` (PR #416, draft, branch `feat/001-f-us5`, base
+`main`). Trilha 001-F (US5 — confirmação humana e reprocessamento). Depende
+de US2 (trilha 001-D, PR #413, já mergeada) para o estado
+`PENDENTE_REVISAO_HUMANA`. Ambiente: worktree
+`.claude/worktrees/agent-a502139ff15a39bc2`, Node 24.13.0, pnpm via
+`corepack pnpm` (pnpm não estava no PATH direto neste worktree).
+
+## Comandos e resultados
+
+```
+$ corepack pnpm run typecheck        # tsc --noEmit
+EXIT=0 (sem output)
+
+$ corepack pnpm run typecheck:infra  # tsc --noEmit -p infra/tsconfig.json
+EXIT=0 (sem output)
+
+$ corepack pnpm run lint             # eslint .
+EXIT=0 (sem output)
+
+$ corepack pnpm test                 # vitest run --passWithNoTests
+Test Files  38 passed | 3 skipped (41)
+Tests       176 passed | 12 skipped (188)
+EXIT=0
+
+$ corepack pnpm exec vitest run --coverage
+Test Files  38 passed | 3 skipped (41)
+Tests       176 passed | 12 skipped (188)
+All files: Statements 86.14% | Branches 72.86% | Functions 80.44% | Lines 85.98%
+EXIT=0
+
+$ corepack pnpm exec cdk synth ConfirmarRevisaoHumanaLambdaRoleStack
+EXIT=0 (synth limpo, 82 feature flags não configuradas — aviso informativo do CDK, não é erro)
+```
+
+Os 12 testes skipped são os mesmos de integração Drizzle/Postgres
+(`drizzle-orcamento.repository.test.ts` e os dois `*.schema.test.ts`) que
+dependem de `DATABASE_URL`/docker-compose local — pré-existentes, não
+relacionados a esta trilha, mesma limitação já registrada nas rodadas T011.
+
+## Critério de aceite (US5) verificado
+- **200 confirma e transiciona para `CLASSIFICADO` com `agenteOrigem: HUMANO`,
+  histórico anterior intacto**: `confirmar-revisao-humana.test.ts` (nível
+  aplicação/agregado) e `revisao-humana.controller.test.ts` (nível HTTP,
+  `app.inject`) — ambos afirmam `status`, `resultadoAtual.agenteOrigem`,
+  `resultadoAtual.nivelConfianca === 100` e `historico` com 2 entradas
+  (`CLASSIFICADOR` preservada + `HUMANO` anexada). Confirmado por leitura de
+  `Orcamento.registrarConfirmacaoHumana` (`orcamento.aggregate.ts:157-169`):
+  guarda de transição (`if (this._status !== "PENDENTE_REVISAO_HUMANA")`) e
+  `this._historico.push(...)` (nunca reatribui/limpa o array).
+- **409 quando não está `PENDENTE_REVISAO_HUMANA`**: `TransicaoInvalidaError`
+  lançado pelo agregado, mapeado pelo controller para Problem Details 409 —
+  testado no nível de agregado (não publica evento, não salva) e no nível
+  HTTP (`Content-Type: application/problem+json`).
+- **404 quando não existe**: `OrcamentoNaoEncontradoParaRevisaoHumanaError` —
+  testado no caso de uso e via HTTP.
+- **400 para body/params inválidos**: Zod (`revisaoHumanaBodySchema`) rejeita
+  campos ausentes/vazios; `orcamentoIdParamSchema` (reaproveitado de
+  `status.schema.ts`) rejeita `orcamentoId` não-UUID — testado em contract
+  test isolado e via HTTP.
+- **Reprocessamento só por ação humana explícita**: não há rota nem caso de
+  uso que dispare reclassificação automática a partir de
+  `PENDENTE_REVISAO_HUMANA`; a única transição de saída desse estado é
+  `registrarConfirmacaoHumana`, acionada exclusivamente pelo endpoint deste
+  PR.
+
+## Cobertura dos arquivos do diff
+- `confirmar-revisao-humana.ts`: **100%** statements/branches/functions/lines.
+- `revisao-humana.controller.ts`: 96% statements/lines, **90% branch** — única
+  linha não coberta é o rethrow de erro inesperado (`throw erro;`, fallback
+  500 não mapeado), mesmo padrão já aceito em `status.controller.ts` nas
+  rodadas T044–T047 (não é invariante de negócio, é o caminho de erro
+  verdadeiramente inesperado do framework).
+- `revisao-humana.schema.ts`: 100%.
+- IAM (`confirmar-revisao-humana-lambda-role-stack.ts`): sem cobertura de
+  linha via vitest (CDK stack, validado por `cdk synth` bem-sucedido, não por
+  teste unitário — mesmo padrão das rodadas anteriores de IAM).
+
+## Conclusão
+176/176 testes passando (0 falhas, 0 regressões), `tsc --noEmit`
+(app + infra) e `eslint .` limpos, `cdk synth` limpo para o novo stack.
+Nenhum defeito de produção encontrado. Critérios de aceite de US5
+(200/409/404/400, histórico preservado, reprocessamento só por ação humana)
+verificados tanto no nível de caso de uso/agregado quanto de HTTP.
+
+## Achado não-bloqueante (já sinalizado pelo backend-reviewer)
+Mesmo padrão save-then-publish sem outbox de `ClassificarOrcamento` (US2,
+PR #413) se repete em `ConfirmarRevisaoHumana` (linhas 56-60: `salvar()`
+seguido de `eventPublisher.publicar()` sem transação/outbox). Já encaminhado
+ao `arquiteto-back` pelo backend-reviewer; QA concorda que não bloqueia esta
+entrega (mesmo risco arquitetural já aceito e rastreado em US2, decisão de
+padrão é do arquiteto, não de código específico desta task).

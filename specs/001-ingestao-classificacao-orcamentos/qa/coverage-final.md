@@ -154,3 +154,40 @@ descoberto.
 Ainda não configurado no projeto (mesma observação de rodadas anteriores) —
 QA não configurou threshold nesta task, decisão de piso mínimo cabe ao
 dev-back-end/arquiteto (T003).
+
+---
+
+# Coverage Final — T050–T055 (issues #55–#60) — PR #416
+
+Comando: `corepack pnpm exec vitest run --coverage` (vitest 4.1.10,
+`@vitest/coverage-v8`, escopo `src/**`, Node 24.13.0, sem `DATABASE_URL` —
+12 testes Drizzle/Postgres pulados, fora de escopo desta trilha). Suíte
+completa: 38 arquivos, 176 testes.
+
+```
+All files: Statements 86.14% | Branches 72.86% | Functions 80.44% | Lines 85.98%
+```
+
+## Arquivos do diff desta task
+- `confirmar-revisao-humana.ts`: **100%** statements/branches/functions/lines
+  (13/13 linhas, 2/2 branches, 3/3 funções).
+- `revisao-humana.controller.ts`: 96% statements/lines (24/25), **90%**
+  branch (9/10). Linha não coberta: rethrow de erro inesperado no `catch`
+  final (fallback 500 não mapeado) — mesmo padrão de gap já aceito em
+  `status.controller.ts` (rodada T044–T047), não é invariante de negócio.
+- `revisao-humana.schema.ts`: 100%.
+- `confirmar-revisao-humana-lambda-role-stack.ts` (CDK): fora do escopo do
+  vitest coverage — validado via `cdk synth` bem-sucedido, mesmo padrão das
+  demais IAM roles desta trilha (T026/T035/T048).
+
+## Variação vs. baseline
+Cobertura global do projeto cai frente às rodadas anteriores (93%→86%
+statements) por incluir arquivos de outras trilhas paralelas mergeadas
+recentemente com cobertura menor (`extracao-orcamento.aggregate.ts` 87.5%,
+`drizzle-orcamento.repository.ts` 0% sem `DATABASE_URL`, `client.ts` 0%) —
+nenhum deles pertence ao diff desta task. Nenhuma linha nova do diff deste
+PR (#416) está descoberta além do rethrow já justificado.
+
+## Threshold
+Ainda não configurado no projeto (mesma observação de todas as rodadas
+anteriores).
