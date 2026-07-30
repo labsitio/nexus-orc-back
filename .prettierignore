@@ -1,0 +1,12 @@
+dist
+node_modules
+pnpm-lock.yaml
+coverage
+
+# conteúdo de produto/processo, fora do escopo de tooling de código (T002)
+docs
+specs
+prompts
+.specify
+.claude
+README.md
