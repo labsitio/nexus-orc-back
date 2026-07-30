@@ -82,13 +82,13 @@
 
 ### Implementation (US2)
 
-- [ ] T030 [US2] Infrastructure: `MarkItDownConversaoACL` (Lambda/layer dedicado, isolado do handler síncrono do Gateway — nota de performance do `plan.md`).
-- [ ] T031 [US2] Infrastructure: `BedrockClassificadorGateway` + ACL de parsing de resposta estruturada (tool-use/JSON Schema), nunca regex sobre texto livre.
-- [ ] T032 [US2] Application: caso de uso `ClassificarOrcamento` (busca bruto → MarkItDown → Bedrock → `registrarTentativaClassificador` → publica `OrcamentoClassificado` se ≥80% ou `OrcamentoEscalonadoParaRevisaoHumana` se <80%).
-- [ ] T033 [US2] Infrastructure: fila SQS `classificador-queue` + DLQ + alarme CloudWatch em mensagem na DLQ; regra EventBridge roteando `OrcamentoRecebido` → fila.
-- [ ] T034 [US2] Interface: handler Lambda consumidor de `classificador-queue` invocando `ClassificarOrcamento`.
-- [ ] T035 [US2] IAM: role `ClassificadorLambdaRole` (least privilege: `bedrock:InvokeModel` restrito ao ARN do modelo aprovado, `s3:GetObject` restrito ao bucket raw).
-- [ ] T036 [US2] Observabilidade: correlação de log por `orcamentoId` ponta a ponta neste handler (pino + OpenTelemetry, trace propagado do evento).
+- [x] T030 [US2] Infrastructure: `MarkItDownConversaoACL` (Lambda/layer dedicado, isolado do handler síncrono do Gateway — nota de performance do `plan.md`). Issue #35.
+- [x] T031 [US2] Infrastructure: `BedrockClassificadorGateway` + ACL de parsing de resposta estruturada (tool-use/JSON Schema), nunca regex sobre texto livre. Issue #36.
+- [x] T032 [US2] Application: caso de uso `ClassificarOrcamento` (busca bruto → MarkItDown → Bedrock → `registrarTentativaClassificador` → publica `OrcamentoClassificado` se ≥80% ou `OrcamentoEscalonadoParaRevisaoHumana` se <80%). Issue #37.
+- [x] T033 [US2] Infrastructure: fila SQS `classificador-queue` + DLQ + alarme CloudWatch em mensagem na DLQ; regra EventBridge roteando `OrcamentoRecebido` → fila. Issue #38.
+- [x] T034 [US2] Interface: handler Lambda consumidor de `classificador-queue` invocando `ClassificarOrcamento`. Issue #39.
+- [x] T035 [US2] IAM: role `ClassificadorLambdaRole` (least privilege: `bedrock:InvokeModel` restrito ao ARN do modelo aprovado, `s3:GetObject` restrito ao bucket raw). Issue #40.
+- [x] T036 [US2] Observabilidade: correlação de log por `orcamentoId` ponta a ponta neste handler (pino + OpenTelemetry, trace propagado do evento). Issue #41.
 
 **Checkpoint**: US1+US2 juntas cobrem o caminho feliz completo (canal → bruto → classificado ou baixa confiança).
 
