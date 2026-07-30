@@ -113,7 +113,7 @@ export class ExtracaoOrcamento {
   }
 
   get itens(): readonly ItemOrcamento[] {
-    return this._itens;
+    return [...this._itens];
   }
 
   get condicoesComerciais(): CondicoesComerciais | undefined {
@@ -147,7 +147,7 @@ export class ExtracaoOrcamento {
     if (this._status !== 'PENDENTE') {
       throw new TransicaoInvalidaExtracaoError(this._status, 'registrarTentativaExtrator');
     }
-    this._itens = itens;
+    this._itens = [...itens];
     this._condicoesComerciais = condicoesComerciais;
 
     if (completo(itens, condicoesComerciais)) {
@@ -174,7 +174,7 @@ export class ExtracaoOrcamento {
     if (this._status !== 'PENDENTE_REVISAO_HUMANA') {
       throw new TransicaoInvalidaExtracaoError(this._status, 'registrarConfirmacaoHumana');
     }
-    this._itens = itens;
+    this._itens = [...itens];
     this._condicoesComerciais = condicoesComerciais;
 
     if (completo(itens, condicoesComerciais)) {
