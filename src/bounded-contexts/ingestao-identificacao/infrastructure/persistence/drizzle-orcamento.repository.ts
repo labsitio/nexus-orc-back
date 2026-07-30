@@ -104,6 +104,17 @@ export class DrizzleOrcamentoRepository implements OrcamentoRepository {
     const resultado = orcamento.resultadoAtual?.paraPayload();
 
     await this.db.transaction(async (tx) => {
+      // Serializa `salvar` concorrente do mesmo agregado (ex.: retry de Lambda
+      // + invocação original) — sem este lock, duas transações poderiam ler a
+      // mesma contagem de `orcamentos_historico` e duplicar a mesma tentativa
+      // nova. Linha inexistente (1º save) não bloqueia nada — sem risco, pois
+      // o id é gerado uma única vez (UUID v7) no Gateway de Ingestão.
+      await tx
+        .select()
+        .from(orcamentos)
+        .where(eq(orcamentos.id, orcamento.id.toString()))
+        .for('update');
+
       await tx
         .insert(orcamentos)
         .values({
