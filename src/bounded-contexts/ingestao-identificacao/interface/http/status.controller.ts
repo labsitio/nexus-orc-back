@@ -8,7 +8,8 @@ import {
 import type { ProblemDetails, StatusIngestaoResponse } from './status.schema.js';
 import { orcamentoIdParamSchema, statusIngestaoResponseSchema } from './status.schema.js';
 
-function paraResposta(orcamento: Orcamento): StatusIngestaoResponse {
+/** Reusado por `revisao-humana.controller.ts` (T053/#58) — mesmo shape de resposta. */
+export function paraResposta(orcamento: Orcamento): StatusIngestaoResponse {
   return statusIngestaoResponseSchema.parse({
     orcamentoId: orcamento.id.toString(),
     canal: orcamento.canal.toString(),
