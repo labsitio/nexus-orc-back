@@ -34,3 +34,49 @@ limpo — nenhum artefato de smoke check foi commitado.
 ## Conclusão
 `strict`, `noUncheckedIndexedAccess` e o pin de `packageManager` funcionam
 como esperado. Nenhum defeito de produção encontrado.
+
+---
+
+# Relatório de execução — T004/T006–T009 (issues #9, #11, #12, #13, #14)
+
+Commit testado: `3b05061` (PR #394 draft, branch `feat/001-fundacao-domain`,
+base `main`@`9466358`).
+Ambiente: worktree do dev-back-end, Node 24.14.1 (via nvm local, sandbox de QA só
+tinha Node 16 por padrão), pnpm 11.18.0 via `corepack prepare pnpm@11.18.0
+--activate` (sandbox de QA não tinha corepack pnpm ativo por padrão).
+
+## Comandos e resultados
+
+```
+$ pnpm install
+✓ Lockfile passes supply-chain policies
++ vitest, @types/node, typescript resolvidos
+pnpm-lock.yaml regenerado (+744 linhas — entradas de vitest ainda não
+commitadas pelo dev-back-end, conforme sinalizado no handoff)
+EXIT=0
+
+$ pnpm exec tsc --noEmit
+EXIT=0 (sem output — sem erro de tipo)
+
+$ pnpm exec vitest run tests/bounded-contexts/ingestao-identificacao/domain
+ Test Files  8 passed (8)
+      Tests  40 passed (40)
+EXIT=0
+
+$ pnpm add -D @vitest/coverage-v8@4.1.10 allure-vitest@3.10.2   # infra de QA
+EXIT=0
+
+$ pnpm exec vitest run --coverage
+ Test Files  8 passed (8)
+      Tests  40 passed (40)
+Statements 92.91% | Branches 100% (38/38) | Functions 84% | Lines 92.8%
+EXIT=0
+allure-results/ gerado com 40 arquivos *-result.json
+```
+
+## Conclusão
+40/40 testes reais (vitest 4.1.10, não a 0.34 usada pelo dev-back-end) passando.
+`tsc --noEmit` limpo. Branch coverage 100% nas invariantes de validação de
+domínio. Nenhum defeito de produção encontrado. Ver `qa/coverage-final.md`
+para análise das linhas de statement/function não cobertas (acessores
+triviais, não invariantes).
