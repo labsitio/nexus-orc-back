@@ -1,15 +1,21 @@
 # Handoff QA → dev-back-end — SPEC 002
 
-## Leva atual — T004 (issue #69, PR #420, branch `feat/002-t004-eventbridge-rule-extrator-queue`, commit `5ecb355`)
+## Leva atual — T004 (issue #69, PR #420, branch `feat/002-t004-eventbridge-rule-extrator-queue`, commit `7e7139c`)
 
-### Bugs abertos por severidade
-- CRÍTICA: `specs/002-extracao-dados-orcamento/bugs/BUG-002.md` — `infra/bin/app.ts`
-  importa `../lib/validador-queue-stack.ts`, arquivo que não existe em nenhum
-  commit deste branch (pertence ao branch irmão `feat/003-t003-validador-queue`,
-  fora do escopo da T004). Checkout limpo do commit quebra `typecheck:infra` e
-  `cdk synth` para todos os stacks.
+### Bugs
+- CRÍTICA: `specs/002-extracao-dados-orcamento/bugs/BUG-002.md` — **VALIDADO** no
+  reteste do commit `7e7139c`. `infra/bin/app.ts` não importa mais
+  `ValidadorQueueStack`; `typecheck:infra` e `cdk synth` (todos os stacks) passam
+  em worktree isolado, sem depender de arquivo untracked de outro branch. Rule
+  `OrcamentoClassificadoParaExtratorQueue` confirmada (source
+  `nexo.ingestao-identificacao`, detail-type `OrcamentoClassificado`, target
+  `extrator-queue`), sem regressão.
 
-Nenhum outro bug (ALTO/MÉDIO/BAIXO) identificado nesta leva.
+Nenhum outro bug (CRÍTICO/ALTO/MÉDIO/BAIXO) identificado nesta leva.
+
+### Parecer
+APROVADO PELO QA — commit `7e7139c` (PR #420) liberado para o próximo passo do
+pipeline (revisão/merge).
 
 ### Comando exato que reproduz
 ```bash
@@ -43,7 +49,7 @@ da regra `OrcamentoClassificadoParaExtratorQueue` (source `nexo.ingestao-identif
 detail-type `OrcamentoClassificado`, target `ExtratorQueue`).
 
 ### Commit/versão testada
-`5ecb355` (PR #420)
+`7e7139c` (PR #420) — reteste validado
 
 ---
 
