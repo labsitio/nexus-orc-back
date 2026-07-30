@@ -264,3 +264,97 @@ coexistem na mesma execução de suíte (sem impacto — todos passam).
 
 ## Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T044–T047 (issues #49–#52) — PR #404
+
+## SPEC_ID e versão testada
+`001-ingestao-classificacao-orcamentos`. PR #404 (draft), branch
+`feat/001-e-us4-v2`, commit `56cf669`, base `main`@`6eaab14`. Primeira
+validação (não é reteste).
+
+## Resumo executivo
+US4 (status consultável): `status.schema.ts` (T044/#49), controller `GET
+/v1/orcamentos/{orcamentoId}/status` (T047/#52), `ConsultarStatusOrcamento`
+(T046/#51). Os 3 testes já escritos pelo dev-back-end cobriam os 3 estados
+via schema/contrato e o fluxo de integração com escalonamento + confirmação
+humana (T045). QA identificou uma lacuna real na camada HTTP — o teste de
+`PENDENTE_REVISAO_HUMANA` só verificava `status`, não o
+`historico`/`resultadoAtual`, e não havia teste de HTTP (`app.inject`) para
+a preservação do histórico após confirmação humana nem para o branch de
+rethrow de erro inesperado do controller. Reforçou o teste existente e
+adicionou 2 novos, sem tocar em código de produção.
+
+## Requisitos cobertos e não cobertos
+Cobertos (detalhe em `qa/traceability-matrix.md`):
+- 3 estados (RECEBIDO/CLASSIFICADO/PENDENTE_REVISAO_HUMANA) consultáveis via
+  `GET /v1/orcamentos/{orcamentoId}/status`, incluindo histórico com agente.
+- 404 Problem Details (RFC 7807, `content-type: application/problem+json`)
+  para `orcamentoId` inexistente.
+- Histórico da tentativa do Classificador preservado (não sobrescrito) após
+  confirmação humana — verificado tanto no caso de uso (T045, dev-back-end)
+  quanto na camada HTTP completa (novo teste, QA).
+- Erro inesperado do repositório não mascarado como 404 (novo teste, QA).
+
+Não cobertos (fora de escopo desta task, aceito): persistência real via
+`DrizzleOrcamentoRepository` (T011/#16, ainda `ready`); IAM (T048); métrica
+CloudWatch de status consultável (T049).
+
+## Suítes executadas e comandos
+```
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run lint
+npx vitest run --coverage
+```
+Detalhe completo em `qa/test-execution-report.md`.
+
+## Quantidade de testes por tipo
+68 testes no total (suíte inteira, 12 arquivos): contrato de schema (7,
+T044), contrato de controller/HTTP (7, T047 + 3 novos de QA), integração de
+caso de uso (3, T045/T046), demais 51 de rodadas/trilhas anteriores sem
+regressão.
+
+## Resultado
+68 aprovados, 0 falhos, 0 ignorados, 0 instáveis.
+
+## Cobertura inicial e final
+Inicial: Statements 92.52% · Branches 91.37% · Functions 90.32% · Lines
+92.44%. Final: Statements 93.1% · Branches 94.82% · Functions 90.32% · Lines
+93.02%. Os 3 arquivos de produção deste PR chegam a 100% statements/lines;
+`status.controller.ts` sobe de 75%→91.66% branch com o teste de rethrow.
+Detalhe em `qa/coverage-final.md`.
+
+## Local do allure-results e do relatório Allure
+`allure-results/` (raiz do repo, git-ignorado), 68 arquivos JSON, todos
+`"status":"passed"`. Relatório HTML não gerado (mesma limitação de rodadas
+anteriores — requer CLI Java Allure). Ver `qa/allure-report.md`.
+
+## Bugs por severidade e status
+Nenhum bug de produção encontrado.
+
+## Riscos residuais
+- Branch restante não coberto em `status.controller.ts` (linha 20, nullish
+  coalescing de `motivoInsucesso`/`resultado` na serialização): caminho
+  trivial sem decisão de negócio, risco baixo.
+- `TentativaClassificacao.insucesso` (VO já existente, T006) nunca é
+  invocado pelo agregado — `registrarTentativaClassificador` sempre usa
+  `.sucesso()`, mesmo para confiança abaixo do limiar (o VO guarda o
+  resultado completo com `nivelConfianca` baixa, não um `motivoInsucesso`
+  textual). O fixture do contract test (T044) para `PENDENTE_REVISAO_HUMANA`
+  usa a forma `resultado: null` + `motivoInsucesso: string`, que o schema
+  aceita (campos opcionais/nulos) mas que a implementação real nunca produz
+  hoje. Não é bug — o schema é intencionalmente permissivo e o comportamento
+  real está coberto por outro teste — mas é uma divergência entre fixture
+  sintético e comportamento observável real, registrada para consciência do
+  time (não bloqueia esta entrega).
+
+## Limitações do ambiente
+`DrizzleOrcamentoRepository` real (T011/#16) ainda não mergeado — sem
+wiring de produção contra Aurora; confirmado como aceito e fora de escopo
+pelo dev-back-end na invocação. Node ativo do shell por padrão em v18 (nvm);
+usado `nvm use 24` para alinhar com `engines.node >= 24`.
+
+## Parecer final
+APROVADO PELO QA

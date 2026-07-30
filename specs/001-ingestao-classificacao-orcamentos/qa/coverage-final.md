@@ -80,3 +80,38 @@ descoberta.
 ## Threshold
 Ainda não configurado no projeto (decisão pendente de T003/dev-back-end,
 mesma observação de rodadas anteriores).
+
+---
+
+# Coverage Final — T044–T047 (issues #49–#52) — PR #404
+
+Comando: `npx vitest run --coverage` (vitest 4.1.10, `@vitest/coverage-v8`,
+escopo `src/**`, Node 24.18.1). Suíte completa: 12 arquivos, 68 testes (66
+pré-existentes + 2 novos de QA).
+
+```
+Statements   : 93.1%  ( 162/174 )
+Branches     : 94.82% ( 55/58 )
+Functions    : 90.32% ( 56/62 )
+Lines        : 93.02% ( 160/172 )
+```
+
+## Arquivos do diff desta task
+- `status.schema.ts`: 100% statements/lines/branches (já assim no baseline).
+- `consultar-status-orcamento.ts`: 100% statements/lines/branches (já assim
+  no baseline).
+- `status.controller.ts`: **100%** statements/lines (era 94.11%), **91.66%**
+  branch (era 75%). Único branch restante: linha 20 (`?? null` da
+  serialização de `motivoInsucesso`/`resultado`), caminho trivial de
+  nullish-coalescing sem decisão de negócio — classificado como risco
+  residual trivial, não bloqueante.
+
+## Variação vs. baseline
+92.52%→93.1% statements, 91.37%→94.82% branches, 92.44%→93.02% lines,
+funções estável (90.32%). Ganho concentrado no branch de rethrow do
+controller (linha 62) e na cobertura de histórico/resultadoAtual do estado
+`PENDENTE_REVISAO_HUMANA` e do fluxo pós-confirmação humana, adicionados por
+QA.
+
+## Threshold
+Ainda não configurado no projeto (mesma observação de rodadas anteriores).

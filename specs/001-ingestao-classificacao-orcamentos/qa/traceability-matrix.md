@@ -55,3 +55,29 @@ Cobertura de branch das invariantes de validação (todos os `throw new` dos VOs
 | Tipagem estrita / lint do projeto | Erro de tipo ou violação de estilo não pego | Estático | `pnpm run typecheck`, `pnpm run lint` | comandos | PASS (exit 0, sem output) |
 
 Cobertura da fatia `S3ArmazenamentoBrutoGateway`: 100% statements/branches/functions (12/12, 4/4, 3/3) — ver `qa/coverage-final.md`.
+
+---
+
+# Matriz de rastreabilidade — T044–T047 (issues #49–#52) — PR #404
+
+| Requisito / Critério de aceite | Risco | Nível | Cenário | Arquivo / caso | Resultado |
+|---|---|---|---|---|---|
+| GET status retorna RECEBIDO | Status não consultável logo após ingestão | Contrato (HTTP) | orçamento recém-recebido → 200, `status: RECEBIDO`, histórico vazio | `status.controller.test.ts` | PASS |
+| GET status retorna CLASSIFICADO + resultado + histórico com agente | Resultado de classificação não exposto | Contrato (HTTP) | confiança 92% → 200, `resultadoAtual` preenchido, `historico[0].agente = CLASSIFICADOR` | `status.controller.test.ts` | PASS |
+| GET status retorna PENDENTE_REVISAO_HUMANA, histórico com a tentativa do Classificador | Escalonamento não visível na consulta | Contrato (HTTP) | confiança 62% → 200, `status: PENDENTE_REVISAO_HUMANA`, `historico[0]` com `nivelConfianca: 62`, `agente: CLASSIFICADOR` | `status.controller.test.ts` (reforçado por QA — assert de `historico`/`resultadoAtual` que faltava) | PASS |
+| Histórico da tentativa do Classificador preservado após confirmação humana (nunca sobrescrito) | Perda/edição do registro da tentativa original | Contrato (HTTP) + Integração (caso de uso) | baixa confiança (40%) + `registrarConfirmacaoHumana` (100%, HUMANO) → `historico` com 2 entradas, a 1ª intacta (CLASSIFICADOR/40%), a 2ª anexada (HUMANO/100%) | `status.controller.test.ts` (novo teste, QA) + `consultar-status-orcamento.integration.test.ts` (T045, dev-back-end) | PASS |
+| 404 Problem Details (RFC 7807) para orcamentoId inexistente | Consumidor não distingue "não encontrado" de outro erro | Contrato (HTTP) | UUID válido mas inexistente → 404, `content-type: application/problem+json`, `status: 404` | `status.controller.test.ts` | PASS |
+| 400 Problem Details para orcamentoId mal formado | UUID inválido gera 500 em vez de erro de validação | Contrato (HTTP) | `orcamentoId = 'nao-e-uuid'` → 400, `content-type: application/problem+json` | `status.controller.test.ts` | PASS |
+| Erro inesperado do repositório não é mascarado como 404 | Falha real de infraestrutura escondida atrás de um 404 silencioso | Contrato (HTTP) | fake de repositório lança erro genérico → 500 (rethrow, não capturado como `OrcamentoNaoEncontradoError`) | `status.controller.test.ts` (novo teste, QA) | PASS |
+| Contrato Zod aceita os 3 status + rejeita status fora do enum | Schema divergente do agregado (`STATUS_ORCAMENTO`) | Contrato (schema) | fixtures RECEBIDO/CLASSIFICADO/PENDENTE_REVISAO_HUMANA aceitas; `APROVADO_AUTOMATICO` rejeitado | `status.contract.test.ts` (T044, dev-back-end) | PASS |
+| `ConsultarStatusOrcamento` lança erro de domínio para ID inexistente | Exceção não tipada vazando para o controller | Integração | `executar(idInexistente)` → `rejects.toThrow(OrcamentoNaoEncontradoError)` | `consultar-status-orcamento.integration.test.ts` (T045) | PASS |
+| Regressão: suíte completa (VOs, agregado, eventos, gateway S3, status) | Quebra de comportamento já validado em rodadas anteriores | Regressão | `pnpm exec vitest run --coverage` | 12 arquivos, 68 casos | PASS (0 falhas) |
+| Tipagem estrita / lint do projeto | Erro de tipo ou violação de estilo não pego | Estático | `pnpm run typecheck`, `pnpm run lint` | comandos | PASS (exit 0, sem output) |
+
+Cobertura da fatia desta entrega (`status.schema.ts`, `consultar-status-orcamento.ts`, `status.controller.ts`): 100% statements/lines, 91.66%–100% branch — ver `qa/coverage-final.md`.
+
+Limitação aceita (não é gap de teste, é escopo de produto fora deste PR):
+`DrizzleOrcamentoRepository` real (T011/#16) não existe ainda — nenhum teste
+desta rodada exercita persistência real contra Aurora; todos usam fake
+in-memory, suficiente para validar o contrato de `OrcamentoRepository` (T009)
+que `ConsultarStatusOrcamento` consome.
