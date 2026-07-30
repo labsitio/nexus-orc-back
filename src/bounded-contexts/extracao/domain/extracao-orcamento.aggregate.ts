@@ -121,7 +121,7 @@ export class ExtracaoOrcamento {
   }
 
   get historico(): readonly TentativaExtracao[] {
-    return this._historico;
+    return [...this._historico];
   }
 
   /** Nenhum código deste contexto pode sobrescrever a referência à classificação (Princípio III). */
