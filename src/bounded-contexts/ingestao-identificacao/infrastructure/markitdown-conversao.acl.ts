@@ -56,7 +56,14 @@ export class MarkItDownConversaoACL implements MarkItDownConversaoACLPort {
       throw new Error(`Lambda MarkItDown "${this.functionName}" não retornou payload`);
     }
 
-    const corpo: unknown = JSON.parse(Buffer.from(resultado.Payload).toString('utf-8'));
+    let corpo: unknown;
+    try {
+      corpo = JSON.parse(Buffer.from(resultado.Payload).toString('utf-8'));
+    } catch {
+      throw new Error(
+        `Lambda MarkItDown "${this.functionName}" retornou payload em formato inesperado (JSON inválido)`,
+      );
+    }
     if (!ehMarkItDownInvokeResponse(corpo)) {
       throw new Error(
         `Lambda MarkItDown "${this.functionName}" retornou payload em formato inesperado`,

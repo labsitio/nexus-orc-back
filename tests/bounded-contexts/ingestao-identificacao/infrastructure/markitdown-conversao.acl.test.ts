@@ -55,6 +55,15 @@ describe('MarkItDownConversaoACL', () => {
     await expect(acl.converterParaTexto(new Uint8Array([1]), 'a.pdf')).rejects.toThrow(/payload/i);
   });
 
+  it('lança erro homogêneo se o payload de resposta não for JSON válido', async () => {
+    const send = vi.fn().mockResolvedValue({ Payload: Buffer.from('não é json') });
+    const acl = new MarkItDownConversaoACL(lambdaClientFake(send), 'markitdown-converter');
+
+    await expect(acl.converterParaTexto(new Uint8Array([1]), 'a.pdf')).rejects.toThrow(
+      /formato inesperado/i,
+    );
+  });
+
   it('lança erro se o payload de resposta não tiver o shape esperado', async () => {
     const send = vi.fn().mockResolvedValue({ Payload: payloadDe({ outroCampo: 'x' }) });
     const acl = new MarkItDownConversaoACL(lambdaClientFake(send), 'markitdown-converter');
