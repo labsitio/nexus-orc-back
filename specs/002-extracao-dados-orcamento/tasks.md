@@ -13,7 +13,7 @@
 ## Phase 1: Setup (Shared Infrastructure)
 
 - [x] T001 Criar estrutura de pastas `src/bounded-contexts/extracao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/extracao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pela spec 001 — não repetir T001/T002/T003 daquela spec).
-- [ ] T002 [P] Migração Drizzle Kit: schema inicial do BC Extração (tabelas vazias, baseline) — ADR-001 herdado da spec 001.
+- [x] T002 [P] Migração Drizzle Kit: schema inicial do BC Extração (tabelas vazias, baseline) — ADR-001 herdado da spec 001. #67
 - [ ] T003 [P] Provisionar fila SQS `extrator-queue`, com DLQ própria + alarme CloudWatch (IaC — Ricardo/DevOps).
 - [ ] T004 [P] Provisionar regra EventBridge no bus `nexo-dominio-bus` roteando `detail-type: OrcamentoClassificado`, `source: nexo.ingestao-identificacao` → `extrator-queue`.
 

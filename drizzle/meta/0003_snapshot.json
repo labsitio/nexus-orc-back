@@ -1,0 +1,516 @@
+{
+  "id": "9dea8fbf-7d0a-4b69-b848-0538b046cac7",
+  "prevId": "39ff89c4-7daf-46bd-9c86-e1ce3a1d00df",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.orcamentos": {
+      "name": "orcamentos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "canal": {
+          "name": "canal",
+          "type": "canal",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recebido_em": {
+          "name": "recebido_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bucket": {
+          "name": "bucket",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_id": {
+          "name": "version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "referencia_externa": {
+          "name": "referencia_externa",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "status_orcamento",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resultado_fornecedor_identificado": {
+          "name": "resultado_fornecedor_identificado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_formato_identificado": {
+          "name": "resultado_formato_identificado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_nivel_confianca": {
+          "name": "resultado_nivel_confianca",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_agente_origem": {
+          "name": "resultado_agente_origem",
+          "type": "agente_origem",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "orcamentos_nivel_confianca_em_faixa": {
+          "name": "orcamentos_nivel_confianca_em_faixa",
+          "value": "(\"orcamentos\".\"resultado_nivel_confianca\" is null or (\"orcamentos\".\"resultado_nivel_confianca\" >= 0 and \"orcamentos\".\"resultado_nivel_confianca\" <= 100))"
+        },
+        "orcamentos_resultado_completo_ou_ausente": {
+          "name": "orcamentos_resultado_completo_ou_ausente",
+          "value": "\n        (\n          \"orcamentos\".\"resultado_fornecedor_identificado\" is null\n          and \"orcamentos\".\"resultado_formato_identificado\" is null\n          and \"orcamentos\".\"resultado_nivel_confianca\" is null\n          and \"orcamentos\".\"resultado_agente_origem\" is null\n        ) or (\n          \"orcamentos\".\"resultado_fornecedor_identificado\" is not null\n          and \"orcamentos\".\"resultado_formato_identificado\" is not null\n          and \"orcamentos\".\"resultado_nivel_confianca\" is not null\n          and \"orcamentos\".\"resultado_agente_origem\" is not null\n        )\n      "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.orcamentos_historico": {
+      "name": "orcamentos_historico",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "orcamento_id": {
+          "name": "orcamento_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agente": {
+          "name": "agente",
+          "type": "agente_origem",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ocorreu_em": {
+          "name": "ocorreu_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resultado_fornecedor_identificado": {
+          "name": "resultado_fornecedor_identificado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_formato_identificado": {
+          "name": "resultado_formato_identificado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_nivel_confianca": {
+          "name": "resultado_nivel_confianca",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "motivo_insucesso": {
+          "name": "motivo_insucesso",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "orcamentos_historico_orcamento_id_idx": {
+          "name": "orcamentos_historico_orcamento_id_idx",
+          "columns": [
+            {
+              "expression": "orcamento_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "orcamentos_historico_orcamento_id_orcamentos_id_fk": {
+          "name": "orcamentos_historico_orcamento_id_orcamentos_id_fk",
+          "tableFrom": "orcamentos_historico",
+          "tableTo": "orcamentos",
+          "columnsFrom": ["orcamento_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "orcamentos_historico_nivel_confianca_em_faixa": {
+          "name": "orcamentos_historico_nivel_confianca_em_faixa",
+          "value": "(\"orcamentos_historico\".\"resultado_nivel_confianca\" is null or (\"orcamentos_historico\".\"resultado_nivel_confianca\" >= 0 and \"orcamentos_historico\".\"resultado_nivel_confianca\" <= 100))"
+        },
+        "orcamentos_historico_sucesso_xor_insucesso": {
+          "name": "orcamentos_historico_sucesso_xor_insucesso",
+          "value": "\n        (\n          \"orcamentos_historico\".\"resultado_fornecedor_identificado\" is not null\n          and \"orcamentos_historico\".\"resultado_formato_identificado\" is not null\n          and \"orcamentos_historico\".\"resultado_nivel_confianca\" is not null\n          and \"orcamentos_historico\".\"motivo_insucesso\" is null\n        ) or (\n          \"orcamentos_historico\".\"resultado_fornecedor_identificado\" is null\n          and \"orcamentos_historico\".\"resultado_formato_identificado\" is null\n          and \"orcamentos_historico\".\"resultado_nivel_confianca\" is null\n          and \"orcamentos_historico\".\"motivo_insucesso\" is not null\n        )\n      "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "platform.confirmacoes_anonimizacao": {
+      "name": "confirmacoes_anonimizacao",
+      "schema": "platform",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "solicitacao_id": {
+          "name": "solicitacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bounded_context": {
+          "name": "bounded_context",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "orcamento_id": {
+          "name": "orcamento_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campos_anonimizados": {
+          "name": "campos_anonimizados",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confirmado_em": {
+          "name": "confirmado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "confirmacoes_anonimizacao_solicitacao_id_idx": {
+          "name": "confirmacoes_anonimizacao_solicitacao_id_idx",
+          "columns": [
+            {
+              "expression": "solicitacao_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "confirmacoes_anonimizacao_solicitacao_id_solicitacoes_esquecimento_id_fk": {
+          "name": "confirmacoes_anonimizacao_solicitacao_id_solicitacoes_esquecimento_id_fk",
+          "tableFrom": "confirmacoes_anonimizacao",
+          "tableTo": "solicitacoes_esquecimento",
+          "schemaTo": "platform",
+          "columnsFrom": ["solicitacao_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "platform.contextos_com_dado_pessoal": {
+      "name": "contextos_com_dado_pessoal",
+      "schema": "platform",
+      "columns": {
+        "bounded_context": {
+          "name": "bounded_context",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "possui_dado_pessoal": {
+          "name": "possui_dado_pessoal",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "platform.politicas_retencao": {
+      "name": "politicas_retencao",
+      "schema": "platform",
+      "columns": {
+        "categoria": {
+          "name": "categoria",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "prazo_em_dias": {
+          "name": "prazo_em_dias",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_legal": {
+          "name": "base_legal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "atualizada_em": {
+          "name": "atualizada_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "platform.solicitacoes_esquecimento": {
+      "name": "solicitacoes_esquecimento",
+      "schema": "platform",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "titular_referencia": {
+          "name": "titular_referencia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registrada_em": {
+          "name": "registrada_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prazo_limite": {
+          "name": "prazo_limite",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contextos_esperados": {
+          "name": "contextos_esperados",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "platform.trilha_auditoria_acesso": {
+      "name": "trilha_auditoria_acesso",
+      "schema": "platform",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "orcamento_id": {
+          "name": "orcamento_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ator": {
+          "name": "ator",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acao": {
+          "name": "acao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ocorreu_em": {
+          "name": "ocorreu_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "trilha_auditoria_acesso_orcamento_id_idx": {
+          "name": "trilha_auditoria_acesso_orcamento_id_idx",
+          "columns": [
+            {
+              "expression": "orcamento_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "extracao.extracoes_orcamento": {
+      "name": "extracoes_orcamento",
+      "schema": "extracao",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "extracao.extracoes_orcamento_historico": {
+      "name": "extracoes_orcamento_historico",
+      "schema": "extracao",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.agente_origem": {
+      "name": "agente_origem",
+      "schema": "public",
+      "values": ["CLASSIFICADOR", "HUMANO"]
+    },
+    "public.canal": {
+      "name": "canal",
+      "schema": "public",
+      "values": ["PORTAL_WEB", "API_REST", "SFTP", "APP_MOBILE"]
+    },
+    "public.status_orcamento": {
+      "name": "status_orcamento",
+      "schema": "public",
+      "values": ["RECEBIDO", "CLASSIFICADO", "PENDENTE_REVISAO_HUMANA"]
+    }
+  },
+  "schemas": {
+    "platform": "platform",
+    "extracao": "extracao"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
