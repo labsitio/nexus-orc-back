@@ -44,5 +44,7 @@ new ExtratorQueueStack(app, 'ExtratorQueueStack', {
 });
 
 new ValidadorQueueStack(app, 'ValidadorQueueStack', {
-  description: 'Fila validador-queue + DLQ + alarme — spec 003, T003.',
+  description:
+    'Fila validador-queue + DLQ + alarme, roteada por regra EventBridge — spec 003, T003/T004.',
+  dominioBus: dominioEventBusStack.dominioBus,
 });
