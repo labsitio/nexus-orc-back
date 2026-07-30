@@ -1,6 +1,7 @@
 import { App } from 'aws-cdk-lib';
 import { ClassificadorLambdaRoleStack } from '../lib/classificador-lambda-role-stack.ts';
 import { ClassificadorQueueStack } from '../lib/classificador-queue-stack.ts';
+import { ConfirmarRevisaoHumanaLambdaRoleStack } from '../lib/confirmar-revisao-humana-lambda-role-stack.ts';
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
 
@@ -27,4 +28,9 @@ new ClassificadorLambdaRoleStack(app, 'ClassificadorLambdaRoleStack', {
   description: 'Role IAM least-privilege da Lambda Classificador — spec 001, T035.',
   orcamentosRawBucket: storageStack.orcamentosRawBucket,
   classificadorQueue: classificadorQueueStack.classificadorQueue,
+});
+
+new ConfirmarRevisaoHumanaLambdaRoleStack(app, 'ConfirmarRevisaoHumanaLambdaRoleStack', {
+  description:
+    'Role IAM least-privilege da Lambda de confirmação humana (sem Bedrock/S3 raw) — spec 001, T054.',
 });

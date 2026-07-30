@@ -473,3 +473,90 @@ principal do agente (em uso por outra trilha, `feat/001-c-us1`).
 
 ## Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T050–T055 (issues #55–#60) — PR #416
+
+## SPEC_ID e versão testada
+`001-ingestao-classificacao-orcamentos`. PR #416 (draft), branch
+`feat/001-f-us5`, commit `62339a1`, base `main`. Trilha 001-F, User Story 5
+"Confirmação humana e reprocessamento". Depende de US2 (trilha 001-D, PR
+#413, já mergeada em `main`). Primeira validação (não é reteste).
+
+## Resumo executivo
+US5 adiciona `POST /v1/orcamentos/{orcamentoId}/revisao-humana` — endpoint
+que confirma explicitamente um orçamento escalonado
+(`PENDENTE_REVISAO_HUMANA`), transicionando-o para `CLASSIFICADO` com
+`agenteOrigem: HUMANO`, preservando o histórico da tentativa automática
+anterior. `backend-reviewer` já aprovou (APPROVE, sem achados bloqueantes).
+QA confirma o critério de aceite via execução própria da suíte e leitura
+direta do agregado (`Orcamento.registrarConfirmacaoHumana`).
+
+## Requisitos cobertos e não cobertos
+Todos os critérios de aceite de US5 cobertos: 200 (transição +
+`agenteOrigem: HUMANO` + histórico preservado), 409 (fora de
+`PENDENTE_REVISAO_HUMANA`), 404 (não encontrado), 400 (body/params
+inválidos), reprocessamento só por ação humana explícita (nenhuma rota/caso
+de uso dispara reclassificação automática a partir de
+`PENDENTE_REVISAO_HUMANA`). IAM least privilege validado via `cdk synth`.
+Nenhuma lacuna de requisito identificada. Detalhe em
+`qa/traceability-matrix.md`.
+
+## Suítes executadas e comandos
+```
+corepack pnpm run typecheck
+corepack pnpm run typecheck:infra
+corepack pnpm run lint
+corepack pnpm test
+corepack pnpm exec vitest run --coverage
+corepack pnpm exec cdk synth ConfirmarRevisaoHumanaLambdaRoleStack
+```
+Detalhe completo em `qa/test-execution-report.md`.
+
+## Quantidade de testes por tipo
+176 testes no total (suíte inteira, 38 arquivos executados + 3 arquivos/12
+casos de integração Drizzle/Postgres pulados sem `DATABASE_URL`, pré-
+existentes e não relacionados a esta trilha) — 14 no escopo direto desta
+task (4 unit de caso de uso, 5 contrato HTTP, 5 contrato Zod), 162 de
+trilhas anteriores sem regressão.
+
+## Resultado
+176 aprovados, 0 falhos, 0 ignorados, 0 instáveis (12 skipped por ausência
+de `DATABASE_URL`, comportamento esperado e documentado desde T011).
+
+## Cobertura inicial e final
+Arquivos novos desta task (baseline 0%, por não existirem antes):
+`confirmar-revisao-humana.ts` → 100% statements/branches/functions/lines.
+`revisao-humana.controller.ts` → 96% statements/lines, 90% branch (gap
+justificado: rethrow de erro inesperado, mesmo padrão já aceito em
+`status.controller.ts`). `revisao-humana.schema.ts` → 100%. Cobertura
+global do projeto (todos os arquivos, todas as trilhas): Statements 86.14%
+· Branches 72.86% · Functions 80.44% · Lines 85.98%. Detalhe em
+`qa/coverage-final.md`.
+
+## Local do allure-results e do relatório Allure
+`allure-results/` (raiz do worktree, git-ignorado), gerado pelo reporter
+`allure-vitest` já configurado em `vitest.config.ts`. Relatório HTML não
+gerado (mesma limitação de todas as rodadas anteriores — requer CLI Java
+Allure). Ver `qa/allure-report.md`.
+
+## Bugs por severidade e status
+Nenhum bug de produção encontrado.
+
+## Riscos residuais
+- Save-then-publish sem outbox em `ConfirmarRevisaoHumana` (mesmo padrão já
+  presente em `ClassificarOrcamento`, US2/PR #413) — já sinalizado pelo
+  `backend-reviewer` e encaminhado ao `arquiteto-back`; não bloqueia esta
+  entrega, é decisão de padrão arquitetural já rastreada em outra trilha.
+- Rethrow de erro inesperado no controller (linha 82) sem teste dedicado —
+  mesmo risco residual trivial já aceito em `status.controller.ts`.
+
+## Limitações do ambiente
+Sem acesso a AWS/Postgres real neste ambiente — testes usam fakes de
+`OrcamentoRepository`/`EventPublisher`, nunca infraestrutura real (conforme
+informado na invocação). `cdk synth` valida a síntese do stack IAM, não o
+deploy real.
+
+## Parecer final
+APROVADO PELO QA

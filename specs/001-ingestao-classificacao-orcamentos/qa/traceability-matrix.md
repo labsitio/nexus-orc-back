@@ -100,3 +100,29 @@ que `ConsultarStatusOrcamento` consome.
 Cobertura da fatia `DrizzleOrcamentoRepository`: 100% statements/lines/functions,
 88.09% branch (3 branches residuais são o caminho `insucesso()`, nunca
 produzido pelo Domain hoje — ver `qa/coverage-final.md`).
+
+---
+
+# Matriz de rastreabilidade — T050–T055 (issues #55–#60) — PR #416
+
+| Requisito / Critério de aceite (US5) | Risco | Nível | Cenário | Arquivo / caso | Resultado |
+|---|---|---|---|---|---|
+| Confirmação humana transiciona `PENDENTE_REVISAO_HUMANA` → `CLASSIFICADO`, `agenteOrigem: HUMANO`, confiança 100 | Confirmação não registrada como decisão humana explícita | Unit | `registrarConfirmacaoHumana` via `ConfirmarRevisaoHumana.executar` | `confirmar-revisao-humana.test.ts` | PASS |
+| Histórico do Classificador preservado, confirmação humana apenas anexada | Perda de rastro da tentativa automática após correção manual | Unit | histórico tem 2 entradas (`CLASSIFICADOR` então `HUMANO`) após confirmação | `confirmar-revisao-humana.test.ts` | PASS |
+| `TransicaoInvalidaError` fora de `PENDENTE_REVISAO_HUMANA` (nunca publica evento, nunca salva) | Reprocessamento indevido fora do estado de escalonamento | Unit | confirmação a partir de `RECEBIDO` lança erro, 0 salvamentos, 0 eventos | `confirmar-revisao-humana.test.ts` | PASS |
+| `OrcamentoNaoEncontradoParaRevisaoHumanaError` para id inexistente | 404 mascarado incorretamente ou exceção não tratada | Unit | `buscarPorId` retorna `undefined` → erro específico, 0 eventos | `confirmar-revisao-humana.test.ts` | PASS |
+| `OrcamentoReclassificadoPorRevisaoHumana` publicado ao final, 1x | Evento de auditoria da correção manual ausente/duplicado | Unit | 1 evento publicado com `detailType` correto após confirmação bem-sucedida | `confirmar-revisao-humana.test.ts` | PASS |
+| `POST /v1/orcamentos/{id}/revisao-humana` — 200 e corpo com `status`/`resultadoAtual` corretos | Contrato HTTP diverge do caso de uso | Contrato/HTTP | `app.inject` com orçamento `PENDENTE_REVISAO_HUMANA` real | `revisao-humana.controller.test.ts` | PASS |
+| 409 Problem Details quando status não é `PENDENTE_REVISAO_HUMANA` | Reprocessamento aceito fora do estado correto via API | Contrato/HTTP | `app.inject` com orçamento `RECEBIDO` → 409 + `application/problem+json` | `revisao-humana.controller.test.ts` | PASS |
+| 404 Problem Details para `orcamentoId` inexistente | Vazamento de stack trace ou 500 para recurso ausente | Contrato/HTTP | `app.inject` com UUID válido não persistido → 404 + Problem Details | `revisao-humana.controller.test.ts` | PASS |
+| 400 Problem Details para body inválido (campo obrigatório ausente/vazio) | Payload malformado aceito, corrompendo dado de confirmação | Contrato/HTTP + Zod | body sem `fornecedorIdentificado` → 400; schema isolado rejeita vazio/ausente | `revisao-humana.controller.test.ts`, `revisao-humana.contract.test.ts` | PASS |
+| 400 Problem Details para `orcamentoId` mal formado (não-UUID) | Injeção de valor não-UUID na busca do agregado | Contrato/HTTP + Zod | `orcamentoIdParamSchema` (reaproveitado de US4) rejeita `'nao-e-uuid'` | `revisao-humana.controller.test.ts`, `revisao-humana.contract.test.ts` | PASS |
+| Reprocessamento só por ação humana explícita (nenhuma reclassificação automática a partir de `PENDENTE_REVISAO_HUMANA`) | Reclassificação automática indevida por IA | Estático + inspeção | grep confirma única transição de saída de `PENDENTE_REVISAO_HUMANA` é `registrarConfirmacaoHumana`, acionada só pelo endpoint deste PR | inspeção manual (`orcamento.aggregate.ts`) | PASS |
+| IAM `ConfirmarRevisaoHumanaLambdaRole` least privilege (sem Bedrock/S3) | Role Lambda com permissão excessiva | Infra estático | `cdk synth ConfirmarRevisaoHumanaLambdaRoleStack` sintetiza só com `AWSLambdaBasicExecutionRole` | comando (`qa/test-execution-report.md`) | PASS |
+| Regressão: suíte completa (US1–US4, VOs, agregados, eventos, gateways) | Quebra de comportamento já validado em rodadas anteriores | Regressão | `corepack pnpm test` | 38 arquivos, 176 casos | PASS (0 falhas) |
+| Tipagem estrita / lint do projeto (app + infra CDK) | Erro de tipo ou violação de estilo não pego | Estático | `corepack pnpm run typecheck`, `typecheck:infra`, `lint` | comandos | PASS (exit 0, sem output) |
+
+Cobertura da fatia desta task: `confirmar-revisao-humana.ts` 100% em todas as
+métricas; `revisao-humana.controller.ts` 96%/90% branch (gap justificado —
+rethrow de erro inesperado, ver `qa/coverage-final.md`); `revisao-humana.schema.ts`
+100%.

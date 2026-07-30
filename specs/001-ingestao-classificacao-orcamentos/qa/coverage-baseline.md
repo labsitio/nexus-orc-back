@@ -39,3 +39,17 @@ arquivos): Statements 81.15% · Branches 55% · Functions 75.67% · Lines
 80.97%. `drizzle-orcamento.repository.ts` (arquivo do diff desta task):
 **0%** statements/branches/functions/lines — arquivo novo, sem nenhum teste
 consumindo-o antes desta validação.
+
+---
+
+# Coverage Baseline — T050–T055 (issues #55–#60) — PR #416
+
+Baseline = suíte de `main` antes deste PR (sem `DATABASE_URL`, 12 testes
+Drizzle/Postgres pulados): 176 testes/38 arquivos executados já incluem os
+testes de US5 escritos pelo dev-back-end no mesmo commit avaliado (T050/T051
+já existiam como unit/contract test antes de T052-T055 implementarem
+produção — TDD). Todos os arquivos de produção do diff
+(`confirmar-revisao-humana.ts`, `revisao-humana.controller.ts`,
+`revisao-humana.schema.ts`, `confirmar-revisao-humana-lambda-role-stack.ts`)
+são novos nesta trilha — baseline de cobertura para eles é 0% por não
+existirem antes. Ver `coverage-final.md` para o resultado desta validação.

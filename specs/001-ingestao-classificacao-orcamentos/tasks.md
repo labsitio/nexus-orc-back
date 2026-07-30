@@ -128,15 +128,15 @@
 
 ### Tests (US5)
 
-- [ ] T050 [P] [US5] Unit test `Orcamento.registrarConfirmacaoHumana` — só é transição válida a partir de PENDENTE_REVISAO_HUMANA; tentativa a partir de outro estado lança erro de domínio.
-- [ ] T051 [P] [US5] Contract test `POST /v1/orcamentos/{orcamentoId}/revisao-humana` — 409 Problem Details se status não for PENDENTE_REVISAO_HUMANA.
+- [x] T050 [P] [US5] Unit test `Orcamento.registrarConfirmacaoHumana` — só é transição válida a partir de PENDENTE_REVISAO_HUMANA; tentativa a partir de outro estado lança erro de domínio. Issue #55 (já coberto por `orcamento.aggregate.test.ts`, sem duplicação).
+- [x] T051 [P] [US5] Contract test `POST /v1/orcamentos/{orcamentoId}/revisao-humana` — 409 Problem Details se status não for PENDENTE_REVISAO_HUMANA. Issue #56.
 
 ### Implementation (US5)
 
-- [ ] T052 [US5] Application: caso de uso `ConfirmarRevisaoHumana`.
-- [ ] T053 [US5] Interface: controller `POST /v1/orcamentos/{orcamentoId}/revisao-humana`, Zod schema de body (fornecedor/formato confirmados).
-- [ ] T054 [US5] IAM: role `ConfirmarRevisaoHumanaLambdaRole` (escrita restrita à tabela deste contexto, sem acesso a Bedrock/S3 raw).
-- [ ] T055 [US5] Publicar `OrcamentoReclassificadoPorRevisaoHumana` via `EventPublisher` ao final do caso de uso.
+- [x] T052 [US5] Application: caso de uso `ConfirmarRevisaoHumana`. Issue #57.
+- [x] T053 [US5] Interface: controller `POST /v1/orcamentos/{orcamentoId}/revisao-humana`, Zod schema de body (fornecedor/formato confirmados). Issue #58.
+- [x] T054 [US5] IAM: role `ConfirmarRevisaoHumanaLambdaRole` (escrita restrita à tabela deste contexto, sem acesso a Bedrock/S3 raw). Issue #59.
+- [x] T055 [US5] Publicar `OrcamentoReclassificadoPorRevisaoHumana` via `EventPublisher` ao final do caso de uso. Issue #60 (implementado junto com T052/#57).
 
 **Checkpoint**: todas as 5 user stories funcionais — pipeline ponta a ponta completo conforme spec.md.
 
