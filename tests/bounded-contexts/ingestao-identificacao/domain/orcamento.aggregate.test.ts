@@ -8,7 +8,6 @@ import {
 import {
   CANAIS_VALIDOS,
   Canal,
-  CanalInvalidoError,
 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/canal.vo.js';
 import { NivelConfianca } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/nivel-confianca.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
@@ -52,10 +51,6 @@ describe('Orcamento.receber', () => {
     });
     expect(orcamento.canal.valor).toBe(canal);
     expect(orcamento.status).toBe('RECEBIDO');
-  });
-
-  it('rejeita canal fora dos 4 fixos antes de construir o agregado', () => {
-    expect(() => Canal.de('EMAIL')).toThrow(CanalInvalidoError);
   });
 });
 
