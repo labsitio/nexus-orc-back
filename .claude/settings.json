@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(gh issue edit *)",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-guard-5h.sh\"",
+            "timeout": 30,
+            "statusMessage": "Checando usage do bloco de 5h"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/task-limit.sh\"",
+            "timeout": 30,
+            "statusMessage": "Contando tasks in-progress"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill|Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/usage-guard-5h.sh\"",
+            "timeout": 30,
+            "statusMessage": "Checando usage do bloco de 5h"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/task-limit.sh\"",
+            "timeout": 30,
+            "statusMessage": "Contando tasks in-progress"
+          }
+        ]
+      }
+    ]
+  }
+}

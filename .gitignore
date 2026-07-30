@@ -8,5 +8,6 @@ coverage/
 .husky/_/
 cdk.out/
 .claude/worktrees/
+.claude/settings.local.json
 allure-results/
 allure-report/
