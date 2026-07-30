@@ -38,3 +38,20 @@ placeholder `NEXO_VERSION` (constante, sem lógica).
 | Tipagem estrita do projeto | Erro de tipo não pego | Estático | `tsc --noEmit` | comando | PASS (exit 0) |
 
 Cobertura de branch das invariantes de validação (todos os `throw new` dos VOs e do agregado): 100% — 38/38 branches, 13 asserções `toThrow` cobrindo os 12 pontos de lançamento de erro de domínio. Detalhe em `qa/coverage-final.md`.
+
+---
+
+# Matriz de rastreabilidade — T016/T019 (issues #21, #24) — PR #402
+
+| Requisito / Critério de aceite | Risco | Nível | Cenário | Arquivo / caso | Resultado |
+|---|---|---|---|---|---|
+| T016 — `Orcamento.receber` cria com os 4 canais fixos, status nasce `RECEBIDO` | Canal inválido ou status inicial incorreto persistido | Unit | `it.each(CANAIS_VALIDOS)` cria orçamento por canal e afirma `canal.valor` e `status === 'RECEBIDO'` | `orcamento.aggregate.test.ts` (describe `Orcamento.receber`) | PASS |
+| T016 — rejeição de canal fora dos 4 fixos | Canal fora do domínio aceito | Unit | `Canal.de('EMAIL')` lança `CanalInvalidoError` (barreira antes do agregado; VO fechado por `CANAIS_VALIDOS`) | `canal.vo.test.ts` (pré-existente, T006) | PASS — coberto na fronteira do VO, redundante testar de novo no agregado |
+| T019 — `armazenar()` grava no prefixo do canal e devolve `ReferenciaS3` com `VersionId` real do S3 | Chave sem isolamento por canal / referência sem versionId real | Unit | fake de `S3Client.send` resolve `VersionId: 'v-123'`; afirma `bucket`, `key` (regex `sftp-incoming/.+-orcamento.pdf`), `versionId` | `s3-armazenamento-bruto.gateway.test.ts` | PASS |
+| T019 — `armazenar()` lança erro explícito se S3 não devolver `VersionId` (bucket sem versionamento) | Imutabilidade (Princípio III) quebrada silenciosamente | Unit | fake resolve `{}` (sem `VersionId`) → `rejects.toThrow(/VersionId/)` | `s3-armazenamento-bruto.gateway.test.ts` | PASS |
+| T019 — `lerConteudoBruto()` lê pela `versionId` explícita da referência | Leitura da versão errada do objeto (não a que foi classificada) | Unit | fake resolve `Body` com conteúdo determinístico; afirma bytes devolvidos | `s3-armazenamento-bruto.gateway.test.ts` | PASS (não afirma o argumento `VersionId` enviado ao comando — ver limitação em `qa/test-plan.md`) |
+| T019 — `lerConteudoBruto()` lança erro explícito se S3 não devolver `Body` | Silêncio em vez de erro ao ler objeto ausente/corrompido | Unit | fake resolve `{}` (sem `Body`) → `rejects.toThrow(/Body/)` | `s3-armazenamento-bruto.gateway.test.ts` | PASS |
+| Regressão: VOs, agregado (T007), eventos (T008), interfaces (T009), status controller (trilha 001-E, fora de escopo mas coexistente na suíte) | Quebra de comportamento já validado | Regressão | suíte completa `pnpm exec vitest run --coverage` | 12 arquivos de teste, 63 casos | PASS (0 falhas, 0 regressões) |
+| Tipagem estrita / lint do projeto | Erro de tipo ou violação de estilo não pego | Estático | `pnpm run typecheck`, `pnpm run lint` | comandos | PASS (exit 0, sem output) |
+
+Cobertura da fatia `S3ArmazenamentoBrutoGateway`: 100% statements/branches/functions (12/12, 4/4, 3/3) — ver `qa/coverage-final.md`.

@@ -15,3 +15,19 @@ CLI Allure a qualquer momento sem re-executar os testes.
 
 Nenhum dado sensível anexado — testes usam apenas fixtures sintéticas
 (`"Fornecedor X"`, UUIDs/bucket fictícios).
+
+---
+
+# Allure — T016/T019 (PR #402)
+
+Reaproveitado `allure-vitest` + `vitest.config.ts` já configurados em rodada
+anterior. `pnpm exec vitest run --coverage` gerou `allure-results/` (raiz do
+repo, git-ignorado) com resultado por teste da suíte inteira (63 arquivos
+`*-result.json`), todos `"status":"passed"`.
+
+Relatório HTML novamente não gerado (requer CLI Java `allure`, fora do
+escopo de dependências Node — mesma limitação registrada nas rodadas
+anteriores; ação de publicação cabe ao CI, T003).
+
+Nenhum dado sensível anexado — fixtures sintéticas (UUIDs, bucket fictício,
+`"orcamento.pdf"`).

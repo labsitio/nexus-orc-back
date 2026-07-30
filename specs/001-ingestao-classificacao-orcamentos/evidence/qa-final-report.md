@@ -152,3 +152,115 @@ isolado, fora do runner de CI oficial (que ainda não existe — T003).
 
 ## Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T016/T019 (issues #21, #24) — PR #402
+
+## SPEC_ID e versão testada
+`001-ingestao-classificacao-orcamentos`. PR #402, branch `feat/001-c-us1`,
+commit `2fee2e2`, base `main`@`b1a2bf4`. Primeira validação (não é reteste).
+
+## Resumo executivo
+Trilha 001-C (US1 Ingestão), parcial: 2 de 11 tasks (T016, T019). Restante da
+trilha bloqueado por dependência externa não implementada (T010/T011,
+`DrizzleOrcamentoRepository`, issue #16). `backend-reviewer` já havia
+aprovado (APPROVE WITH NITS); nit de teste duplicado corrigido no commit
+`2fee2e2`. QA confirma diretamente no código e na execução, não apenas por
+declaração do dev-back-end ou do reviewer anterior.
+
+- **T016**: `Orcamento.receber` testado para os 4 canais fixos
+  (`PORTAL_WEB`, `API_REST`, `SFTP`, `APP_MOBILE`) via `it.each`, status
+  nasce `RECEBIDO`. Rejeição de canal fora dos 4 fixos já coberta na
+  fronteira do VO `Canal` (T006, pré-existente) — redundante repetir no
+  agregado, decisão de engenharia correta.
+- **T019**: `S3ArmazenamentoBrutoGateway` — `armazenar()` grava com chave
+  prefixada por canal + UUID, propaga erro explícito se o S3 não devolver
+  `VersionId` (bucket sem versionamento); `lerConteudoBruto()` lê sempre
+  pela `versionId` explícita da referência, propaga erro explícito se não
+  vier `Body`. Ambos os caminhos de erro têm teste dedicado.
+
+## Requisitos cobertos e não cobertos
+Cobertos (detalhe em `qa/traceability-matrix.md`):
+- Criação do agregado nos 4 canais fixos com status inicial correto (T016).
+- Imutabilidade do dado bruto via versionamento S3 real, com erro explícito
+  em vez de silêncio quando o S3 não confirma versionamento (T019,
+  Princípio III).
+- Leitura sempre pela versão explícita, nunca "latest" implícito (T019).
+
+Não cobertos (fora de escopo desta entrega parcial, não é lacuna desta
+task): T017 (contract test upload), T018 (integração 4 canais → mesmo
+evento), T020–T026 (caso de uso `ReceberOrcamento`, controllers, Lambda
+SFTP, lifecycle rule, Cognito, IAM) — todos bloqueados por T010/T011
+(repositório) ainda não implementado, conforme informado pelo dev-back-end.
+
+## Suítes executadas e comandos
+```
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm exec vitest run --coverage
+```
+Detalhe completo em `qa/test-execution-report.md`.
+
+## Quantidade de testes por tipo
+63 testes unitários no total (suíte inteira, 12 arquivos) — 15 no escopo
+direto deste PR (11 no agregado, 4 no gateway S3), 48 de rodadas/trilhas
+anteriores, todos passando sem regressão. Sem teste de integração real
+contra S3 (LocalStack indisponível neste ambiente — limitação conhecida e
+aceita, ver abaixo). Sem contrato/E2E aplicável (fora do escopo de T016/T019).
+
+## Resultado
+63 aprovados, 0 falhos, 0 ignorados, 0 instáveis.
+
+## Cobertura inicial e final
+Inicial (baseline, `main`@`b1a2bf4`): Statements 92.91% · Branches 100% ·
+Functions 84% · Lines 92.8% (domain-only).
+Final (commit `2fee2e2`, suíte inteira): Statements 92.52% · Branches
+91.37% · Functions 90.32% · Lines 92.44%. `s3-armazenamento-bruto.gateway.ts`
+— o único arquivo de produção deste PR — está em **100%** statements/
+branches/functions. A leve queda no agregado geral vem de arquivos de outra
+trilha (001-E) coexistindo na suíte, não do diff deste PR. Detalhe em
+`qa/coverage-final.md`.
+
+## Local do allure-results e do relatório Allure
+`allure-results/` (raiz do repo, git-ignorado), 63 arquivos JSON, todos
+`"status":"passed"`. Relatório HTML não gerado (mesma limitação de rodadas
+anteriores — requer CLI Java Allure). Ver `qa/allure-report.md`.
+
+## Bugs por severidade e status
+Nenhum bug de produção aberto.
+
+## Riscos residuais
+- Fake de `S3Client` no teste de `s3-armazenamento-bruto.gateway.test.ts`
+  não afirma os argumentos exatos enviados a `GetObjectCommand`/
+  `PutObjectCommand` (ex.: que `VersionId` do comando corresponde à
+  `referencia.versionId`) — apenas o retorno é estimulado. Revisão manual
+  do código de produção confirma que os argumentos estão corretos. Risco
+  baixo, registrado para reforço futuro (assert em `send.mock.calls`), não
+  bloqueia esta entrega.
+- Sem teste de integração real contra S3 (LocalStack indisponível). Unit
+  test contra fake é adequado ao escopo declarado da task (T019 é infra
+  unitária); integração real fica para T018 (fase de US1 ainda bloqueada).
+- Observação não bloqueante: commit `24c6403` (T019) trouxe `fastify` e
+  `zod` para `package.json`/`pnpm-lock.yaml` sem uso no diff deste PR —
+  aparenta arraste do worktree compartilhado com a trilha 001-E paralela.
+  Não quebra build/lint/teste. Sinalizado ao dev-back-end para avaliar
+  remoção em commit separado (não é bloqueio de gate).
+- Trilha 001-C majoritariamente bloqueada (9 de 11 tasks) por T010/T011
+  (`DrizzleOrcamentoRepository`, issue #16) ainda não implementada — sem
+  repositório real, US1 não é testável ponta a ponta ainda.
+
+## Limitações do ambiente
+Sem LocalStack/AWS real disponível — teste de T019 usa fake de `S3Client`,
+não integração real. Node ativo do shell era 18/24 dependendo da sessão;
+usado `nvm use 24` para alinhar com `engines.node >= 24` do projeto.
+Worktree compartilhado com agente paralelo (trilha 001-E, US4) — arquivos
+não relacionados (`consultar-status-orcamento.ts`, `status.schema.ts`,
+testes de contrato de status) presentes mas não commitados nesta PR;
+ignorados nesta validação por não pertencerem ao diff de #402, exceto onde
+coexistem na mesma execução de suíte (sem impacto — todos passam).
+
+## Parecer final
+APROVADO PELO QA

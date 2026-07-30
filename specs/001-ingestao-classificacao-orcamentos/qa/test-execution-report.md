@@ -80,3 +80,56 @@ allure-results/ gerado com 40 arquivos *-result.json
 domínio. Nenhum defeito de produção encontrado. Ver `qa/coverage-final.md`
 para análise das linhas de statement/function não cobertas (acessores
 triviais, não invariantes).
+
+---
+
+# Relatório de execução — T016/T019 (issues #21, #24) — PR #402
+
+Commit testado: `2fee2e2` (PR #402, branch `feat/001-c-us1`, base
+`main`@`b1a2bf4`). Ambiente: worktree do dev-back-end (compartilhado com
+agente paralelo na trilha 001-E), Node 24.18.1 (nvm), pnpm 11.18.0.
+
+## Comandos e resultados
+
+```
+$ source ~/.nvm/nvm.sh && nvm use 24
+Now using node v24.18.1
+
+$ pnpm install --frozen-lockfile
+Already up to date
+EXIT=0
+
+$ pnpm run typecheck        # tsc --noEmit
+EXIT=0 (sem output)
+
+$ pnpm run lint              # eslint .
+EXIT=0 (sem output)
+
+$ pnpm run test               # vitest run --passWithNoTests
+Test Files  12 passed (12)
+Tests       63 passed (63)
+EXIT=0
+
+$ pnpm exec vitest run --coverage
+Test Files  12 passed (12)
+Tests       63 passed (63)
+Statements 92.52% | Branches 91.37% | Functions 90.32% | Lines 92.44%
+EXIT=0
+allure-results/ regenerado, 63 arquivos *-result.json, todos passed
+```
+
+## Conclusão
+63/63 testes passando (11 no agregado `Orcamento.receber`/`Orcamento`, 4 no
+`S3ArmazenamentoBrutoGateway`, 48 pré-existentes de outras trilhas — nenhuma
+regressão). `tsc --noEmit` e `eslint .` limpos. `s3-armazenamento-bruto.gateway.ts`
+com 100% de cobertura (statements/branches/functions). Nenhum defeito de
+produção encontrado.
+
+## Observação (não bloqueante)
+O commit `24c6403` (T019) adicionou, além de `@aws-sdk/client-s3`
+(dependência esperada desta task), `fastify` e `zod` a `package.json`/
+`pnpm-lock.yaml` — dependências não usadas por nenhum arquivo do diff deste
+PR (pertencem à trilha 001-E, em desenvolvimento paralelo no mesmo
+worktree). Não quebra build/lint/teste; sinalizado ao dev-back-end como
+possível arraste acidental de lockfile do worktree compartilhado, para
+avaliar remoção em commit separado.

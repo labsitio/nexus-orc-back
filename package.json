@@ -48,9 +48,12 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1097.0",
     "aws-cdk-lib": "^2.262.2",
     "constructs": "^10.7.2",
     "drizzle-orm": "^0.45.2",
-    "pg": "^8.22.0"
+    "fastify": "^5.10.0",
+    "pg": "^8.22.0",
+    "zod": "^4.4.3"
   }
 }

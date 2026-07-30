@@ -5,7 +5,10 @@ import {
   ReferenciaBrutaImutavelError,
   TransicaoInvalidaError,
 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
-import { Canal } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/canal.vo.js';
+import {
+  CANAIS_VALIDOS,
+  Canal,
+} from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/canal.vo.js';
 import { NivelConfianca } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/nivel-confianca.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
@@ -34,6 +37,22 @@ function resultado(
     agenteOrigem,
   });
 }
+
+describe('Orcamento.receber', () => {
+  it.each(CANAIS_VALIDOS)('cria o orçamento com o canal fixo %s', (canal) => {
+    const orcamento = Orcamento.receber({
+      id: OrcamentoId.novo(),
+      canal: Canal.de(canal),
+      referenciaBruta: ReferenciaS3.de({
+        bucket: 'nexo-orcamentos-raw',
+        key: `${canal}/arquivo.pdf`,
+        versionId: 'v1',
+      }),
+    });
+    expect(orcamento.canal.valor).toBe(canal);
+    expect(orcamento.status).toBe('RECEBIDO');
+  });
+});
 
 describe('Orcamento', () => {
   it('nasce em RECEBIDO, sem resultado e sem histórico', () => {
