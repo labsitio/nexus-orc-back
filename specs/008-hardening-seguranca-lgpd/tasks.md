@@ -21,9 +21,9 @@ Conforme `plan.md` desta spec e convenção herdada de 001: `src/platform/confor
 
 **Purpose**: scaffolding de pastas e dependências, sem lógica de negócio.
 
-- [ ] T001 Criar estrutura de pastas `src/platform/conformidade/{domain,application,infrastructure,interface}` e `src/platform/shared-value-objects/domain/` conforme `plan.md` (Project Structure).
-- [ ] T002 [P] Criar schema Drizzle inicial `platform` (migração) com tabelas vazias `solicitacoes_esquecimento`, `confirmacoes_anonimizacao`, `politicas_retencao`, `trilha_auditoria_acesso`, `contextos_com_dado_pessoal` em `src/platform/conformidade/infrastructure/persistence/schema/`.
-- [ ] T003 [P] Configurar lint/format já existentes do monorepo para os novos diretórios (nenhuma config nova — apenas confirmar que `tsc --strict`/ESLint cobrem `src/platform/**`).
+- [x] T001 Criar estrutura de pastas `src/platform/conformidade/{domain,application,infrastructure,interface}` e `src/platform/shared-value-objects/domain/` conforme `plan.md` (Project Structure). (#302, PR #407)
+- [x] T002 [P] Criar schema Drizzle inicial `platform` (migração) com tabelas vazias `solicitacoes_esquecimento`, `confirmacoes_anonimizacao`, `politicas_retencao`, `trilha_auditoria_acesso`, `contextos_com_dado_pessoal` em `src/platform/conformidade/infrastructure/persistence/schema/`. (#303, PR #407)
+- [x] T003 [P] Configurar lint/format já existentes do monorepo para os novos diretórios (nenhuma config nova — apenas confirmar que `tsc --strict`/ESLint cobrem `src/platform/**`). (#304, PR #407)
 
 **Checkpoint**: estrutura pronta, sem código de negócio ainda.
 
