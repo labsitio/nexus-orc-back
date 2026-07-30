@@ -55,7 +55,7 @@
 
 ### Implementation (US1)
 
-- [ ] T019 [US1] Infrastructure: `S3ArmazenamentoBrutoGateway` implementando `ArmazenamentoBrutoGateway` (put via presigned URL server-side generation + get versionado).
+- [x] T019 [US1] Infrastructure: `S3ArmazenamentoBrutoGateway` implementando `ArmazenamentoBrutoGateway` (put via presigned URL server-side generation + get versionado).
 - [ ] T020 [US1] Application: caso de uso `ReceberOrcamento` (cria agregado, persiste, publica `OrcamentoRecebido`), incluindo verificação de `Idempotency-Key` (tabela `idempotency_keys`, TTL 24h) — ADR de idempotência do `plan.md`.
 - [ ] T021 [US1] Interface: controller `POST /v1/orcamentos/upload-url` (gera URL presigned + `orcamentoId` provisório), Zod schema de request/response.
 - [ ] T022 [US1] Interface: controller `POST /v1/orcamentos/{orcamentoId}/confirmar-upload` (dispara `ReceberOrcamento` de fato) — ADR-002.
