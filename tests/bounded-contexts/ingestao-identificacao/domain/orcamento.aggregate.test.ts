@@ -90,11 +90,14 @@ describe('Orcamento', () => {
   it.each([
     [100, 'CLASSIFICADO'],
     [0, 'PENDENTE_REVISAO_HUMANA'],
-  ] as const)('confiança extrema %d transita para %s', (nivelConfianca, statusEsperado) => {
-    const orcamento = novoOrcamento();
-    orcamento.registrarTentativaClassificador(resultado(nivelConfianca));
-    expect(orcamento.status).toBe(statusEsperado);
-  });
+  ] as const)(
+    'confiança no extremo válido da faixa (%d) transita para %s',
+    (nivelConfianca, statusEsperado) => {
+      const orcamento = novoOrcamento();
+      orcamento.registrarTentativaClassificador(resultado(nivelConfianca));
+      expect(orcamento.status).toBe(statusEsperado);
+    },
+  );
 
   it('registrarTentativaClassificador registra resultadoAtual e histórico com o mesmo resultado recebido', () => {
     const orcamento = novoOrcamento();
