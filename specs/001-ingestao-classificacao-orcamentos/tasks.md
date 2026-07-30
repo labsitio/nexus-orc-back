@@ -12,7 +12,7 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Inicializar monorepo Node.js 24 + TypeScript 5.x strict (`tsconfig.json`, `package.json`), gerenciador de pacotes a confirmar com Ricardo (pnpm recomendado por workspace único, ver Configuração Inicial pendente).
+- [x] T001 Inicializar monorepo Node.js 24 + TypeScript 5.x strict (`tsconfig.json`, `package.json`). Gerenciador de pacotes: pnpm (decisão registrada em comentário na issue #6; PR #391).
 - [ ] T002 [P] Configurar ESLint (`typescript-eslint`) + Prettier + Husky/lint-staged pre-commit.
 - [ ] T003 [P] Configurar CI (GitHub Actions): lint, `tsc --strict`, testes Vitest, `npm audit`/`pnpm audit`.
 - [ ] T004 Criar estrutura de pastas `src/bounded-contexts/ingestao-identificacao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/ingestao-identificacao/{domain,application,contract}` conforme `plan.md`.
