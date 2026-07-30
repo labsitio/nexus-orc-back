@@ -105,4 +105,26 @@ describe('Orcamento', () => {
     );
     expect(orcamento.historico).toHaveLength(1);
   });
+
+  it.each([
+    [100, 'CLASSIFICADO'],
+    [0, 'PENDENTE_REVISAO_HUMANA'],
+  ] as const)(
+    'confiança no extremo válido da faixa (%d) transita para %s',
+    (nivelConfianca, statusEsperado) => {
+      const orcamento = novoOrcamento();
+      orcamento.registrarTentativaClassificador(resultado(nivelConfianca));
+      expect(orcamento.status).toBe(statusEsperado);
+    },
+  );
+
+  it('registrarTentativaClassificador registra resultadoAtual e histórico com o mesmo resultado recebido', () => {
+    const orcamento = novoOrcamento();
+    const resultadoRecebido = resultado(LIMIAR_CONFIANCA - 1);
+    orcamento.registrarTentativaClassificador(resultadoRecebido);
+
+    expect(orcamento.resultadoAtual).toBe(resultadoRecebido);
+    expect(orcamento.historico[0]?.agente).toBe('CLASSIFICADOR');
+    expect(orcamento.historico[0]?.resultado).toBe(resultadoRecebido);
+  });
 });
