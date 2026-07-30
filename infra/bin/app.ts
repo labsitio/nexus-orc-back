@@ -3,6 +3,7 @@ import { ClassificadorLambdaRoleStack } from '../lib/classificador-lambda-role-s
 import { ClassificadorQueueStack } from '../lib/classificador-queue-stack.ts';
 import { ConfirmarRevisaoHumanaLambdaRoleStack } from '../lib/confirmar-revisao-humana-lambda-role-stack.ts';
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
+import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
 
 const app = new App();
@@ -33,4 +34,8 @@ new ClassificadorLambdaRoleStack(app, 'ClassificadorLambdaRoleStack', {
 new ConfirmarRevisaoHumanaLambdaRoleStack(app, 'ConfirmarRevisaoHumanaLambdaRoleStack', {
   description:
     'Role IAM least-privilege da Lambda de confirmação humana (sem Bedrock/S3 raw) — spec 001, T054.',
+});
+
+new ExtratorQueueStack(app, 'ExtratorQueueStack', {
+  description: 'Fila extrator-queue + DLQ + alarme — spec 002, T003.',
 });
