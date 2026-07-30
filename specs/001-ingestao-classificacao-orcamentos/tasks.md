@@ -34,8 +34,8 @@
 - [ ] T011 Infrastructure: `DrizzleOrcamentoRepository` implementando `OrcamentoRepository`, traduzindo linha↔agregado, nunca vazando tipo de linha para fora da Infra.
 - [x] T012 [P] Infrastructure: provisionar bucket S3 `nexo-orcamentos-raw` (IaC — CDK/Terraform a definir por Ricardo/DevOps) com versionamento, SSE-KMS, bucket policy deny-overwrite/deny-delete. Decisão registrada na issue/PR: AWS CDK v2 (TypeScript); imutabilidade via S3 Object Lock (GOVERNANCE, retenção 5 anos — pendente de confirmação de compliance) em vez de bucket policy deny-overwrite, para não bloquear o PUT legítimo do gateway de upload.
 - [x] T013 [P] Infrastructure: provisionar EventBridge custom bus `nexo-dominio-bus` + regras de roteamento para as filas SQS previstas nas fases seguintes. Escopo entregue: o bus (CDK, `infra/lib/dominio-event-bus-stack.ts`); regras de roteamento nascem junto com cada fila consumidora nas issues seguintes (ex. T033), não há fila para rotear ainda.
-- [ ] T014 Infrastructure: `EventBridgePublisher` implementando `EventPublisher`.
-- [ ] T015 Configurar logging estruturado (pino) + OpenTelemetry Node SDK como base transversal de observabilidade para todos os handlers Lambda deste contexto.
+- [x] T014 Infrastructure: `EventBridgePublisher` implementando `EventPublisher`. #19
+- [x] T015 Configurar logging estruturado (pino) + OpenTelemetry Node SDK como base transversal de observabilidade para todos os handlers Lambda deste contexto. #20
 
 **Checkpoint**: Domain testável isoladamente (sem infra), repositório e publisher funcionais contra ambiente local (LocalStack).
 

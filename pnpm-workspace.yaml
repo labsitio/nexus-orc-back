@@ -1,5 +1,9 @@
 allowBuilds:
   esbuild: false
+  protobufjs: false
+
+minimumReleaseAgeExclude:
+  - '@aws-sdk/client-eventbridge@3.1099.0'
 
 # GHSA-67mh-4wv8-2f99 (esbuild <= 0.24.2): drizzle-kit depende do
 # @esbuild-kit/esm-loader, deprecado ("merged into tsx") e preso ao
