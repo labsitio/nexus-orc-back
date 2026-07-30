@@ -38,7 +38,9 @@ new ConfirmarRevisaoHumanaLambdaRoleStack(app, 'ConfirmarRevisaoHumanaLambdaRole
 });
 
 new ExtratorQueueStack(app, 'ExtratorQueueStack', {
-  description: 'Fila extrator-queue + DLQ + alarme — spec 002, T003.',
+  description:
+    'Fila extrator-queue + DLQ + alarme, roteada por regra EventBridge — spec 002, T003/T004.',
+  dominioBus: dominioEventBusStack.dominioBus,
 });
 
 new ValidadorQueueStack(app, 'ValidadorQueueStack', {
