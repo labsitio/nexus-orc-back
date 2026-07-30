@@ -48,3 +48,20 @@ publicação cabe ao CI, T003, ainda não configurado neste repo para Allure).
 Nenhum dado sensível anexado — fixtures sintéticas (UUID de teste
 `018f2f6a-...`, nomes de fornecedor fictícios, bucket `nexo-orcamentos-raw`
 fictício).
+
+---
+
+# Allure — T011 (issue #16) — PR #410
+
+Reaproveitado `allure-vitest` + `vitest.config.ts` já configurados.
+`pnpm exec vitest run --coverage` (com `DATABASE_URL`) gerou `allure-results/`
+(raiz do repo, git-ignorado) com resultado por teste da suíte inteira (14
+arquivos, 79 casos), todos `"status":"passed"`.
+
+Relatório HTML não gerado (requer CLI Java `allure`, fora do escopo de
+dependências Node — mesma limitação registrada em rodadas anteriores;
+publicação cabe ao CI, T003, ainda não configurado neste repo para Allure).
+
+Nenhum dado sensível anexado — fixtures sintéticas (UUID v7 gerado em
+runtime, bucket `nexo-orcamentos-raw` fictício, `fornecedor-x`/`fornecedor-x-
+confirmado` fictícios).

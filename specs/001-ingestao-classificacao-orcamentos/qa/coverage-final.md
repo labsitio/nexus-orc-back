@@ -115,3 +115,42 @@ QA.
 
 ## Threshold
 Ainda não configurado no projeto (mesma observação de rodadas anteriores).
+
+---
+
+# Coverage Final — T011 (issue #16) — PR #410
+
+Comando: `pnpm exec vitest run --coverage` (vitest 4.1.10,
+`@vitest/coverage-v8`, escopo `src/**`, Node 24.14.0, `DATABASE_URL` setado
+para Postgres real). Suíte completa: 14 arquivos, 79 testes (74 pré-existentes
++ 5 novos de QA).
+
+```
+Statements   : 94.2%  ( 195/207 )
+Branches     : 92%    ( 92/100 )
+Functions    : 90.54% ( 67/74 )
+Lines        : 94.14% ( 193/205 )
+```
+
+## Arquivo do diff desta task
+`drizzle-orcamento.repository.ts`: **100%** statements/lines/functions (era
+0%), **88.09%** branch (era 0%). Linhas de branch residuais: 53, 150,
+160-162 — todas o caminho `motivoInsucesso`/`insucesso()`, nunca produzido
+pelo Domain hoje (`Orcamento.registrarTentativaClassificador` sempre chama
+`TentativaClassificacao.sucesso()`, mesmo para confiança abaixo do limiar —
+mesma observação já registrada na rodada de T044–T047 sobre o VO
+`TentativaClassificacao`). Classificado como **risco ainda não testado por
+ser inalcançável no comportamento atual do sistema** — não é lacuna de teste
+de T011; corrigir exigiria o Domain produzir `insucesso()` em algum fluxo
+real, decisão fora do escopo desta task/agente.
+
+## Variação vs. baseline
+81.15%→94.2% statements, 55%→92% branches, 75.67%→90.54% functions,
+80.97%→94.14% lines — ganho concentrado no arquivo do diff (0%→100/88.09%),
+que antes zerava a média do projeto por ser um arquivo grande e totalmente
+descoberto.
+
+## Threshold
+Ainda não configurado no projeto (mesma observação de rodadas anteriores) —
+QA não configurou threshold nesta task, decisão de piso mínimo cabe ao
+dev-back-end/arquiteto (T003).

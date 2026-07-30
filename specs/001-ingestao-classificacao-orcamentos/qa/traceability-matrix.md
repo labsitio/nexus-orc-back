@@ -81,3 +81,22 @@ Limitação aceita (não é gap de teste, é escopo de produto fora deste PR):
 desta rodada exercita persistência real contra Aurora; todos usam fake
 in-memory, suficiente para validar o contrato de `OrcamentoRepository` (T009)
 que `ConsultarStatusOrcamento` consome.
+
+---
+
+# Matriz de rastreabilidade — T011 (issue #16) — PR #410
+
+| Requisito / Critério de aceite | Risco | Nível | Cenário | Arquivo / caso | Resultado |
+|---|---|---|---|---|---|
+| `buscarPorId` retorna `undefined` para id inexistente | Erro não tipado vazando para a Application em vez de `undefined` esperado pelo contrato | Integração (Postgres real) | `buscarPorId(idNovo)` sem linha na tabela → `undefined` | `drizzle-orcamento.repository.test.ts` | PASS |
+| `salvar` (1ª vez, RECEBIDO) → recarregar → `registrarTentativaClassificador` (confiança alta) → `salvar` → recarregar | Tradução linha↔agregado incorreta (status, resultado) | Integração (Postgres real) | confiança 90% → `CLASSIFICADO`, histórico com 1 entrada `CLASSIFICADOR`, `resultadoAtual.fornecedorIdentificado` correto | `drizzle-orcamento.repository.test.ts` | PASS |
+| Confiança baixa escalona para `PENDENTE_REVISAO_HUMANA`; `registrarConfirmacaoHumana` retorna a `CLASSIFICADO` preservando a tentativa anterior | Histórico sobrescrito/perdido na confirmação humana | Integração (Postgres real) | confiança 50% → `PENDENTE_REVISAO_HUMANA` (1 entrada) → confirmação humana → `CLASSIFICADO` (2 entradas, `historico[0]=CLASSIFICADOR`, `historico[1]=HUMANO`) | `drizzle-orcamento.repository.test.ts` | PASS |
+| Re-salvar o mesmo agregado sem transição nova não duplica histórico | Contagem de "linhas já persistidas" incorreta duplicando a última tentativa | Integração (Postgres real) | `salvar` do agregado recém-carregado (sem nova transição) → histórico permanece com 1 entrada | `drizzle-orcamento.repository.test.ts` | PASS |
+| **`salvar` concorrente do mesmo agregado (retry de Lambda) serializado pelo lock — nunca duplica histórico** | **MAJOR da revisão anterior**: 2 transações lendo a mesma contagem de histórico e inserindo a mesma tentativa em duplicidade | Integração (Postgres real, 2 conexões distintas) | `Promise.all([repoA.salvar(agregadoA), repoB.salvar(agregadoB)])`, mesmo `orcamentoId`, mesma transição aplicada em ambos → exatamente 1 linha em `orcamentos_historico`, 1 linha em `orcamentos`, status final `CLASSIFICADO` | `drizzle-orcamento.repository.test.ts` | PASS |
+| Regressão: suíte completa (VOs, agregado, eventos, gateway S3, status, schema T010) | Quebra de comportamento já validado em rodadas anteriores | Regressão | `pnpm exec vitest run --coverage` (com `DATABASE_URL`) | 14 arquivos, 79 casos | PASS (0 falhas) |
+| Suíte não quebra ambiente de dev local sem Postgres | Dev sem Docker de pé não consegue rodar `pnpm run test` | Smoke | `pnpm run test` sem `DATABASE_URL` | comando | PASS (10 testes de integração pulados — T010 + T011 —, 68 demais passam) |
+| Tipagem estrita / lint do projeto | Erro de tipo ou violação de estilo não pego | Estático | `pnpm run typecheck`, `pnpm run lint` | comandos | PASS (exit 0, sem output) |
+
+Cobertura da fatia `DrizzleOrcamentoRepository`: 100% statements/lines/functions,
+88.09% branch (3 branches residuais são o caminho `insucesso()`, nunca
+produzido pelo Domain hoje — ver `qa/coverage-final.md`).
