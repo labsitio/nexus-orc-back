@@ -1,0 +1,229 @@
+{
+  "id": "6a02bb4e-d649-4f2a-a466-5df9f306ed93",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.orcamentos": {
+      "name": "orcamentos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "canal": {
+          "name": "canal",
+          "type": "canal",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recebido_em": {
+          "name": "recebido_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bucket": {
+          "name": "bucket",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_id": {
+          "name": "version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "referencia_externa": {
+          "name": "referencia_externa",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "status_orcamento",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resultado_fornecedor_identificado": {
+          "name": "resultado_fornecedor_identificado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_formato_identificado": {
+          "name": "resultado_formato_identificado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_nivel_confianca": {
+          "name": "resultado_nivel_confianca",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_agente_origem": {
+          "name": "resultado_agente_origem",
+          "type": "agente_origem",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "orcamentos_nivel_confianca_em_faixa": {
+          "name": "orcamentos_nivel_confianca_em_faixa",
+          "value": "(\"orcamentos\".\"resultado_nivel_confianca\" is null or (\"orcamentos\".\"resultado_nivel_confianca\" >= 0 and \"orcamentos\".\"resultado_nivel_confianca\" <= 100))"
+        },
+        "orcamentos_resultado_completo_ou_ausente": {
+          "name": "orcamentos_resultado_completo_ou_ausente",
+          "value": "\n        (\n          \"orcamentos\".\"resultado_fornecedor_identificado\" is null\n          and \"orcamentos\".\"resultado_formato_identificado\" is null\n          and \"orcamentos\".\"resultado_nivel_confianca\" is null\n          and \"orcamentos\".\"resultado_agente_origem\" is null\n        ) or (\n          \"orcamentos\".\"resultado_fornecedor_identificado\" is not null\n          and \"orcamentos\".\"resultado_formato_identificado\" is not null\n          and \"orcamentos\".\"resultado_nivel_confianca\" is not null\n          and \"orcamentos\".\"resultado_agente_origem\" is not null\n        )\n      "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.orcamentos_historico": {
+      "name": "orcamentos_historico",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "orcamento_id": {
+          "name": "orcamento_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agente": {
+          "name": "agente",
+          "type": "agente_origem",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ocorreu_em": {
+          "name": "ocorreu_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resultado_fornecedor_identificado": {
+          "name": "resultado_fornecedor_identificado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_formato_identificado": {
+          "name": "resultado_formato_identificado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resultado_nivel_confianca": {
+          "name": "resultado_nivel_confianca",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "motivo_insucesso": {
+          "name": "motivo_insucesso",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "orcamentos_historico_orcamento_id_idx": {
+          "name": "orcamentos_historico_orcamento_id_idx",
+          "columns": [
+            {
+              "expression": "orcamento_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "orcamentos_historico_orcamento_id_orcamentos_id_fk": {
+          "name": "orcamentos_historico_orcamento_id_orcamentos_id_fk",
+          "tableFrom": "orcamentos_historico",
+          "tableTo": "orcamentos",
+          "columnsFrom": ["orcamento_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "orcamentos_historico_nivel_confianca_em_faixa": {
+          "name": "orcamentos_historico_nivel_confianca_em_faixa",
+          "value": "(\"orcamentos_historico\".\"resultado_nivel_confianca\" is null or (\"orcamentos_historico\".\"resultado_nivel_confianca\" >= 0 and \"orcamentos_historico\".\"resultado_nivel_confianca\" <= 100))"
+        },
+        "orcamentos_historico_sucesso_xor_insucesso": {
+          "name": "orcamentos_historico_sucesso_xor_insucesso",
+          "value": "\n        (\n          \"orcamentos_historico\".\"resultado_fornecedor_identificado\" is not null\n          and \"orcamentos_historico\".\"resultado_formato_identificado\" is not null\n          and \"orcamentos_historico\".\"resultado_nivel_confianca\" is not null\n          and \"orcamentos_historico\".\"motivo_insucesso\" is null\n        ) or (\n          \"orcamentos_historico\".\"resultado_fornecedor_identificado\" is null\n          and \"orcamentos_historico\".\"resultado_formato_identificado\" is null\n          and \"orcamentos_historico\".\"resultado_nivel_confianca\" is null\n          and \"orcamentos_historico\".\"motivo_insucesso\" is not null\n        )\n      "
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.agente_origem": {
+      "name": "agente_origem",
+      "schema": "public",
+      "values": ["CLASSIFICADOR", "HUMANO"]
+    },
+    "public.canal": {
+      "name": "canal",
+      "schema": "public",
+      "values": ["PORTAL_WEB", "API_REST", "SFTP", "APP_MOBILE"]
+    },
+    "public.status_orcamento": {
+      "name": "status_orcamento",
+      "schema": "public",
+      "values": ["RECEBIDO", "CLASSIFICADO", "PENDENTE_REVISAO_HUMANA"]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

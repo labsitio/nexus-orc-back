@@ -16,6 +16,25 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      # Postgres real para os testes de integração de schema/migração
+      # (specs/001-ingestao-classificacao-orcamentos, T010) — mesmas
+      # credenciais do docker-compose.yml local.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: nexo
+          POSTGRES_USER: nexo
+          POSTGRES_PASSWORD: nexo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexo -d nexo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://nexo:nexo@localhost:5432/nexo
     steps:
       - uses: actions/checkout@v4
 
@@ -39,6 +58,9 @@ jobs:
 
       - name: CDK synth (smoke test)
         run: pnpm exec cdk synth --quiet
+
+      - name: Migrar schema (Postgres do serviço CI)
+        run: pnpm run db:migrate
 
       - name: Test
         run: pnpm run test
