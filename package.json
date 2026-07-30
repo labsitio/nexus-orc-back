@@ -13,6 +13,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "test": "vitest run --passWithNoTests",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -32,6 +33,7 @@
     "lint-staged": "^17.2.0",
     "prettier": "^3.9.6",
     "typescript": "^5.9.0",
-    "typescript-eslint": "^8.65.0"
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
   }
 }
