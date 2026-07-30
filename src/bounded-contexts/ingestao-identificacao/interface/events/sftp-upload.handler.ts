@@ -11,6 +11,12 @@ const PREFIXO_SFTP = 'sftp-incoming/';
  * fluxo de upload-url (ADR-002). Chama `ReceberOrcamento(canal=SFTP, ...)`
  * diretamente com a referência do próprio evento (bucket/key/versionId),
  * sem re-ler nem re-gravar o objeto.
+ *
+ * Notificação S3 é entrega "at-least-once" (redelivery da AWS) e este `for`
+ * reprocessa o lote inteiro se um registro no meio falhar — por isso usa
+ * `bucket/key#versionId` como `Idempotency-Key` (achado MAJOR do
+ * backend-reviewer): reaproveita o mesmo gate de admissão de `ReceberOrcamento`
+ * para nunca publicar `OrcamentoRecebido` duplicado num reprocessamento.
  */
 export function criarHandlerSftpUpload(receberOrcamento: ReceberOrcamento): S3Handler {
   return async (event: S3Event) => {
@@ -31,6 +37,7 @@ export function criarHandlerSftpUpload(receberOrcamento: ReceberOrcamento): S3Ha
       await receberOrcamento.executar({
         canal: 'SFTP',
         referenciaBruta: ReferenciaS3.de({ bucket, key, versionId }),
+        idempotencyKey: `${bucket}/${key}#${versionId}`,
       });
     }
   };

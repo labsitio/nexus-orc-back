@@ -24,19 +24,43 @@ function eventoS3(registros: Array<{ bucket: string; key: string; versionId?: st
   };
 }
 
-function receberOrcamentoFake(): { useCase: ReceberOrcamento; salvar: ReturnType<typeof vi.fn> } {
+function receberOrcamentoFake(): {
+  useCase: ReceberOrcamento;
+  salvar: ReturnType<typeof vi.fn>;
+  reservar: ReturnType<typeof vi.fn>;
+} {
   const salvar = vi.fn().mockResolvedValue(undefined);
   const repositorio: OrcamentoRepository = { salvar, buscarPorId: vi.fn() };
   const publisher: EventPublisher = { publicar: vi.fn().mockResolvedValue(undefined) };
+  const reservar = vi.fn(async (_chave, orcamentoId) => ({ reservado: true, orcamentoId }));
+  const idempotencia: IdempotencyKeyRepository = { reservar };
+  return { useCase: new ReceberOrcamento(repositorio, publisher, idempotencia), salvar, reservar };
+}
+
+/** Simula `IdempotencyKeyRepository` de verdade — reserva atômica, chave reutilizada não passa de novo. */
+function receberOrcamentoComReservaReal(): {
+  useCase: ReceberOrcamento;
+  salvar: ReturnType<typeof vi.fn>;
+} {
+  const salvar = vi.fn().mockResolvedValue(undefined);
+  const repositorio: OrcamentoRepository = { salvar, buscarPorId: vi.fn() };
+  const publisher: EventPublisher = { publicar: vi.fn().mockResolvedValue(undefined) };
+  const chavesReservadas = new Map<string, unknown>();
   const idempotencia: IdempotencyKeyRepository = {
-    reservar: vi.fn(async (_chave, orcamentoId) => ({ reservado: true, orcamentoId })),
+    reservar: vi.fn(async (chave, orcamentoId) => {
+      if (chavesReservadas.has(chave)) {
+        return { reservado: false, orcamentoId: chavesReservadas.get(chave) };
+      }
+      chavesReservadas.set(chave, orcamentoId);
+      return { reservado: true, orcamentoId };
+    }),
   };
   return { useCase: new ReceberOrcamento(repositorio, publisher, idempotencia), salvar };
 }
 
 describe('criarHandlerSftpUpload', () => {
-  it('chama ReceberOrcamento(canal=SFTP) com a referência do próprio evento, sem re-ler o objeto', async () => {
-    const { useCase, salvar } = receberOrcamentoFake();
+  it('chama ReceberOrcamento(canal=SFTP) com a referência do próprio evento e Idempotency-Key derivada, sem re-ler o objeto', async () => {
+    const { useCase, salvar, reservar } = receberOrcamentoFake();
     const handler = criarHandlerSftpUpload(useCase);
 
     await handler(
@@ -56,6 +80,26 @@ describe('criarHandlerSftpUpload', () => {
       key: 'sftp-incoming/orcamento.pdf',
       versionId: 'v-1',
     });
+    expect(reservar).toHaveBeenCalledWith(
+      'nexo-orcamentos-raw/sftp-incoming/orcamento.pdf#v-1',
+      expect.anything(),
+      expect.any(Date),
+    );
+  });
+
+  it('redelivery do mesmo evento S3 (at-least-once da AWS) não duplica salvar/publicar — mesma Idempotency-Key', async () => {
+    const { useCase, salvar } = receberOrcamentoComReservaReal();
+    const handler = criarHandlerSftpUpload(useCase);
+    const evento = eventoS3([
+      { bucket: 'nexo-orcamentos-raw', key: 'sftp-incoming/orcamento.pdf', versionId: 'v-1' },
+    ]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await handler(evento, {} as any, () => undefined);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await handler(evento, {} as any, () => undefined);
+
+    expect(salvar).toHaveBeenCalledTimes(1);
   });
 
   it('processa múltiplos registros do mesmo evento', async () => {

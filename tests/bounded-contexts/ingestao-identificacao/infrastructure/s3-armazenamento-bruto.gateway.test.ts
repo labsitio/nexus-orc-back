@@ -84,6 +84,10 @@ describe('S3ArmazenamentoBrutoGateway', () => {
     expect((comando as PutObjectCommand).input.Key).toBe(
       chaveUploadPendente(orcamentoId, 'orcamento.pdf'),
     );
+    expect((comando as PutObjectCommand).input.ObjectLockMode).toBe('GOVERNANCE');
+    const retainUntil = (comando as PutObjectCommand).input.ObjectLockRetainUntilDate as Date;
+    expect(retainUntil.getTime()).toBeGreaterThan(Date.now());
+    expect(retainUntil.getTime()).toBeLessThanOrEqual(Date.now() + 2 * 60 * 60 * 1000 + 1000);
     expect(opcoes).toMatchObject({ expiresIn: 15 * 60 });
   });
 

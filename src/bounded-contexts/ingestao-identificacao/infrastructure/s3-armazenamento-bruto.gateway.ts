@@ -25,6 +25,17 @@ const PREFIXO_UPLOAD_PENDENTE = 'pending-uploads';
 /** TTL da URL presigned de upload — curto, o suficiente para o cliente concluir o PUT. */
 const PRESIGNED_URL_TTL_SEGUNDOS = 15 * 60;
 
+/**
+ * Retenção Object Lock explícita (curta) do objeto em `pending-uploads/` —
+ * o bucket `nexo-orcamentos-raw` tem retenção GOVERNANCE default de anos
+ * (T012/#17); sem sobrescrever no PUT presigned, todo upload pendente
+ * herdaria essa retenção longa e a lifecycle rule de expiração de "órfão"
+ * (T024/#29) nunca conseguiria de fato apagar nada (S3 Lifecycle nunca
+ * ignora Object Lock). Exportada para a lifecycle rule (CDK) rodar depois
+ * que esta janela já tiver passado.
+ */
+export const RETENCAO_UPLOAD_PENDENTE_HORAS = 2;
+
 /** Chave determinística — `confirmar-upload` (T022/#27) recalcula a mesma chave para localizar o objeto. */
 export function chaveUploadPendente(orcamentoId: OrcamentoId, nomeArquivo: string): string {
   return `${PREFIXO_UPLOAD_PENDENTE}/${orcamentoId.toString()}-${nomeArquivo}`;
@@ -85,9 +96,18 @@ export class S3ArmazenamentoBrutoGateway implements ArmazenamentoBrutoGateway {
 
   async gerarUrlUpload(orcamentoId: OrcamentoId, nomeArquivo: string): Promise<string> {
     const key = chaveUploadPendente(orcamentoId, nomeArquivo);
-    return getSignedUrl(this.s3, new PutObjectCommand({ Bucket: this.bucket, Key: key }), {
-      expiresIn: PRESIGNED_URL_TTL_SEGUNDOS,
-    });
+    return getSignedUrl(
+      this.s3,
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ObjectLockMode: 'GOVERNANCE',
+        ObjectLockRetainUntilDate: new Date(
+          Date.now() + RETENCAO_UPLOAD_PENDENTE_HORAS * 60 * 60 * 1000,
+        ),
+      }),
+      { expiresIn: PRESIGNED_URL_TTL_SEGUNDOS },
+    );
   }
 
   async obterReferenciaAposUpload(
