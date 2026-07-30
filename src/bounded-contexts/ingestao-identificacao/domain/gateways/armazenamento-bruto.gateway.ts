@@ -13,4 +13,13 @@ export interface ArmazenamentoBrutoGateway {
    * mesmo objeto depois via essa chave determinística.
    */
   gerarUrlUpload(orcamentoId: OrcamentoId, nomeArquivo: string): Promise<string>;
+  /**
+   * Referência do objeto já enviado via `gerarUrlUpload` (mesma chave
+   * determinística) — `undefined` se o cliente nunca completou o PUT
+   * (`confirmar-upload`, T022/#27, retorna 409 Problem Details nesse caso).
+   */
+  obterReferenciaAposUpload(
+    orcamentoId: OrcamentoId,
+    nomeArquivo: string,
+  ): Promise<ReferenciaS3 | undefined>;
 }

@@ -1,4 +1,9 @@
-import { GetObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  type S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
 import type { ArmazenamentoBrutoGateway } from '../domain/gateways/armazenamento-bruto.gateway.js';
@@ -83,5 +88,28 @@ export class S3ArmazenamentoBrutoGateway implements ArmazenamentoBrutoGateway {
     return getSignedUrl(this.s3, new PutObjectCommand({ Bucket: this.bucket, Key: key }), {
       expiresIn: PRESIGNED_URL_TTL_SEGUNDOS,
     });
+  }
+
+  async obterReferenciaAposUpload(
+    orcamentoId: OrcamentoId,
+    nomeArquivo: string,
+  ): Promise<ReferenciaS3 | undefined> {
+    const key = chaveUploadPendente(orcamentoId, nomeArquivo);
+    try {
+      const resultado = await this.s3.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      if (!resultado.VersionId) {
+        throw new Error(
+          `HeadObject não retornou VersionId — bucket "${this.bucket}" precisa de versionamento habilitado`,
+        );
+      }
+      return ReferenciaS3.de({ bucket: this.bucket, key, versionId: resultado.VersionId });
+    } catch (erro) {
+      if (erro instanceof Error && erro.name === 'NotFound') {
+        return undefined;
+      }
+      throw erro;
+    }
   }
 }

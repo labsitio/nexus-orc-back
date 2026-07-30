@@ -9,6 +9,7 @@ function armazenamentoFake(url = 'https://s3.exemplo/presigned'): ArmazenamentoB
     armazenar: vi.fn(),
     lerConteudoBruto: vi.fn(),
     gerarUrlUpload: vi.fn().mockResolvedValue(url),
+    obterReferenciaAposUpload: vi.fn(),
   };
 }
 

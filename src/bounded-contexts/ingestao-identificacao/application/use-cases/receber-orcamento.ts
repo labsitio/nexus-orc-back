@@ -1,4 +1,3 @@
-import type { ArmazenamentoBrutoGateway } from '../../domain/gateways/armazenamento-bruto.gateway.js';
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import { OrcamentoRecebido } from '../../domain/events/orcamento-recebido.event.js';
 import { Orcamento } from '../../domain/orcamento.aggregate.js';
@@ -6,14 +5,21 @@ import type { IdempotencyKeyRepository } from '../../domain/repositories/idempot
 import type { OrcamentoRepository } from '../../domain/repositories/orcamento.repository.js';
 import { Canal } from '../../domain/value-objects/canal.vo.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
+import type { ReferenciaS3 } from '../../domain/value-objects/referencia-s3.vo.js';
 
 /** TTL da chave de idempotência (plan.md, ADR de idempotência). */
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface ReceberOrcamentoParams {
   readonly canal: string;
-  readonly conteudo: Uint8Array;
-  readonly nomeArquivo: string;
+  /**
+   * Referência do bruto já gravado no S3 — em todo canal real (confirmar-upload,
+   * T022/#27, e trigger SFTP, T023/#28) o arquivo já está no bucket quando
+   * `ReceberOrcamento` executa; este caso de uso nunca faz o PUT em si
+   * (`ArmazenamentoBrutoGateway.armazenar` é usado antes, por quem já tem o
+   * arquivo em mãos, se algum canal futuro precisar).
+   */
+  readonly referenciaBruta: ReferenciaS3;
   readonly referenciaExterna?: string;
   /** Header `Idempotency-Key` — opcional, os 3 canais de upload via API o suportam. */
   readonly idempotencyKey?: string;
@@ -27,14 +33,13 @@ export interface ReceberOrcamentoParams {
 }
 
 /**
- * Caso de uso `ReceberOrcamento` (T020/#25): grava o bruto no S3, cria o
- * agregado, persiste e publica `OrcamentoRecebido`. Com `idempotencyKey`
- * repetida dentro do TTL, devolve o `OrcamentoId` já existente sem repetir
- * nenhum efeito colateral (sem novo upload/persist/publish).
+ * Caso de uso `ReceberOrcamento` (T020/#25): cria o agregado a partir de uma
+ * referência de bruto já gravada, persiste e publica `OrcamentoRecebido`.
+ * Com `idempotencyKey` repetida dentro do TTL, devolve o `OrcamentoId` já
+ * existente sem repetir nenhum efeito colateral (sem novo persist/publish).
  */
 export class ReceberOrcamento {
   constructor(
-    private readonly armazenamento: ArmazenamentoBrutoGateway,
     private readonly repositorio: OrcamentoRepository,
     private readonly publisher: EventPublisher,
     private readonly idempotencia: IdempotencyKeyRepository,
@@ -49,16 +54,10 @@ export class ReceberOrcamento {
     }
 
     const canal = Canal.de(params.canal);
-    const referenciaBruta = await this.armazenamento.armazenar(
-      canal.valor,
-      params.conteudo,
-      params.nomeArquivo,
-    );
-
     const orcamento = Orcamento.receber({
       id: params.orcamentoId ?? OrcamentoId.novo(),
       canal,
-      referenciaBruta,
+      referenciaBruta: params.referenciaBruta,
       referenciaExterna: params.referenciaExterna,
     });
     await this.repositorio.salvar(orcamento);
@@ -68,9 +67,9 @@ export class ReceberOrcamento {
         orcamento.id.toString(),
         canal.valor,
         {
-          bucket: referenciaBruta.bucket,
-          key: referenciaBruta.key,
-          versionId: referenciaBruta.versionId,
+          bucket: params.referenciaBruta.bucket,
+          key: params.referenciaBruta.key,
+          versionId: params.referenciaBruta.versionId,
         },
         params.referenciaExterna,
       ),

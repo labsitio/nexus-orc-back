@@ -86,4 +86,48 @@ describe('S3ArmazenamentoBrutoGateway', () => {
     );
     expect(opcoes).toMatchObject({ expiresIn: 15 * 60 });
   });
+
+  it('obterReferenciaAposUpload devolve a ReferenciaS3 quando o HeadObject encontra o objeto', async () => {
+    const orcamentoId = OrcamentoId.novo();
+    const send = vi.fn().mockResolvedValue({ VersionId: 'v-999' });
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    const referencia = await gateway.obterReferenciaAposUpload(orcamentoId, 'orcamento.pdf');
+
+    expect(referencia).toEqual(
+      ReferenciaS3.de({
+        bucket: 'nexo-orcamentos-raw',
+        key: chaveUploadPendente(orcamentoId, 'orcamento.pdf'),
+        versionId: 'v-999',
+      }),
+    );
+  });
+
+  it('obterReferenciaAposUpload devolve undefined quando o objeto não existe (upload não concluído)', async () => {
+    const erroNaoEncontrado = Object.assign(new Error('not found'), { name: 'NotFound' });
+    const send = vi.fn().mockRejectedValue(erroNaoEncontrado);
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    const referencia = await gateway.obterReferenciaAposUpload(OrcamentoId.novo(), 'x.pdf');
+
+    expect(referencia).toBeUndefined();
+  });
+
+  it('obterReferenciaAposUpload propaga erro inesperado do S3 (não mascara como upload ausente)', async () => {
+    const send = vi.fn().mockRejectedValue(new Error('acesso negado'));
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    await expect(gateway.obterReferenciaAposUpload(OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
+      /acesso negado/,
+    );
+  });
+
+  it('obterReferenciaAposUpload lança erro se o HeadObject não devolver VersionId', async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    await expect(gateway.obterReferenciaAposUpload(OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
+      /VersionId/,
+    );
+  });
 });
