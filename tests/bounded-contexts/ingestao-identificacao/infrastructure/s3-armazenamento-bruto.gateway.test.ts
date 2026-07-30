@@ -1,4 +1,4 @@
-import type { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import type { CopyObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -91,46 +91,76 @@ describe('S3ArmazenamentoBrutoGateway', () => {
     expect(opcoes).toMatchObject({ expiresIn: 15 * 60 });
   });
 
-  it('obterReferenciaAposUpload devolve a ReferenciaS3 quando o HeadObject encontra o objeto', async () => {
+  it('confirmarUpload copia de pending-uploads/ para o prefixo definitivo do canal e devolve a nova ReferenciaS3', async () => {
     const orcamentoId = OrcamentoId.novo();
-    const send = vi.fn().mockResolvedValue({ VersionId: 'v-999' });
+    const send = vi.fn((command: unknown) => {
+      if ((command as { constructor: { name: string } }).constructor.name === 'HeadObjectCommand') {
+        return Promise.resolve({ VersionId: 'v-pendente' });
+      }
+      return Promise.resolve({ VersionId: 'v-final' });
+    });
     const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
 
-    const referencia = await gateway.obterReferenciaAposUpload(orcamentoId, 'orcamento.pdf');
+    const referencia = await gateway.confirmarUpload(
+      'PORTAL_WEB',
+      orcamentoId,
+      'orcamento pdf.pdf',
+    );
 
     expect(referencia).toEqual(
       ReferenciaS3.de({
         bucket: 'nexo-orcamentos-raw',
-        key: chaveUploadPendente(orcamentoId, 'orcamento.pdf'),
-        versionId: 'v-999',
+        key: `portal-web/${orcamentoId.toString()}-orcamento pdf.pdf`,
+        versionId: 'v-final',
       }),
+    );
+    expect(send).toHaveBeenCalledTimes(2);
+    const copia = send.mock.calls[1]?.[0] as CopyObjectCommand;
+    expect(copia.input.Bucket).toBe('nexo-orcamentos-raw');
+    expect(copia.input.Key).toBe(`portal-web/${orcamentoId.toString()}-orcamento pdf.pdf`);
+    expect(copia.input.CopySource).toBe(
+      `nexo-orcamentos-raw/${chaveUploadPendente(orcamentoId, 'orcamento%20pdf.pdf')}?versionId=v-pendente`,
     );
   });
 
-  it('obterReferenciaAposUpload devolve undefined quando o objeto não existe (upload não concluído)', async () => {
+  it('confirmarUpload devolve undefined quando o objeto não existe (upload não concluído)', async () => {
     const erroNaoEncontrado = Object.assign(new Error('not found'), { name: 'NotFound' });
     const send = vi.fn().mockRejectedValue(erroNaoEncontrado);
     const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
 
-    const referencia = await gateway.obterReferenciaAposUpload(OrcamentoId.novo(), 'x.pdf');
+    const referencia = await gateway.confirmarUpload('API_REST', OrcamentoId.novo(), 'x.pdf');
 
     expect(referencia).toBeUndefined();
   });
 
-  it('obterReferenciaAposUpload propaga erro inesperado do S3 (não mascara como upload ausente)', async () => {
+  it('confirmarUpload propaga erro inesperado do S3 (não mascara como upload ausente)', async () => {
     const send = vi.fn().mockRejectedValue(new Error('acesso negado'));
     const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
 
-    await expect(gateway.obterReferenciaAposUpload(OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
+    await expect(gateway.confirmarUpload('API_REST', OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
       /acesso negado/,
     );
   });
 
-  it('obterReferenciaAposUpload lança erro se o HeadObject não devolver VersionId', async () => {
+  it('confirmarUpload lança erro se o HeadObject não devolver VersionId', async () => {
     const send = vi.fn().mockResolvedValue({});
     const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
 
-    await expect(gateway.obterReferenciaAposUpload(OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
+    await expect(gateway.confirmarUpload('API_REST', OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
+      /VersionId/,
+    );
+  });
+
+  it('confirmarUpload lança erro se o CopyObject não devolver VersionId', async () => {
+    const send = vi.fn((command: unknown) => {
+      if ((command as { constructor: { name: string } }).constructor.name === 'HeadObjectCommand') {
+        return Promise.resolve({ VersionId: 'v-pendente' });
+      }
+      return Promise.resolve({});
+    });
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    await expect(gateway.confirmarUpload('API_REST', OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
       /VersionId/,
     );
   });

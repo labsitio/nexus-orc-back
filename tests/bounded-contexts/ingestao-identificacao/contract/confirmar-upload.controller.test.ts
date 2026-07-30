@@ -15,7 +15,7 @@ function armazenamentoFake(referencia: ReferenciaS3 | undefined): ArmazenamentoB
     armazenar: vi.fn(),
     lerConteudoBruto: vi.fn(),
     gerarUrlUpload: vi.fn(),
-    obterReferenciaAposUpload: vi.fn().mockResolvedValue(referencia),
+    confirmarUpload: vi.fn().mockResolvedValue(referencia),
   };
 }
 

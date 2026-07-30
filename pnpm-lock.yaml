@@ -47,6 +47,9 @@ importers:
       aws-cdk-lib:
         specifier: ^2.262.2
         version: 2.262.2(constructs@10.7.2)
+      aws-jwt-verify:
+        specifier: ^5.2.1
+        version: 5.2.1
       constructs:
         specifier: ^10.7.2
         version: 10.7.2
@@ -1291,6 +1294,10 @@ packages:
     resolution: {integrity: sha512-DGlCBwqxSHTe1u/IoT5WV+Bbd2K3UhwFHsdMqb2nQa1fkJmaQgoNFu0It+p3HxyMWeW+gKsVzT5KcjQPQ6Kzuw==}
     engines: {node: '>= 18.0.0'}
     hasBin: true
+
+  aws-jwt-verify@5.2.1:
+    resolution: {integrity: sha512-J+buA4M+qvQDk58WXFBLkDodkEX3DDL1ac5XFQPW3opxAsaLXYu5hYnlSHsaBRDBUXBAn695kE/cw/mdyJKwJg==}
+    engines: {node: '>=18.0.0'}
 
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
@@ -3507,6 +3514,8 @@ snapshots:
       constructs: 10.7.2
 
   aws-cdk@2.1133.0: {}
+
+  aws-jwt-verify@5.2.1: {}
 
   balanced-match@4.0.4: {}
 

@@ -1,4 +1,5 @@
 import {
+  CopyObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -39,6 +40,21 @@ export const RETENCAO_UPLOAD_PENDENTE_HORAS = 2;
 /** Chave determinística — `confirmar-upload` (T022/#27) recalcula a mesma chave para localizar o objeto. */
 export function chaveUploadPendente(orcamentoId: OrcamentoId, nomeArquivo: string): string {
   return `${PREFIXO_UPLOAD_PENDENTE}/${orcamentoId.toString()}-${nomeArquivo}`;
+}
+
+/** Chave final por canal, usada tanto por `armazenar` (canal síncrono) quanto pelo destino de `confirmarUpload`. */
+function chaveFinalDoCanal(
+  canal: CanalValor,
+  orcamentoId: OrcamentoId,
+  nomeArquivo: string,
+): string {
+  return `${PREFIXO_POR_CANAL[canal]}/${orcamentoId.toString()}-${nomeArquivo}`;
+}
+
+/** Cada segmento de path percent-encoded, `/` preservado como separador literal (formato exigido por `CopySource`). */
+function codificarCopySource(bucket: string, key: string, versionId: string): string {
+  const keyCodificada = key.split('/').map(encodeURIComponent).join('/');
+  return `${encodeURIComponent(bucket)}/${keyCodificada}?versionId=${encodeURIComponent(versionId)}`;
 }
 
 /**
@@ -110,26 +126,47 @@ export class S3ArmazenamentoBrutoGateway implements ArmazenamentoBrutoGateway {
     );
   }
 
-  async obterReferenciaAposUpload(
+  async confirmarUpload(
+    canal: CanalValor,
     orcamentoId: OrcamentoId,
     nomeArquivo: string,
   ): Promise<ReferenciaS3 | undefined> {
-    const key = chaveUploadPendente(orcamentoId, nomeArquivo);
+    const chavePendente = chaveUploadPendente(orcamentoId, nomeArquivo);
+    let versionIdPendente: string;
     try {
       const resultado = await this.s3.send(
-        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+        new HeadObjectCommand({ Bucket: this.bucket, Key: chavePendente }),
       );
       if (!resultado.VersionId) {
         throw new Error(
           `HeadObject não retornou VersionId — bucket "${this.bucket}" precisa de versionamento habilitado`,
         );
       }
-      return ReferenciaS3.de({ bucket: this.bucket, key, versionId: resultado.VersionId });
+      versionIdPendente = resultado.VersionId;
     } catch (erro) {
       if (erro instanceof Error && erro.name === 'NotFound') {
         return undefined;
       }
       throw erro;
     }
+
+    // Copia para o prefixo definitivo do canal — nunca referenciar
+    // diretamente `pending-uploads/`, alvo da lifecycle rule de expiração
+    // (T024/#29): o dado bruto confirmado precisa sobreviver além da janela
+    // curta de retenção do upload pendente (achado BLOCKER do backend-reviewer).
+    const chaveFinal = chaveFinalDoCanal(canal, orcamentoId, nomeArquivo);
+    const copia = await this.s3.send(
+      new CopyObjectCommand({
+        Bucket: this.bucket,
+        Key: chaveFinal,
+        CopySource: codificarCopySource(this.bucket, chavePendente, versionIdPendente),
+      }),
+    );
+    if (!copia.VersionId) {
+      throw new Error(
+        `CopyObject não retornou VersionId — bucket "${this.bucket}" precisa de versionamento habilitado`,
+      );
+    }
+    return ReferenciaS3.de({ bucket: this.bucket, key: chaveFinal, versionId: copia.VersionId });
   }
 }

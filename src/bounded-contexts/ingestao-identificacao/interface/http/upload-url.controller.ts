@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ArmazenamentoBrutoGateway } from '../../domain/gateways/armazenamento-bruto.gateway.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
+import type { RotaOpts } from './route-opts.js';
 import type { ProblemDetails } from './status.schema.js';
 import { uploadUrlRequestSchema, uploadUrlResponseSchema } from './upload-url.schema.js';
 
@@ -8,12 +9,14 @@ import { uploadUrlRequestSchema, uploadUrlResponseSchema } from './upload-url.sc
  * Controller (T021/#26): `POST /v1/orcamentos/upload-url`. Gera apenas a URL
  * presigned + `orcamentoId` provisório — não persiste nada (ADR-002: só
  * `confirmar-upload`, T022/#27, dispara `ReceberOrcamento` de fato).
+ * Autenticação Cognito via `opts.preHandler` (T025/#30).
  */
 export function registrarRotaUploadUrl(
   app: FastifyInstance,
   armazenamento: ArmazenamentoBrutoGateway,
+  opts: RotaOpts = {},
 ): void {
-  app.post('/v1/orcamentos/upload-url', async (request, reply) => {
+  app.post('/v1/orcamentos/upload-url', { preHandler: opts.preHandler }, async (request, reply) => {
     const body = uploadUrlRequestSchema.safeParse(request.body);
     if (!body.success) {
       const problema: ProblemDetails = {

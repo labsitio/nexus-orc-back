@@ -5,6 +5,7 @@ import {
   ConsultarStatusOrcamento,
   OrcamentoNaoEncontradoError,
 } from '../../application/use-cases/consultar-status-orcamento.js';
+import type { RotaOpts } from './route-opts.js';
 import type { ProblemDetails, StatusIngestaoResponse } from './status.schema.js';
 import { orcamentoIdParamSchema, statusIngestaoResponseSchema } from './status.schema.js';
 
@@ -33,34 +34,42 @@ export function paraResposta(orcamento: Orcamento): StatusIngestaoResponse {
 export function registrarRotaStatusOrcamento(
   app: FastifyInstance,
   consultarStatusOrcamento: ConsultarStatusOrcamento,
+  opts: RotaOpts = {},
 ): void {
-  app.get('/v1/orcamentos/:orcamentoId/status', async (request, reply) => {
-    const params = orcamentoIdParamSchema.safeParse(request.params);
-    if (!params.success) {
-      const problema: ProblemDetails = {
-        type: 'https://nexo.internal/problems/validacao',
-        title: 'orcamentoId inválido',
-        status: 400,
-        detail: params.error.issues.map((i) => i.message).join('; '),
-      };
-      await reply.status(400).type('application/problem+json').send(problema);
-      return;
-    }
-
-    try {
-      const orcamento = await consultarStatusOrcamento.executar(params.data.orcamentoId);
-      await reply.status(200).send(paraResposta(orcamento));
-    } catch (erro) {
-      if (erro instanceof OrcamentoNaoEncontradoError || erro instanceof OrcamentoIdInvalidoError) {
+  app.get(
+    '/v1/orcamentos/:orcamentoId/status',
+    { preHandler: opts.preHandler },
+    async (request, reply) => {
+      const params = orcamentoIdParamSchema.safeParse(request.params);
+      if (!params.success) {
         const problema: ProblemDetails = {
-          type: 'https://nexo.internal/problems/nao-encontrado',
-          title: 'Orçamento não encontrado',
-          status: 404,
+          type: 'https://nexo.internal/problems/validacao',
+          title: 'orcamentoId inválido',
+          status: 400,
+          detail: params.error.issues.map((i) => i.message).join('; '),
         };
-        await reply.status(404).type('application/problem+json').send(problema);
+        await reply.status(400).type('application/problem+json').send(problema);
         return;
       }
-      throw erro;
-    }
-  });
+
+      try {
+        const orcamento = await consultarStatusOrcamento.executar(params.data.orcamentoId);
+        await reply.status(200).send(paraResposta(orcamento));
+      } catch (erro) {
+        if (
+          erro instanceof OrcamentoNaoEncontradoError ||
+          erro instanceof OrcamentoIdInvalidoError
+        ) {
+          const problema: ProblemDetails = {
+            type: 'https://nexo.internal/problems/nao-encontrado',
+            title: 'Orçamento não encontrado',
+            status: 404,
+          };
+          await reply.status(404).type('application/problem+json').send(problema);
+          return;
+        }
+        throw erro;
+      }
+    },
+  );
 }

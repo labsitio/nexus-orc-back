@@ -61,8 +61,8 @@
 - [x] T022 [US1] Interface: controller `POST /v1/orcamentos/{orcamentoId}/confirmar-upload` (dispara `ReceberOrcamento` de fato) — ADR-002. #27
 - [x] T023 [US1] Interface: handler Lambda de trigger S3 (prefixo `sftp-incoming/`) chamando `ReceberOrcamento(canal=SFTP, ...)` diretamente. #28
 - [x] T024 [US1] Infrastructure: lifecycle rule S3 de expiração de objetos não confirmados no prefixo de upload temporário (mitigação de "orfão" do ADR-002). #29
-- [ ] T025 [US1] Interface: autenticação Cognito (JWT) nos 3 endpoints REST; autenticação SFTP via AWS Transfer Family, isolada de Cognito.
-- [ ] T026 [US1] IAM: role dedicada `ReceberOrcamentoLambdaRole` (least privilege: `s3:PutObject`/`GetObject` restrito ao bucket raw, sem `DeleteObject`).
+- [x] T025 [US1] Interface: autenticação Cognito (JWT) nos 3 endpoints REST; autenticação SFTP via AWS Transfer Family, isolada de Cognito. #30
+- [x] T026 [US1] IAM: role dedicada `ReceberOrcamentoLambdaRole` (least privilege: `s3:PutObject`/`GetObject` restrito ao bucket raw, sem `DeleteObject`). #31
 
 **Checkpoint**: US1 funcional e testável isoladamente — orçamento entra por qualquer canal, fica imutável, evento publicado.
 

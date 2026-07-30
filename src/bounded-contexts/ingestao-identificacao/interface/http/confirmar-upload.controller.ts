@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ReceberOrcamento } from '../../application/use-cases/receber-orcamento.js';
 import type { ArmazenamentoBrutoGateway } from '../../domain/gateways/armazenamento-bruto.gateway.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
+import type { RotaOpts } from './route-opts.js';
 import type { ProblemDetails } from './status.schema.js';
 import {
   confirmarUploadParamsSchema,
@@ -29,59 +30,65 @@ export function registrarRotaConfirmarUpload(
   app: FastifyInstance,
   armazenamento: ArmazenamentoBrutoGateway,
   receberOrcamento: ReceberOrcamento,
+  opts: RotaOpts = {},
 ): void {
-  app.post('/v1/orcamentos/:orcamentoId/confirmar-upload', async (request, reply) => {
-    const params = confirmarUploadParamsSchema.safeParse(request.params);
-    if (!params.success) {
-      const problema: ProblemDetails = {
-        type: 'https://nexo.internal/problems/validacao',
-        title: 'orcamentoId inválido',
-        status: 400,
-        detail: params.error.issues.map((i) => i.message).join('; '),
-      };
-      await reply.status(400).type('application/problem+json').send(problema);
-      return;
-    }
+  app.post(
+    '/v1/orcamentos/:orcamentoId/confirmar-upload',
+    { preHandler: opts.preHandler },
+    async (request, reply) => {
+      const params = confirmarUploadParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        const problema: ProblemDetails = {
+          type: 'https://nexo.internal/problems/validacao',
+          title: 'orcamentoId inválido',
+          status: 400,
+          detail: params.error.issues.map((i) => i.message).join('; '),
+        };
+        await reply.status(400).type('application/problem+json').send(problema);
+        return;
+      }
 
-    const body = confirmarUploadRequestSchema.safeParse(request.body);
-    if (!body.success) {
-      const problema: ProblemDetails = {
-        type: 'https://nexo.internal/problems/validacao',
-        title: 'corpo da requisição inválido',
-        status: 400,
-        detail: body.error.issues.map((i) => i.message).join('; '),
-      };
-      await reply.status(400).type('application/problem+json').send(problema);
-      return;
-    }
+      const body = confirmarUploadRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        const problema: ProblemDetails = {
+          type: 'https://nexo.internal/problems/validacao',
+          title: 'corpo da requisição inválido',
+          status: 400,
+          detail: body.error.issues.map((i) => i.message).join('; '),
+        };
+        await reply.status(400).type('application/problem+json').send(problema);
+        return;
+      }
 
-    const idempotencyKey = idempotencyKeyDoHeader(request.headers['idempotency-key']);
+      const idempotencyKey = idempotencyKeyDoHeader(request.headers['idempotency-key']);
 
-    const orcamentoId = OrcamentoId.de(params.data.orcamentoId);
-    const referenciaBruta = await armazenamento.obterReferenciaAposUpload(
-      orcamentoId,
-      body.data.nomeArquivo,
-    );
-    if (!referenciaBruta) {
-      const problema: ProblemDetails = {
-        type: 'https://nexo.internal/problems/upload-nao-concluido',
-        title: 'Upload ainda não concluído para este orcamentoId',
-        status: 409,
-      };
-      await reply.status(409).type('application/problem+json').send(problema);
-      return;
-    }
+      const orcamentoId = OrcamentoId.de(params.data.orcamentoId);
+      const referenciaBruta = await armazenamento.confirmarUpload(
+        body.data.canal,
+        orcamentoId,
+        body.data.nomeArquivo,
+      );
+      if (!referenciaBruta) {
+        const problema: ProblemDetails = {
+          type: 'https://nexo.internal/problems/upload-nao-concluido',
+          title: 'Upload ainda não concluído para este orcamentoId',
+          status: 409,
+        };
+        await reply.status(409).type('application/problem+json').send(problema);
+        return;
+      }
 
-    const idResultado = await receberOrcamento.executar({
-      canal: body.data.canal,
-      referenciaBruta,
-      referenciaExterna: body.data.referenciaExterna,
-      orcamentoId,
-      idempotencyKey,
-    });
+      const idResultado = await receberOrcamento.executar({
+        canal: body.data.canal,
+        referenciaBruta,
+        referenciaExterna: body.data.referenciaExterna,
+        orcamentoId,
+        idempotencyKey,
+      });
 
-    await reply
-      .status(200)
-      .send(confirmarUploadResponseSchema.parse({ orcamentoId: idResultado.toString() }));
-  });
+      await reply
+        .status(200)
+        .send(confirmarUploadResponseSchema.parse({ orcamentoId: idResultado.toString() }));
+    },
+  );
 }

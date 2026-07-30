@@ -14,11 +14,18 @@ export interface ArmazenamentoBrutoGateway {
    */
   gerarUrlUpload(orcamentoId: OrcamentoId, nomeArquivo: string): Promise<string>;
   /**
-   * Referência do objeto já enviado via `gerarUrlUpload` (mesma chave
-   * determinística) — `undefined` se o cliente nunca completou o PUT
-   * (`confirmar-upload`, T022/#27, retorna 409 Problem Details nesse caso).
+   * Confirma o objeto já enviado via `gerarUrlUpload` — copia de
+   * `pending-uploads/` (retenção Object Lock curta, alvo da lifecycle rule
+   * de expiração, T024/#29) para o prefixo definitivo do canal (mesma
+   * retenção longa de `armazenar`); a chave temporária nunca vira a
+   * referência persistida do agregado (achado BLOCKER do backend-reviewer:
+   * sem essa cópia, o dado bruto confirmado seria apagado 1 dia depois pela
+   * mesma lifecycle rule que existe para limpar upload nunca confirmado).
+   * `undefined` se o cliente nunca completou o PUT (`confirmar-upload`,
+   * T022/#27, retorna 409 Problem Details nesse caso).
    */
-  obterReferenciaAposUpload(
+  confirmarUpload(
+    canal: CanalValor,
     orcamentoId: OrcamentoId,
     nomeArquivo: string,
   ): Promise<ReferenciaS3 | undefined>;
