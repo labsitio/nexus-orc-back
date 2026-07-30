@@ -65,3 +65,24 @@ publicação cabe ao CI, T003, ainda não configurado neste repo para Allure).
 Nenhum dado sensível anexado — fixtures sintéticas (UUID v7 gerado em
 runtime, bucket `nexo-orcamentos-raw` fictício, `fornecedor-x`/`fornecedor-x-
 confirmado` fictícios).
+
+---
+
+# Allure — T014/T015 (issues #19, #20) — PR #412
+
+Reaproveitado `allure-vitest` + `vitest.config.ts` já configurados.
+`corepack pnpm test` gerou `allure-results/` (raiz do worktree `qa-pr412`,
+git-ignorado) com resultado por teste da suíte inteira (31 arquivos
+executados, 142 casos + 2 arquivos de integração Postgres pulados sem
+`DATABASE_URL`), todos `"status":"passed"`.
+
+Relatório HTML não gerado (requer CLI Java `allure`, mesma limitação
+registrada em todas as rodadas anteriores; publicação cabe ao CI, ainda não
+configurado neste repo para Allure).
+
+Nenhum dado sensível anexado — fixtures sintéticas (`orc-1`/`orc-2`/`orc-3`,
+bucket `nexo-orcamentos-raw` fictício, `nomeServico: 'teste-ingestao-
+identificacao'`). Nenhum token/JWT real presente — `logger.ts` já redige
+`req.headers.authorization` por design (T015), confirmado por revisão do
+código, não exercitado nos testes atuais (nenhum handler HTTP usa
+`criarLogger` ainda).

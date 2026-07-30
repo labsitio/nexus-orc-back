@@ -373,3 +373,103 @@ usado `nvm use 24` para alinhar com `engines.node >= 24`.
 
 ## Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T014/T015 (issues #19, #20) — PR #412
+
+## SPEC_ID e versão testada
+`001-ingestao-classificacao-orcamentos`. PR #412, branch
+`feat/001-b-persistencia`, commit `e7c6f6d`, base `main`. Primeira validação
+(não é reteste). `backend-reviewer` já havia aprovado (APPROVE WITH NITS,
+sem bloqueantes).
+
+## Resumo executivo
+T014 (`EventBridgePublisher`) e T015 (base transversal de observabilidade
+`pino`+OpenTelemetry Node SDK) para o BC Ingestão & Identificação. Ambos são
+componentes isolados — nenhum handler Lambda deste contexto existe ainda
+para consumi-los em produção (confirmado pelo dev-back-end: T023/T028/T034
+são trilhas futuras). Os 3 testes já escritos pelo dev cobriam os cenários
+principais de aceite; QA identificou 1 branch residual não coberto
+(mensagem de fallback do EventBridge) e adicionou 1 teste para fechá-lo, sem
+tocar em produção.
+
+## Requisitos cobertos e não cobertos
+Cobertos (detalhe em `qa/traceability-matrix.md`):
+- T014: publica no bus configurado com `Source`/`DetailType`/`Detail`
+  corretos; propaga falha do EventBridge como erro descritivo, incluindo o
+  branch de fallback quando `ErrorMessage` está ausente (novo teste, QA).
+- T015: `criarLogger` respeita `LOG_LEVEL` (default e override) e fixa
+  bindings de correlação (`orcamentoId`); `iniciarObservabilidade` inicia o
+  `NodeSDK` e finaliza (`shutdown()`) sem lançar e sem rede real no teste.
+
+Não cobertos (fora de escopo desta task, aceito): wiring real em um handler
+Lambda (nenhum existe ainda neste BC); exportação real de traces para um
+coletor OTLP (sem coletor disponível no ambiente — teste valida apenas
+início/parada limpos do SDK).
+
+## Suítes executadas e comandos
+```
+corepack pnpm install
+corepack pnpm typecheck
+corepack pnpm lint
+corepack pnpm test
+npx vitest run --coverage --coverage.include=... eventbridge.publisher.test.ts
+```
+Detalhe completo em `qa/test-execution-report.md`.
+
+## Quantidade de testes por tipo
+142 testes no total (suíte inteira, 31 arquivos executados + 2 arquivos de
+integração Postgres pulados sem `DATABASE_URL`, comportamento esperado) — 6
+no escopo direto deste PR (3 `EventBridgePublisher`, incluindo 1 novo de QA;
+3 `logger`/`tracing`), 136 de rodadas/trilhas anteriores sem regressão. Sem
+teste de integração real contra AWS/OTLP (limitação de ambiente conhecida e
+aceita — testes desenhados para rodar 100% mockados/locais).
+
+## Resultado
+142 aprovados, 0 falhos, 0 ignorados, 0 instáveis.
+
+## Cobertura inicial e final
+Escopo do diff (`eventbridge.publisher.ts` + `observability/**`): antes do
+teste adicional de QA — Statements 100% · Branches 87.5% (7/8) · Functions
+100% · Lines 100%. Depois — Statements 100% · Branches 100% (4/4) ·
+Functions 100% · Lines 100%. `logger.ts`/`tracing.ts` já 100% desde o
+início (wrappers finos sem branch de decisão própria). Detalhe em
+`qa/coverage-final.md`.
+
+## Local do allure-results e do relatório Allure
+`allure-results/` (raiz do worktree, git-ignorado), gerado pelo reporter
+`allure-vitest` já configurado em `vitest.config.ts`. Relatório HTML não
+gerado (mesma limitação de todas as rodadas anteriores — requer CLI Java
+Allure). Ver `qa/allure-report.md`.
+
+## Bugs por severidade e status
+Nenhum bug de produção encontrado.
+
+## Riscos residuais
+- Achado de cobertura não bloqueante (linha 33 de
+  `eventbridge.publisher.ts`, branch de fallback `?? 'motivo desconhecido'`)
+  — corrigido pelo próprio QA com 1 teste novo, sem tocar produção.
+- Observação de flakiness sob `--coverage`: com instrumentação v8 ativa, o
+  teste pré-existente (T028, PR #405)
+  `sanitizar-conteudo-documento.test.ts > ... mitigação de DoS` falha por
+  threshold de tempo (`toBeLessThan(200)` vs `~375ms` medido sob overhead de
+  coverage). Não é regressão desta PR — não tocado no diff — e a suíte
+  completa sem `--coverage` passa 100%. Registrado para consciência do time
+  (candidato a threshold com folga maior ou a rodar fora de `--coverage`),
+  não bloqueia este gate.
+- Sem coletor OTLP real disponível — `iniciarObservabilidade` validado
+  apenas quanto a iniciar/finalizar sem lançar; exportação real de spans
+  fica para quando houver handler Lambda + ambiente com coletor (trilhas
+  futuras T023/T028/T034).
+
+## Limitações do ambiente
+Sem acesso a AWS real nem a coletor OTLP real (conforme informado na
+invocação) — os 3 testes deste PR rodam 100% mockados/locais, sem rede,
+confirmado pela execução rápida (23-275ms por arquivo, sem timeout).
+Execução em worktree dedicado (`qa-pr412`, criado via `git worktree add` a
+partir de `origin/feat/001-b-persistencia`) para não interferir no worktree
+principal do agente (em uso por outra trilha, `feat/001-c-us1`).
+
+## Parecer final
+APROVADO PELO QA

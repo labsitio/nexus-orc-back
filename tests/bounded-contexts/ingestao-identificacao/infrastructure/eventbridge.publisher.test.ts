@@ -42,4 +42,16 @@ describe('EventBridgePublisher', () => {
 
     await expect(publisher.publicar(evento)).rejects.toThrow(/rate exceeded/);
   });
+
+  it('usa mensagem de fallback quando o EventBridge não informa ErrorMessage', async () => {
+    const send = vi.fn().mockResolvedValue({ FailedEntryCount: 1, Entries: [{}] });
+    const publisher = new EventBridgePublisher(eventBridgeClientFake(send), 'nexo-dominio-bus');
+    const evento = new OrcamentoRecebido('orc-3', 'PORTAL_WEB', {
+      bucket: 'nexo-orcamentos-raw',
+      key: 'portal-web/z.pdf',
+      versionId: 'v-3',
+    });
+
+    await expect(publisher.publicar(evento)).rejects.toThrow(/motivo desconhecido/);
+  });
 });
