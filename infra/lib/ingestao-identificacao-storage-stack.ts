@@ -14,7 +14,10 @@ const BUCKET_NAME = 'nexo-orcamentos-raw';
  * de deny total em `s3:PutObject` bloquearia o próprio upload legítimo do
  * `S3ArmazenamentoBrutoGateway` (T019); com Object Lock, o PUT inicial segue
  * funcionando e cada versão gravada fica protegida contra delete/overwrite
- * pelo período de retenção, sem exceção nem para a conta root.
+ * pelo período de retenção. Modo GOVERNANCE (não COMPLIANCE): a garantia
+ * depende de nenhuma IAM policy conceder `s3:BypassGovernanceRetention` —
+ * hoje nenhuma role tem essa permissão; qualquer PR que conceda precisa
+ * de revisão de segurança explícita referenciando esta nota.
  *
  * ponytail: retenção fixada em 5 anos (GOVERNANCE) como default restritivo —
  * plan.md registra o SLA de retenção como "pendente de decisão de
@@ -28,6 +31,7 @@ export class IngestaoIdentificacaoStorageStack extends Stack {
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
+    this.terminationProtection = true;
 
     const key = new kms.Key(this, 'OrcamentosRawKey', {
       alias: 'alias/nexo-orcamentos-raw',
