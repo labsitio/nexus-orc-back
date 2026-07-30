@@ -10,10 +10,19 @@
 | 3 Domain Events com `schemaVersion: 1`, `source: nexo.extracao` | Contrato de evento | Unit | shape do evento | `domain-events.test.ts` (3 testes) | PASS |
 
 ## Fora desta leva (não rastreado ainda)
-- "Resultado de extração disponível em até 5 minutos (p95)" — depende de
-  Infrastructure/Application (T012+), não testável nesta leva.
 - "Consulta de status reflete a etapa extraído/pendência" — depende do
   endpoint de status (T024, T039), não existe ainda.
 - "Conversão via MarkItDown por padrão" — depende do ACL de Infrastructure
   (T021), interface já definida (`markitdown-conversao-extracao.acl.ts`) mas
   sem implementação nesta leva.
+
+## Leva T012 (issue #77, PR #423, commit `27409c6`)
+
+| Critério de aceite (spec.md / plan.md) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| Schema persiste estado atual do agregado (`itens`/`condicoesComerciais` em JSONB, ADR-004) | Persistência | Integração (Postgres real) | criação com `itens` default `[]`, `condicoesComerciais` opcional | `extracao-orcamento.schema.test.ts` (1 teste) | PASS |
+| `status` e `referencia_classificacao_agente_origem` restritos ao enum de domínio | Integridade de dados | Integração (Postgres real) | INSERT com valor fora do enum → violação de CHECK | `extracao-orcamento.schema.test.ts` (1 teste) | PASS |
+| `extracoes_orcamento_historico` é append-only (nunca sobrescrito) | Governança/auditoria | Integração (Postgres real) | UPDATE/DELETE em linha de histórico → `RAISE EXCEPTION` | `extracao-orcamento.schema.test.ts` (2 testes) | **BLOQUEADO por BUG-003** — migração 0005 não aplica, coluna `id` não migrada para `bigserial`, INSERT falha antes do UPDATE/DELETE ser exercitado |
+| `TentativaExtracao` é sucesso XOR insucesso, nunca ambos/nenhum | Integridade de domínio | Integração (Postgres real) | INSERT com ambos os campos e com nenhum → violação de CHECK | `extracao-orcamento.schema.test.ts` (2 testes) | **BLOQUEADO por BUG-003** (mesma causa raiz) |
+| Migração aplica sem erro em Postgres real a partir do baseline (pré-condição p/ CI e T013) | Deploy/CI | Integração (Postgres real) | `drizzle-kit migrate` a partir do estado pós-T002 | manual (`drizzle-kit migrate` + `psql` direto) | **FAIL** — `bugs/BUG-003.md`, CRÍTICA |
+| `db:generate` sem diff pendente (schema TS ≡ migração commitada) | Consistência schema/migração | Estático | `npx drizzle-kit generate` | manual | PASS |

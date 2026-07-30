@@ -1,4 +1,15 @@
-ALTER TABLE "extracao"."extracoes_orcamento_historico" ALTER COLUMN "id" SET DATA TYPE bigserial;--> statement-breakpoint
+-- BUG-003: `bigserial` é pseudo-tipo, só válido em CREATE TABLE — não existe
+-- como tipo real para ALTER COLUMN ... SET DATA TYPE (Postgres rejeita com
+-- "type bigserial does not exist"). Hand-authored: expande manualmente para
+-- o que bigserial realmente significa (bigint + sequência + DEFAULT
+-- nextval(...)), mesmo espírito de correção manual do 0006 (trigger).
+-- Tabela nunca teve dado real fora deste pipeline de migração (baseline
+-- T002) — troca de tipo com "USING NULL" é segura aqui.
+ALTER TABLE "extracao"."extracoes_orcamento_historico" ALTER COLUMN "id" DROP DEFAULT;--> statement-breakpoint
+ALTER TABLE "extracao"."extracoes_orcamento_historico" ALTER COLUMN "id" TYPE bigint USING NULL;--> statement-breakpoint
+CREATE SEQUENCE "extracao"."extracoes_orcamento_historico_id_seq" OWNED BY "extracao"."extracoes_orcamento_historico"."id";--> statement-breakpoint
+ALTER TABLE "extracao"."extracoes_orcamento_historico" ALTER COLUMN "id" SET DEFAULT nextval('"extracao"."extracoes_orcamento_historico_id_seq"');--> statement-breakpoint
+ALTER TABLE "extracao"."extracoes_orcamento_historico" ALTER COLUMN "id" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "extracao"."extracoes_orcamento" ADD COLUMN "status" text NOT NULL;--> statement-breakpoint
 ALTER TABLE "extracao"."extracoes_orcamento" ADD COLUMN "referencia_classificacao_fornecedor_identificado" text NOT NULL;--> statement-breakpoint
 ALTER TABLE "extracao"."extracoes_orcamento" ADD COLUMN "referencia_classificacao_formato_identificado" text NOT NULL;--> statement-breakpoint
