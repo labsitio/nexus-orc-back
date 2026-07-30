@@ -12,7 +12,7 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Criar estrutura de pastas `src/bounded-contexts/validacao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/validacao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pelas specs 001/002 — não repetir setup daquelas specs).
+- [x] T001 Criar estrutura de pastas `src/bounded-contexts/validacao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/validacao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pelas specs 001/002 — não repetir setup daquelas specs).
 - [ ] T002 [P] Migração Drizzle Kit: schema inicial do BC Validação (tabelas vazias, baseline) — ADR-001 da spec 001, herdado.
 - [ ] T003 [P] Provisionar fila SQS `validador-queue` com DLQ própria + alarme CloudWatch (IaC — Ricardo/DevOps). Sem fila de revisor de IA, por decisão de ADR-001 desta spec.
 - [ ] T004 [P] Provisionar regra EventBridge no bus `nexo-dominio-bus` roteando `detail-type: OrcamentoExtraido` e `detail-type: OrcamentoExtraidoComPendenciaConfirmada`, `source: nexo.extracao` → `validador-queue`.
