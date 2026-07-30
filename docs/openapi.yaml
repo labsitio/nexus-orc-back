@@ -1,0 +1,1078 @@
+openapi: 3.1.0
+
+info:
+  title: Nexo — Contrato de API (Backend)
+  version: "0.1.0-provisional"
+  summary: >
+    Contrato de borda HTTP do backend Nexo, derivado de specs/001-005 e specs/007
+    (Spec-Driven Development). Entrega de handoff para o time de FRONTEND antes do
+    início da implementação backend — NÃO é garantia de implementação já existente.
+  description: >
+    Este documento é gerado a partir de artefatos de arquitetura (`plan.md`) e não de
+    código em produção — o repositório `nexus-orc-back` está em fase de especificação
+    (ver README.md). Todo endpoint aqui é rastreável a uma spec de origem; onde a spec
+    não detalha um campo necessário para fechar o contrato, o campo foi assumido e está
+    marcado como PROVISÓRIO no arquivo `docs/api-contrato-frontend.md` (seção "Status do
+    contrato") — leia aquele documento antes de mockar contra este arquivo.
+
+
+    Escopo excluído deste contrato por decisão de produto/constituição:
+    - canal SFTP (AWS Transfer Family) não expõe endpoint REST — o arquivo chega
+      diretamente ao S3, sem chamada HTTP do fornecedor a esta API;
+    - qualquer interface visual (Portal Web) é responsabilidade de um consumidor
+      externo de frontend — este time entrega apenas o contrato de API/evento/dado
+      (Additional Constraint "escopo exclusivamente backend", constitution.md v1.2.0);
+    - não existe spec/plan para um Bounded Context "Acompanhamento" completo
+      (spec 006 nunca existiu no repositório) — o endpoint de status consolidado por
+      orçamento (`GET /v1/orcamentos/{orcamentoId}`) é PROVISÓRIO, inferido do padrão
+      recorrente "BC Acompanhamento consulta GET /orcamentos/{id}/status" citado nos
+      Context Maps de 001-005, nunca especificado com schema próprio em nenhum plan.md.
+  contact:
+    name: Nexo — Arquitetura Backend
+    email: jonas.sousa@labsit.io
+
+servers:
+  - url: "https://{host}/v1"
+    description: >
+      Placeholder — nenhum ambiente real foi definido em specs/plans. Substituir
+      {host} pelo domínio de API Gateway correspondente ao ambiente (dev/staging/prod)
+      quando provisionado. Não usar como URL real.
+    variables:
+      host:
+        default: api.dev.nexo.internal
+        enum:
+          - api.dev.nexo.internal
+          - api.staging.nexo.internal
+          - api.nexo.internal
+
+tags:
+  - name: Ingestão & Identificação
+    description: spec 001 — upload multi-canal, classificação, escalonamento humano.
+  - name: Extração
+    description: spec 002 — itens/condições comerciais estruturados.
+  - name: Validação
+    description: spec 003 — regras de consistência de negócio.
+  - name: Busca & Indexação
+    description: spec 004 — busca semântica em linguagem natural.
+  - name: Orquestração
+    description: spec 005 — decisão de workflow (aprovar/encaminhar/reenviar).
+  - name: Acompanhamento
+    description: >
+      spec 007 (escopo tático: auditoria/exportação) — não existe spec/plan de um BC
+      "Acompanhamento" completo. Endpoint de status agregado por orçamento é PROVISÓRIO.
+  - name: Configuração
+    description: spec 003 — parâmetro operacional (faixas de preço), CRUD simples.
+
+security:
+  - cognitoAuth: []
+
+paths:
+  # ============================== INGESTÃO (spec 001) ==============================
+  /orcamentos/upload-url:
+    post:
+      tags: [Ingestão & Identificação]
+      summary: Gera URL S3 presigned para upload direto do orçamento bruto
+      description: >
+        Passo 1/2 do fluxo de upload (ADR-002 da spec 001). O arquivo NÃO é enviado ao
+        API Gateway — o cliente faz PUT direto na URL retornada. Este passo sozinho NÃO
+        dispara `OrcamentoRecebido`; é preciso chamar
+        `POST /orcamentos/{orcamentoId}/confirmar-upload` depois do PUT concluir.
+        Canais aplicáveis: portal web, API REST, app mobile (não SFTP).
+
+
+        PROVISÓRIO: o `spec.md`/`plan.md` de 001 não detalha o schema exato do corpo
+        desta requisição (apenas descreve a existência do endpoint e o padrão de duas
+        chamadas) — campos abaixo são assumidos para fechar o contrato.
+      operationId: gerarUploadUrlOrcamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GerarUploadUrlRequest"
+            example:
+              canal: PORTAL_WEB
+              nomeArquivo: "orcamento-fornecedor-abc.pdf"
+              tipoConteudo: "application/pdf"
+              referenciaExterna: "COT-2026-00042"
+      responses:
+        "201":
+          description: URL presigned gerada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GerarUploadUrlResponse"
+              example:
+                orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                uploadUrl: "https://nexo-orcamentos-raw.s3.amazonaws.com/pending/018f2f6a-....pdf?X-Amz-Signature=..."
+                metodo: PUT
+                expiraEm: "2026-07-30T15:10:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /orcamentos/{orcamentoId}/confirmar-upload:
+    post:
+      tags: [Ingestão & Identificação]
+      summary: Confirma upload concluído e dispara o pipeline (publica OrcamentoRecebido)
+      description: >
+        Passo 2/2 do fluxo de upload. Este é o ponto real de disparo do evento de
+        domínio `OrcamentoRecebido` (spec 001, ADR-002) — antes desta chamada, o
+        arquivo pode existir no S3 mas não está "recebido" para efeito de pipeline.
+        Suporta idempotência via header `Idempotency-Key`: reenvio da mesma chave
+        dentro de 24h retorna o mesmo `orcamentoId` já existente, sem duplicar o
+        registro (spec 001, caso de uso `ReceberOrcamento`).
+      operationId: confirmarUploadOrcamento
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      responses:
+        "200":
+          description: Upload confirmado; orçamento já estava registrado (idempotência) ou recém-criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmarUploadResponse"
+              example:
+                orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                status: RECEBIDO
+                recebidoEm: "2026-07-30T14:05:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Upload ainda não concluído no S3 (objeto não encontrado no prefixo temporário).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              example:
+                type: "https://nexo.internal/problems/upload-nao-concluido"
+                title: "Upload ainda não concluído"
+                status: 409
+                detail: "Nenhum objeto encontrado no prefixo temporário para este orcamentoId."
+                instance: "/v1/orcamentos/018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f/confirmar-upload"
+
+  /orcamentos/{orcamentoId}/status:
+    get:
+      tags: [Ingestão & Identificação]
+      summary: Status e histórico de classificação do orçamento (BC Ingestão & Identificação)
+      description: >
+        Retorna o status do agregado `Orcamento` deste BC especificamente — RECEBIDO,
+        CLASSIFICADO ou PENDENTE_REVISAO_HUMANA (spec 001). Não inclui dado de
+        extração/validação/workflow de outros BCs (ver `GET /orcamentos/{orcamentoId}`,
+        endpoint agregado PROVISÓRIO, para visão consolidada).
+      operationId: consultarStatusIngestao
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      responses:
+        "200":
+          description: Status atual + histórico de tentativas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusIngestaoResponse"
+              example:
+                orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                canal: PORTAL_WEB
+                status: PENDENTE_REVISAO_HUMANA
+                resultadoAtual: null
+                historico:
+                  - agente: CLASSIFICADOR
+                    ocorreuEm: "2026-07-30T14:06:12Z"
+                    resultado: null
+                    motivoInsucesso: "confianca 62% abaixo do limiar de 80%"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: >
+            Não encontrado — inclui o caso de orçamento existir mas pertencer a outro
+            tenant (spec 007: nunca 403 revelador de existência cross-tenant).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+  /orcamentos/{orcamentoId}/revisao-humana:
+    post:
+      tags: [Ingestão & Identificação]
+      summary: Confirmação humana explícita de fornecedor/formato (fila de escalonamento)
+      description: >
+        Só aceito quando `status === PENDENTE_REVISAO_HUMANA` (spec 001). Publica
+        `OrcamentoReclassificadoPorRevisaoHumana`. Mecanismo de apresentação da fila
+        (tela de triagem) é responsabilidade do consumidor externo de frontend.
+      operationId: confirmarRevisaoHumanaIngestao
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevisaoHumanaIngestaoRequest"
+            example:
+              fornecedorIdentificado: "Distribuidora ABC Ltda"
+              formatoIdentificado: "PDF_TABELA_PADRAO"
+      responses:
+        "200":
+          description: Confirmação registrada; orçamento retorna ao fluxo normal.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusIngestaoResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Orçamento não está em PENDENTE_REVISAO_HUMANA.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              example:
+                type: "https://nexo.internal/problems/estado-invalido"
+                title: "Orçamento não está pendente de revisão humana"
+                status: 409
+                detail: "Status atual: CLASSIFICADO. Ação só é válida em PENDENTE_REVISAO_HUMANA."
+
+  # ============================== EXTRAÇÃO (spec 002) ==============================
+  /orcamentos/{orcamentoId}/extracao/status:
+    get:
+      tags: [Extração]
+      summary: Status, itens e condições comerciais extraídos
+      operationId: consultarStatusExtracao
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      responses:
+        "200":
+          description: Status atual + itens + condições comerciais + histórico.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusExtracaoResponse"
+              example:
+                orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                status: EXTRAIDO
+                itens:
+                  - descricao: { valor: "Caixa de papelão ondulado 40x30x20", confianca: 96, extraido: true, agenteOrigem: EXTRATOR }
+                    quantidade: { valor: 500, confianca: 94, extraido: true, agenteOrigem: EXTRATOR }
+                    precoUnitario: { valor: { montante: 3.20, moeda: "BRL" }, confianca: 91, extraido: true, agenteOrigem: EXTRATOR }
+                condicoesComerciais:
+                  condicoesPagamento: { valor: "30/60/90 dias", confianca: 88, extraido: true, agenteOrigem: EXTRATOR }
+                  prazoValidade: { valor: "2026-08-30", confianca: 90, extraido: true, agenteOrigem: EXTRATOR }
+                  condicoesEntrega: { valor: "CIF, até 10 dias úteis", confianca: 85, extraido: true, agenteOrigem: EXTRATOR }
+                historico: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orcamentos/{orcamentoId}/extracao/revisao-humana:
+    post:
+      tags: [Extração]
+      summary: Confirmação humana de campo(s) não extraído(s)
+      description: >
+        Só aceito quando `status === PENDENTE_REVISAO_HUMANA` (spec 002). Cada campo
+        confirmado recebe valor real OU marcação explícita "indisponível no documento"
+        — nunca ambos ausentes. Publica `OrcamentoExtraido` (todos supridos) ou
+        `OrcamentoExtraidoComPendenciaConfirmada` (1+ confirmado indisponível).
+
+
+        PROVISÓRIO: o shape exato de `camposConfirmados` foi assumido — a spec 002
+        descreve o comportamento esperado, não o schema de payload deste endpoint.
+      operationId: confirmarRevisaoHumanaExtracao
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevisaoHumanaExtracaoRequest"
+            example:
+              camposConfirmados:
+                - caminho: "itens[0].precoUnitario"
+                  valor: { montante: 3.20, moeda: "BRL" }
+                  indisponivel: false
+                - caminho: "condicoesComerciais.prazoValidade"
+                  valor: null
+                  indisponivel: true
+      responses:
+        "200":
+          description: Confirmação registrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusExtracaoResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflitoEstado"
+
+  # ============================== VALIDAÇÃO (spec 003) ==============================
+  /orcamentos/{orcamentoId}/validacao/status:
+    get:
+      tags: [Validação]
+      summary: Status e inconsistências de validação de consistência
+      operationId: consultarStatusValidacao
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      responses:
+        "200":
+          description: Status atual + inconsistências + histórico.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusValidacaoResponse"
+              example:
+                orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                status: PENDENTE_REVISAO_HUMANA
+                inconsistencias:
+                  - regra: PRECO_FORA_DE_FAIXA
+                    referenciaItem: "itens[0]"
+                    detalhe: "Preço unitário R$ 3,20 abaixo da faixa mínima esperada (R$ 4,00) para a categoria 'embalagens'."
+                historico: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orcamentos/{orcamentoId}/validacao/decisao-humana:
+    post:
+      tags: [Validação]
+      summary: Decisão humana explícita sobre inconsistência de validação
+      description: >
+        Só aceito quando `status === PENDENTE_REVISAO_HUMANA` (spec 003). Duas decisões
+        possíveis: `CORRECAO_APLICADA` (reenvia dados corrigidos, regras reavaliadas) ou
+        `ACEITE_COM_RESSALVA` (aceita explicitamente a inconsistência remanescente).
+      operationId: registrarDecisaoHumanaValidacao
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisaoHumanaValidacaoRequest"
+            example:
+              decisao: ACEITE_COM_RESSALVA
+              justificativa: "Comprador aceita preço abaixo da faixa por acordo comercial pontual com o fornecedor."
+      responses:
+        "200":
+          description: Decisão registrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusValidacaoResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflitoEstado"
+
+  /configuracoes/faixas-preco-categoria:
+    get:
+      tags: [Configuração]
+      summary: Lista faixas de preço configuradas por categoria
+      description: >
+        CRUD simples de parâmetro operacional (spec 003, "Nota de complexidade YAGNI") —
+        transaction script, não é caso de uso do domínio `OrcamentoValidacao`.
+      operationId: listarFaixasPrecoCategoria
+      responses:
+        "200":
+          description: Lista de faixas configuradas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FaixaPrecoCategoria"
+              example:
+                - categoria: "embalagens"
+                  precoMinimo: { montante: 4.00, moeda: "BRL" }
+                  precoMaximo: { montante: 12.00, moeda: "BRL" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Configuração]
+      summary: Cria ou atualiza faixa de preço de uma categoria
+      description: >
+        Requer papel administrativo distinto do papel de comprador (spec 003, Interface).
+      operationId: upsertFaixaPrecoCategoria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaixaPrecoCategoria"
+            example:
+              categoria: "embalagens"
+              precoMinimo: { montante: 4.00, moeda: "BRL" }
+              precoMaximo: { montante: 12.00, moeda: "BRL" }
+      responses:
+        "201":
+          description: Faixa criada/atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaixaPrecoCategoria"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ============================== BUSCA & INDEXAÇÃO (spec 004) ==============================
+  /orcamentos/{orcamentoId}/indexacao/status:
+    get:
+      tags: [Busca & Indexação]
+      summary: Status de indexação (enriquecimento assíncrono, nunca bloqueia negócio)
+      description: >
+        `FALHA_INDEXACAO` nunca significa que o orçamento não é válido — é falha técnica
+        de enriquecimento, sujeita a retry automático (spec 004, ADR-002). O orçamento
+        permanece "validado" e disponível por outras formas de consulta.
+      operationId: consultarStatusIndexacao
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      responses:
+        "200":
+          description: Status atual + histórico de tentativas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusIndexacaoResponse"
+              example:
+                orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                status: INDEXADO
+                modeloEmbedding: "amazon.titan-embed-text-v2:0"
+                historico: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orcamentos/busca:
+    post:
+      tags: [Busca & Indexação]
+      summary: Busca semântica em linguagem natural + filtros estruturados
+      description: >
+        Operação de leitura sem efeito colateral, documentada com verbo POST por padrão
+        de API de busca com corpo estruturado (spec 004, Interface — evita limite de
+        querystring). Combina filtro determinístico (categoria/preço/período) com
+        similaridade vetorial pgvector.
+
+
+        RISCO CONHECIDO (declarado explicitamente na spec 004): esta API autentica via
+        JWT mas NÃO filtra resultado por permissão de visibilidade de orçamento
+        individual — qualquer usuário autenticado do sistema pode, em tese, encontrar
+        qualquer orçamento validado do seu tenant. Aceitável apenas em single-tenant
+        (Fase 01/02); requer revisão quando isolamento completo (spec 007) estiver em
+        produção real.
+      operationId: buscarOrcamentos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuscaRequest"
+            example:
+              consulta: "orçamentos de embalagens recebidos abaixo de R$10 mil nos últimos 30 dias"
+              categoria: "embalagens"
+              precoMaximo: 10000
+              periodoInicio: "2026-07-01"
+              periodoFim: "2026-07-30"
+              pagina: 1
+              tamanhoPagina: 20
+      responses:
+        "200":
+          description: Resultados ordenados por relevância + metadados de paginação.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuscaResponse"
+              example:
+                resultados:
+                  - orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                    scoreRelevancia: 0.91
+                    trechoDestacado: "Caixa de papelão ondulado 40x30x20 — 500 unidades"
+                    origemValidacao: VALIDADO
+                pagina: 1
+                tamanhoPagina: 20
+                totalAproximado: 1
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ============================== ORQUESTRAÇÃO (spec 005) ==============================
+  /orcamentos/{orcamentoId}/workflow/status:
+    get:
+      tags: [Orquestração]
+      summary: Status da decisão de workflow (aprovar/encaminhar/reenviar)
+      operationId: consultarStatusWorkflow
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      responses:
+        "200":
+          description: Status + contexto consolidado + decisão + histórico.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusWorkflowResponse"
+              example:
+                orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                status: DECIDIDO
+                decisaoAtual:
+                  acao: ENCAMINHAR_COMPRADOR
+                  nivelConfianca: 74
+                  criterio: "Valor total acima de R$50.000 exige aprovação humana por política interna reportada pelo modelo."
+                  agenteOrigem: ORQUESTRADOR
+                  requerIntegracaoExterna: false
+                historico: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orcamentos/{orcamentoId}/workflow/decisao-humana:
+    post:
+      tags: [Orquestração]
+      summary: Decisão humana explícita do comprador (fila de escalonamento de workflow)
+      description: >
+        Só aceito quando `status === PENDENTE_REVISAO_HUMANA` (spec 005). É a decisão de
+        maior risco financeiro da cadeia — `justificativa` é obrigatória para qualquer
+        ação; `motivoDadoAusente` obrigatório quando `acao === SOLICITAR_REENVIO`.
+        Requer papel "comprador responsável" (Cognito).
+      operationId: registrarDecisaoHumanaWorkflow
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisaoHumanaWorkflowRequest"
+            example:
+              acao: APROVAR
+              justificativa: "Comprador validou manualmente o orçamento após revisão do histórico do fornecedor."
+      responses:
+        "200":
+          description: Decisão registrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusWorkflowResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflitoEstado"
+
+  # ============================== ACOMPANHAMENTO (spec 007 + PROVISÓRIO) ==============================
+  /orcamentos/{orcamentoId}:
+    get:
+      tags: [Acompanhamento]
+      summary: "PROVISÓRIO — Status consolidado do orçamento (visão única, todos os BCs)"
+      description: >
+        **PROVISÓRIO, não especificado em nenhum plan.md.** Inferido do padrão repetido
+        nos Context Maps de 001-005 ("BC Acompanhamento / consumidor de frontend externo:
+        assina todos os eventos + consulta GET /orcamentos/{id}/status"), mas nenhuma
+        spec/plan de um BC "Acompanhamento" completo existe no repositório (spec 006
+        nunca existiu; 007 cobre apenas exportação de auditoria em lote, não status por
+        orçamento). Modelado aqui como leitura agregada do read-model
+        `auditoria_trilha_eventos` (já descrito em 007) filtrado por `orcamentoId`,
+        combinando o resumo de cada etapa (ingestão/extração/validação/indexação/
+        workflow) em uma única resposta — para o frontend não precisar orquestrar 5
+        chamadas separadas. SUJEITO A MUDANÇA ou remoção quando um BC Acompanhamento for
+        de fato especificado; até lá, o frontend pode usar os 5 endpoints de status por
+        BC (`.../status` em cada tag acima) como alternativa com contrato firme.
+      operationId: consultarStatusConsolidadoOrcamento
+      parameters:
+        - $ref: "#/components/parameters/OrcamentoIdPath"
+      responses:
+        "200":
+          description: Visão consolidada por etapa do pipeline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusConsolidadoResponse"
+              example:
+                orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                canal: PORTAL_WEB
+                etapas:
+                  ingestao: { status: CLASSIFICADO, atualizadoEm: "2026-07-30T14:06:00Z" }
+                  extracao: { status: EXTRAIDO, atualizadoEm: "2026-07-30T14:08:00Z" }
+                  validacao: { status: VALIDADO, atualizadoEm: "2026-07-30T14:09:00Z" }
+                  indexacao: { status: INDEXADO, atualizadoEm: "2026-07-30T14:10:00Z" }
+                  workflow: { status: DECIDIDO, atualizadoEm: "2026-07-30T14:11:00Z" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /auditoria/orcamentos/export:
+    get:
+      tags: [Acompanhamento]
+      summary: Exportação paginada de relatório de auditoria (por tenant)
+      description: >
+        spec 007, ADR-006 — JSON paginado (cursor-based), nunca arquivo pré-gerado
+        (CSV/PDF fica a cargo de um consumidor externo). `tenantId` sempre resolvido do
+        JWT, nunca aceito como query param.
+      operationId: exportarRelatorioAuditoria
+      parameters:
+        - name: periodo_inicio
+          in: query
+          schema: { type: string, format: date }
+        - name: periodo_fim
+          in: query
+          schema: { type: string, format: date }
+        - name: fornecedorId
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Página de eventos de auditoria do tenant solicitante.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditoriaExportResponse"
+              example:
+                itens:
+                  - tenantId: "0189abcd-1111-7000-8000-000000000001"
+                    orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
+                    tipoEvento: "OrcamentoValidado"
+                    sourceBc: "nexo.validacao"
+                    ocorreuEm: "2026-07-30T14:09:00Z"
+                    agenteOrigem: null
+                    resumoPayload: { status: "VALIDADO" }
+                proximoCursor: "eyJvcmNhbWVudG9JZCI6IjAxOGYyZjZhLi4uIn0="
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    cognitoAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT emitido pelo Amazon Cognito User Pool (spec 001, Interface; spec 007,
+        Infrastructure). O escopo de tenant NÃO é um header separado — é resolvido
+        exclusivamente da claim verificada `custom:tenant_id` dentro do próprio JWT
+        (spec 007, convenção #5: "tenant_id nunca é aceito como input de query param,
+        path param ou body"). Papéis (comprador-responsavel, compliance-admin) também
+        vêm de claims/grupos Cognito, não de header customizado.
+
+  parameters:
+    OrcamentoIdPath:
+      name: orcamentoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: UUID v7, gerado exclusivamente pelo Gateway de Ingestão (spec 001).
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string }
+      description: >
+        Chave de idempotência opcional (spec 001, caso de uso `ReceberOrcamento`).
+        Reenvio da mesma chave dentro de 24h retorna o `orcamentoId` já existente sem
+        duplicar o registro.
+
+  responses:
+    BadRequest:
+      description: Corpo/parâmetros inválidos (validação Zod na borda).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetails" }
+          example:
+            type: "https://nexo.internal/problems/validacao"
+            title: "Corpo da requisição inválido"
+            status: 400
+            detail: "campo 'canal' deve ser um dos valores: PORTAL_WEB, API_REST, SFTP, APP_MOBILE."
+            instance: "/v1/orcamentos/upload-url"
+    Unauthorized:
+      description: JWT ausente/inválido/expirado.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetails" }
+          example:
+            type: "https://nexo.internal/problems/nao-autenticado"
+            title: "Token ausente ou inválido"
+            status: 401
+    Forbidden:
+      description: Autenticado, mas sem papel/permissão exigida para a ação.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetails" }
+          example:
+            type: "https://nexo.internal/problems/sem-permissao"
+            title: "Papel insuficiente para esta ação"
+            status: 403
+    NotFound:
+      description: >
+        Não encontrado — inclui deliberadamente o caso de orçamento existir mas
+        pertencer a outro tenant (spec 007: nunca 403 revelador de existência
+        cross-tenant, sempre 404).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetails" }
+          example:
+            type: "https://nexo.internal/problems/nao-encontrado"
+            title: "Orçamento não encontrado"
+            status: 404
+    ConflitoEstado:
+      description: Ação não permitida para o estado atual do agregado.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetails" }
+
+  schemas:
+    ProblemDetails:
+      type: object
+      description: RFC 7807.
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+      required: [title, status]
+
+    Canal:
+      type: string
+      enum: [PORTAL_WEB, API_REST, SFTP, APP_MOBILE]
+
+    NivelConfianca:
+      type: integer
+      minimum: 0
+      maximum: 100
+
+    Dinheiro:
+      type: object
+      properties:
+        montante: { type: number }
+        moeda: { type: string, example: "BRL" }
+      required: [montante, moeda]
+
+    CampoExtraido:
+      type: object
+      description: "spec 002 — extraido:false ⟺ valor:null (nunca valor inventado)."
+      properties:
+        valor: {}
+        confianca: { $ref: "#/components/schemas/NivelConfianca" }
+        extraido: { type: boolean }
+        agenteOrigem: { type: string, enum: [EXTRATOR, HUMANO] }
+      required: [confianca, extraido, agenteOrigem]
+
+    GerarUploadUrlRequest:
+      type: object
+      description: PROVISÓRIO — ver nota no path.
+      properties:
+        canal: { $ref: "#/components/schemas/Canal" }
+        nomeArquivo: { type: string }
+        tipoConteudo: { type: string }
+        referenciaExterna: { type: string, nullable: true }
+      required: [canal, nomeArquivo, tipoConteudo]
+
+    GerarUploadUrlResponse:
+      type: object
+      properties:
+        orcamentoId: { type: string, format: uuid }
+        uploadUrl: { type: string, format: uri }
+        metodo: { type: string, enum: [PUT] }
+        expiraEm: { type: string, format: date-time }
+      required: [orcamentoId, uploadUrl, metodo, expiraEm]
+
+    ConfirmarUploadResponse:
+      type: object
+      properties:
+        orcamentoId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/StatusOrcamentoIngestao" }
+        recebidoEm: { type: string, format: date-time }
+      required: [orcamentoId, status, recebidoEm]
+
+    StatusOrcamentoIngestao:
+      type: string
+      enum: [RECEBIDO, CLASSIFICADO, PENDENTE_REVISAO_HUMANA]
+
+    ResultadoClassificacao:
+      type: object
+      nullable: true
+      properties:
+        fornecedorIdentificado: { type: string }
+        formatoIdentificado: { type: string }
+        nivelConfianca: { $ref: "#/components/schemas/NivelConfianca" }
+        agenteOrigem: { type: string, enum: [CLASSIFICADOR, HUMANO] }
+
+    TentativaClassificacao:
+      type: object
+      properties:
+        agente: { type: string, enum: [CLASSIFICADOR, HUMANO] }
+        ocorreuEm: { type: string, format: date-time }
+        resultado: { $ref: "#/components/schemas/ResultadoClassificacao" }
+        motivoInsucesso: { type: string, nullable: true }
+
+    StatusIngestaoResponse:
+      type: object
+      properties:
+        orcamentoId: { type: string, format: uuid }
+        canal: { $ref: "#/components/schemas/Canal" }
+        status: { $ref: "#/components/schemas/StatusOrcamentoIngestao" }
+        resultadoAtual: { $ref: "#/components/schemas/ResultadoClassificacao" }
+        historico:
+          type: array
+          items: { $ref: "#/components/schemas/TentativaClassificacao" }
+      required: [orcamentoId, canal, status, historico]
+
+    RevisaoHumanaIngestaoRequest:
+      type: object
+      properties:
+        fornecedorIdentificado: { type: string }
+        formatoIdentificado: { type: string }
+      required: [fornecedorIdentificado, formatoIdentificado]
+
+    ItemOrcamento:
+      type: object
+      properties:
+        descricao: { $ref: "#/components/schemas/CampoExtraido" }
+        quantidade: { $ref: "#/components/schemas/CampoExtraido" }
+        precoUnitario: { $ref: "#/components/schemas/CampoExtraido" }
+
+    CondicoesComerciais:
+      type: object
+      properties:
+        condicoesPagamento: { $ref: "#/components/schemas/CampoExtraido" }
+        prazoValidade: { $ref: "#/components/schemas/CampoExtraido" }
+        condicoesEntrega: { $ref: "#/components/schemas/CampoExtraido" }
+
+    StatusExtracaoResponse:
+      type: object
+      properties:
+        orcamentoId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [PENDENTE, EXTRAIDO, PENDENTE_REVISAO_HUMANA, EXTRAIDO_COM_PENDENCIA_CONFIRMADA]
+        itens:
+          type: array
+          items: { $ref: "#/components/schemas/ItemOrcamento" }
+        condicoesComerciais: { $ref: "#/components/schemas/CondicoesComerciais" }
+        historico:
+          type: array
+          items: { type: object }
+      required: [orcamentoId, status]
+
+    RevisaoHumanaExtracaoRequest:
+      type: object
+      description: PROVISÓRIO — ver nota no path.
+      properties:
+        camposConfirmados:
+          type: array
+          items:
+            type: object
+            properties:
+              caminho: { type: string, description: "ex.: 'itens[0].precoUnitario'" }
+              valor: { nullable: true }
+              indisponivel: { type: boolean }
+            required: [caminho, indisponivel]
+      required: [camposConfirmados]
+
+    InconsistenciaDetectada:
+      type: object
+      properties:
+        regra:
+          type: string
+          enum: [CNPJ_INVALIDO, CNPJ_DIVERGENTE_CADASTRO, CAMPO_OBRIGATORIO_AUSENTE, PRECO_FORA_DE_FAIXA, PRAZO_INCOERENTE]
+        referenciaItem: { type: string, nullable: true }
+        detalhe: { type: string }
+      required: [regra, detalhe]
+
+    StatusValidacaoResponse:
+      type: object
+      properties:
+        orcamentoId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [PENDENTE, VALIDADO, PENDENTE_REVISAO_HUMANA, VALIDADO_COM_RESSALVA]
+        inconsistencias:
+          type: array
+          items: { $ref: "#/components/schemas/InconsistenciaDetectada" }
+        historico:
+          type: array
+          items: { type: object }
+      required: [orcamentoId, status, inconsistencias]
+
+    DecisaoHumanaValidacaoRequest:
+      type: object
+      properties:
+        decisao: { type: string, enum: [CORRECAO_APLICADA, ACEITE_COM_RESSALVA] }
+        justificativa: { type: string }
+        dadosCorrigidos:
+          type: object
+          nullable: true
+          description: obrigatório quando decisao === CORRECAO_APLICADA (PROVISÓRIO no shape).
+      required: [decisao, justificativa]
+
+    FaixaPrecoCategoria:
+      type: object
+      properties:
+        categoria: { type: string }
+        precoMinimo: { $ref: "#/components/schemas/Dinheiro" }
+        precoMaximo: { $ref: "#/components/schemas/Dinheiro" }
+      required: [categoria, precoMinimo, precoMaximo]
+
+    StatusIndexacaoResponse:
+      type: object
+      properties:
+        orcamentoId: { type: string, format: uuid }
+        status: { type: string, enum: [PENDENTE, INDEXADO, FALHA_INDEXACAO] }
+        modeloEmbedding: { type: string, nullable: true }
+        historico:
+          type: array
+          items: { type: object }
+      required: [orcamentoId, status]
+
+    BuscaRequest:
+      type: object
+      properties:
+        consulta: { type: string, description: "linguagem natural, opcional se filtros bastarem" }
+        categoria: { type: string, nullable: true }
+        precoMinimo: { type: number, nullable: true }
+        precoMaximo: { type: number, nullable: true }
+        periodoInicio: { type: string, format: date, nullable: true }
+        periodoFim: { type: string, format: date, nullable: true }
+        pagina: { type: integer, minimum: 1, default: 1 }
+        tamanhoPagina: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+    ResultadoBusca:
+      type: object
+      properties:
+        orcamentoId: { type: string, format: uuid }
+        scoreRelevancia: { type: number, minimum: 0, maximum: 1 }
+        trechoDestacado: { type: string, nullable: true }
+        origemValidacao: { type: string, enum: [VALIDADO, VALIDADO_COM_RESSALVA] }
+
+    BuscaResponse:
+      type: object
+      properties:
+        resultados:
+          type: array
+          items: { $ref: "#/components/schemas/ResultadoBusca" }
+        pagina: { type: integer }
+        tamanhoPagina: { type: integer }
+        totalAproximado: { type: integer }
+      required: [resultados, pagina, tamanhoPagina]
+
+    DecisaoRoteamento:
+      type: object
+      properties:
+        acao: { type: string, enum: [APROVAR, ENCAMINHAR_COMPRADOR, SOLICITAR_REENVIO] }
+        nivelConfianca: { $ref: "#/components/schemas/NivelConfianca" }
+        criterio: { type: string }
+        agenteOrigem: { type: string, enum: [ORQUESTRADOR, HUMANO] }
+        requerIntegracaoExterna: { type: boolean }
+        motivoDadoAusente: { type: string, nullable: true }
+      required: [acao, criterio, agenteOrigem, requerIntegracaoExterna]
+
+    StatusWorkflowResponse:
+      type: object
+      properties:
+        orcamentoId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [AGUARDANDO_CONTEXTO, CONTEXTO_CONSOLIDADO, DECIDIDO, PENDENTE_REVISAO_HUMANA]
+        decisaoAtual: { $ref: "#/components/schemas/DecisaoRoteamento" }
+        historico:
+          type: array
+          items: { type: object }
+      required: [orcamentoId, status]
+
+    DecisaoHumanaWorkflowRequest:
+      type: object
+      properties:
+        acao: { type: string, enum: [APROVAR, ENCAMINHAR_COMPRADOR, SOLICITAR_REENVIO] }
+        justificativa: { type: string }
+        motivoDadoAusente:
+          type: string
+          nullable: true
+          description: obrigatório quando acao === SOLICITAR_REENVIO
+      required: [acao, justificativa]
+
+    TrilhaAuditoriaEvento:
+      type: object
+      properties:
+        tenantId: { type: string, format: uuid }
+        orcamentoId: { type: string, format: uuid }
+        tipoEvento: { type: string }
+        sourceBc: { type: string }
+        ocorreuEm: { type: string, format: date-time }
+        agenteOrigem: { type: string, nullable: true }
+        resumoPayload: { type: object }
+      required: [tenantId, orcamentoId, tipoEvento, sourceBc, ocorreuEm, resumoPayload]
+
+    AuditoriaExportResponse:
+      type: object
+      properties:
+        itens:
+          type: array
+          items: { $ref: "#/components/schemas/TrilhaAuditoriaEvento" }
+        proximoCursor: { type: string, nullable: true }
+      required: [itens]
+
+    StatusConsolidadoResponse:
+      type: object
+      description: PROVISÓRIO — ver descrição do path GET /orcamentos/{orcamentoId}.
+      properties:
+        orcamentoId: { type: string, format: uuid }
+        canal: { $ref: "#/components/schemas/Canal" }
+        etapas:
+          type: object
+          properties:
+            ingestao:
+              type: object
+              properties: { status: { type: string }, atualizadoEm: { type: string, format: date-time } }
+            extracao:
+              type: object
+              properties: { status: { type: string }, atualizadoEm: { type: string, format: date-time } }
+            validacao:
+              type: object
+              properties: { status: { type: string }, atualizadoEm: { type: string, format: date-time } }
+            indexacao:
+              type: object
+              properties: { status: { type: string }, atualizadoEm: { type: string, format: date-time } }
+            workflow:
+              type: object
+              properties: { status: { type: string }, atualizadoEm: { type: string, format: date-time } }
+      required: [orcamentoId, etapas]
