@@ -67,3 +67,101 @@ adicionado.
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T004 (issue #114)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: `003-validacao-consistencia-orcamentos`
+- PR #422, branch `feat/003-t004-eventbridge-rule-validador-queue`, commit `c9cb206`
+- Task: T004 (issue #114) — regra EventBridge `nexo-dominio-bus` → `validador-queue` (IaC)
+- `backend-reviewer`: APPROVE, sem achados
+- Primeira validação (sem BUG-XXX prévio)
+
+## 2. Resumo executivo
+T004 adiciona `events.Rule` em `ValidadorQueueStack` (`infra/lib/validador-queue-stack.ts`)
+roteando `source: nexo.extracao` / `detail-type: OrcamentoExtraido,
+OrcamentoExtraidoComPendenciaConfirmada` para a fila `validador-queue` já provisionada em T003
+(#113, PR #421, mergeado). `infra/bin/app.ts` passa `dominioBus: dominioEventBusStack.dominioBus`
+como prop (bus importado por referência, nunca recriado). Estrutura idêntica ao padrão já mergeado
+em `extrator-queue-stack.ts` (regra `OrcamentoClassificado` → `extrator-queue`, PR #420) e
+`classificador-queue-stack.ts`. Sem defeito de produção encontrado.
+
+## 3. Requisitos cobertos e não cobertos
+- Coberto: regra EventBridge no bus `nexo-dominio-bus`, `source: nexo.extracao`, dois
+  `detail-type` (`OrcamentoExtraido`, `OrcamentoExtraidoComPendenciaConfirmada`), target
+  `validador-queue` — verificado por leitura do código, `tsc --noEmit -p infra/tsconfig.json` e
+  inspeção do template sintetizado (`cdk synth ValidadorQueueStack`).
+- Template sintetizado confirma exatamente:
+  - `AWS::Events::Rule` (`OrcamentoExtraidoParaValidadorQueue...`) com
+    `EventPattern.source: ["nexo.extracao"]` e
+    `EventPattern.detail-type: ["OrcamentoExtraido", "OrcamentoExtraidoComPendenciaConfirmada"]`;
+  - `Targets[0].Arn` aponta via `Fn::GetAtt` para `ValidadorQueue6C91600B` (a fila `validador-queue`
+    de T003), não uma fila nova;
+  - contagem de recursos do stack: 2 `AWS::SQS::Queue` (fila + DLQ, ambas já existentes de T003,
+    não recriadas), 1 `AWS::SQS::QueuePolicy` (gerada automaticamente pelo CDK para autorizar o
+    target do Rule — efeito colateral esperado de `targets.SqsQueue`, não código manual), 1
+    `AWS::Events::Rule`, 1 `AWS::CloudWatch::Alarm` (de T003, inalterado);
+  - `0` recursos `AWS::Events::EventBus` no stack — confirma que o bus `nexo-dominio-bus` é
+    importado por referência (`props.dominioBus`) e não recriado.
+- `infra/bin/app.ts`: `dominioBus: dominioEventBusStack.dominioBus` passado a
+  `ValidadorQueueStack`, coerente com o mesmo padrão usado por `ClassificadorQueueStack`.
+- Não aplicável: contrato de API, autorização, idempotência de aplicação, handler Lambda — T004 é
+  IaC pura, sem lógica de domínio nesta task (confirmado pelo escopo do dev-back-end).
+
+## 4. Suítes executadas e comandos
+Ambiente: Node 24.18.1 via `source ~/.nvm/nvm.sh && nvm use 24` (default do shell é 18.19.1,
+incompatível — mesma limitação documentada em T003).
+
+1. `corepack pnpm run typecheck:infra` (`tsc --noEmit -p infra/tsconfig.json`) → sem erros.
+2. `corepack pnpm exec cdk synth ValidadorQueueStack --app "npx tsx infra/bin/app.ts"` → sintetiza
+   sem erro; template inspecionado via script Node ad-hoc (ver seção 3).
+3. `corepack pnpm run lint` (`eslint .`) → sem erros.
+4. `git diff main..HEAD -- infra/ specs/.../tasks.md` → confirma escopo declarado pelo
+   dev-back-end: apenas `infra/lib/validador-queue-stack.ts`, `infra/bin/app.ts` (produção) e
+   checkbox de `tasks.md`. Nenhum arquivo `src/` alterado.
+
+Nenhum teste automatizado novo criado: mudança é IaC pura, mesmo padrão de T003 (repositório não
+tem testes de `aws-cdk-lib/assertions` para nenhum dos 3 stacks de fila — lacuna pré-existente e
+uniforme, já registrada em T003, não agravada por esta task).
+
+## 5. Quantidade de testes por tipo
+Nenhum teste novo. Regressão: suíte Vitest completa não impactada (nenhum arquivo `src/`
+alterado por esta task); não reexecutada nesta validação por não haver alteração no runtime da
+aplicação — apenas `typecheck:infra`, `cdk synth` e `lint`, suficientes para o escopo IaC-only
+declarado.
+
+## 6. Resultado
+- `typecheck:infra`: OK, 0 erros.
+- `lint`: OK, 0 erros.
+- `cdk synth ValidadorQueueStack`: OK, template sintetizado e validado conforme critério de aceite.
+- Falhos: 0.
+
+## 7. Cobertura inicial e final
+Não aplicável — nenhum arquivo `src/` alterado por T004; cobertura de domínio/aplicação inalterada.
+Stack CDK segue sem instrumentação de cobertura, mesma situação de T003.
+
+## 8. Allure
+Não gerado — mesma justificativa de T003: repositório não tem adaptador Allure configurado no
+runner atual (Vitest); fora do escopo desta task alterar tooling de relatório sem ADR prévio.
+
+## 9. Bugs por severidade e status
+Nenhum bug encontrado.
+
+## 10. Riscos residuais
+- Mesma lacuna já registrada em T003: nenhum dos 3 stacks de fila tem teste de
+  `aws-cdk-lib/assertions`; nenhum teste hoje detectaria regressão no `EventPattern` ou no target
+  do Rule por engano futuro. Não bloqueia esta entrega — dívida técnica de infra já sinalizada,
+  não agravada por T004.
+- `QueuePolicy` gerada automaticamente pelo CDK concede a `events.amazonaws.com` permissão de
+  `sqs:SendMessage` na fila `validador-queue`, escopada por `aws:SourceArn` à Rule — comportamento
+  padrão do CDK (`targets.SqsQueue`), idêntico ao usado pelos 2 stacks irmãos já mergeados; sem
+  risco novo.
+
+## 11. Limitações do ambiente
+Node 18 é o default do shell; exige `nvm use 24` manual antes de `cdk synth`/testes, mesma
+limitação documentada em T003 pelo dev-back-end.
+
+## 12. Parecer final
+APROVADO PELO QA
