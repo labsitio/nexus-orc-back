@@ -5,7 +5,6 @@ import { ConfirmarRevisaoHumanaLambdaRoleStack } from '../lib/confirmar-revisao-
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
 import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
-import { ValidadorQueueStack } from '../lib/validador-queue-stack.ts';
 
 const app = new App();
 
@@ -41,8 +40,4 @@ new ExtratorQueueStack(app, 'ExtratorQueueStack', {
   description:
     'Fila extrator-queue + DLQ + alarme, roteada por regra EventBridge — spec 002, T003/T004.',
   dominioBus: dominioEventBusStack.dominioBus,
-});
-
-new ValidadorQueueStack(app, 'ValidadorQueueStack', {
-  description: 'Fila validador-queue + DLQ + alarme — spec 003, T003.',
 });
