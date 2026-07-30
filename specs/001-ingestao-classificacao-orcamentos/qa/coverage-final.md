@@ -46,3 +46,37 @@ invariantes.
 Não havia threshold configurado (T003 ainda não existe). QA não configurou
 threshold nesta task — decisão de piso mínimo de cobertura para CI é do
 dev-back-end/arquiteto em T003, para não antecipar decisão fora do escopo de QA.
+
+---
+
+# Coverage Final — T016/T019 (issues #21, #24) — PR #402
+
+Comando: `pnpm exec vitest run --coverage` (vitest 4.1.10, `@vitest/coverage-v8`,
+escopo `src/**`, Node 24.18.1). Suíte completa (12 arquivos, 63 testes — inclui
+trilha 001-E em desenvolvimento paralelo no mesmo worktree, fora do escopo
+deste PR mas coexistente e passando).
+
+```
+Statements   : 92.52% ( 161/174 )
+Branches     : 91.37% ( 53/58 )
+Functions    : 90.32% ( 56/62 )
+Lines        : 92.44% ( 159/172 )
+```
+
+## Arquivo do diff desta task
+`s3-armazenamento-bruto.gateway.ts`: **100%** statements (12/12), branches
+(4/4), functions (3/3) — confirmado via `coverage/coverage-final.json`
+(o resumo em texto do vitest agrupa/omite da tabela arquivos com 100% de
+cobertura nesta versão do reporter; não é ausência de instrumentação).
+
+## Variação vs. baseline
+Queda de statements/functions face à rodada anterior (92.91%→92.52%,
+84%→90.32% funções sobe) explicada pela adição de `interface/http` e
+`application` (trilha 001-E, fora de escopo) e `shared-kernel/database/client.ts`
+(T005, 0% coberto, pré-existente e fora de escopo — sem teste de integração
+com Aurora nesta task). Nenhuma linha nova do diff deste PR (#402) está
+descoberta.
+
+## Threshold
+Ainda não configurado no projeto (decisão pendente de T003/dev-back-end,
+mesma observação de rodadas anteriores).
