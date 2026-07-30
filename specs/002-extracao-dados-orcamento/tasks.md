@@ -12,7 +12,7 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Criar estrutura de pastas `src/bounded-contexts/extracao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/extracao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pela spec 001 — não repetir T001/T002/T003 daquela spec).
+- [x] T001 Criar estrutura de pastas `src/bounded-contexts/extracao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/extracao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pela spec 001 — não repetir T001/T002/T003 daquela spec).
 - [ ] T002 [P] Migração Drizzle Kit: schema inicial do BC Extração (tabelas vazias, baseline) — ADR-001 herdado da spec 001.
 - [ ] T003 [P] Provisionar fila SQS `extrator-queue`, com DLQ própria + alarme CloudWatch (IaC — Ricardo/DevOps).
 - [ ] T004 [P] Provisionar regra EventBridge no bus `nexo-dominio-bus` roteando `detail-type: OrcamentoClassificado`, `source: nexo.ingestao-identificacao` → `extrator-queue`.
@@ -25,13 +25,13 @@
 
 **⚠️ CRITICAL**: nenhuma user story começa antes desta fase.
 
-- [ ] T005 Domain: implementar VOs `OrcamentoId`, `NivelConfianca` (redefinidos localmente neste BC, mesma validação da spec 001, sem import cruzado) em `src/bounded-contexts/extracao/domain/value-objects/`.
-- [ ] T006 Domain: implementar VO genérico `CampoExtraido<T>` — construtor MUST garantir `extraido === false ⟺ valor === null`. Critério de aceite: spec.md "NUNCA preenche o campo com um valor inventado/estimado" — unit test que tenta construir `CampoExtraido` com `extraido: true` e `valor: null` (ou vice-versa) e espera erro de domínio.
-- [ ] T007 [P] Domain: implementar VOs `Dinheiro`, `Quantidade`, `DescricaoProduto`, `PeriodoValidade` (nunca primitivos soltos).
-- [ ] T008 [P] Domain: implementar VOs `ItemOrcamento`, `CondicoesComerciais`, `ReferenciaClassificacao`, `ReferenciaS3` (redefinido localmente), `TentativaExtracao`.
-- [ ] T009 Domain: implementar agregado `ExtracaoOrcamento` (`extracao-orcamento.aggregate.ts`) com métodos `registrarTentativaExtrator` (1+ campo obrigatório sem confiança → transita direto para `PENDENTE_REVISAO_HUMANA`), `registrarConfirmacaoHumana`, invariante de campo obrigatório completo para transitar a `EXTRAIDO`, histórico append-only. Critério: unit test que tenta forçar transição para `EXTRAIDO` com campo obrigatório `extraido: false` e espera erro de domínio.
-- [ ] T010 [P] Domain: definir os 3 Domain Events (`orcamento-extraido`, `extracao-escalonada-revisao-humana`, `orcamento-extraido-pendencia-confirmada`) com `schemaVersion: 1`, `source: nexo.extracao`, conforme convenção do `plan.md`. `extracao-escalonada-revisao-humana` é publicado diretamente quando o Extrator não atinge confiança em 1+ campo obrigatório.
-- [ ] T011 [P] Domain: definir interfaces de repositório/gateway (`extracao-orcamento.repository.ts`, `agente-extrator.gateway.ts`, `leitura-bruta.gateway.ts`, `markitdown-conversao-extracao.acl.ts`) — sem implementação, apenas contratos TypeScript.
+- [x] T005 Domain: implementar VOs `OrcamentoId`, `NivelConfianca` (redefinidos localmente neste BC, mesma validação da spec 001, sem import cruzado) em `src/bounded-contexts/extracao/domain/value-objects/`.
+- [x] T006 Domain: implementar VO genérico `CampoExtraido<T>` — construtor MUST garantir `extraido === false ⟺ valor === null`. Critério de aceite: spec.md "NUNCA preenche o campo com um valor inventado/estimado" — unit test que tenta construir `CampoExtraido` com `extraido: true` e `valor: null` (ou vice-versa) e espera erro de domínio.
+- [x] T007 [P] Domain: implementar VOs `Dinheiro`, `Quantidade`, `DescricaoProduto`, `PeriodoValidade` (nunca primitivos soltos).
+- [x] T008 [P] Domain: implementar VOs `ItemOrcamento`, `CondicoesComerciais`, `ReferenciaClassificacao`, `ReferenciaS3` (redefinido localmente), `TentativaExtracao`.
+- [x] T009 Domain: implementar agregado `ExtracaoOrcamento` (`extracao-orcamento.aggregate.ts`) com métodos `registrarTentativaExtrator` (1+ campo obrigatório sem confiança → transita direto para `PENDENTE_REVISAO_HUMANA`), `registrarConfirmacaoHumana`, invariante de campo obrigatório completo para transitar a `EXTRAIDO`, histórico append-only. Critério: unit test que tenta forçar transição para `EXTRAIDO` com campo obrigatório `extraido: false` e espera erro de domínio.
+- [x] T010 [P] Domain: definir os 3 Domain Events (`orcamento-extraido`, `extracao-escalonada-revisao-humana`, `orcamento-extraido-pendencia-confirmada`) com `schemaVersion: 1`, `source: nexo.extracao`, conforme convenção do `plan.md`. `extracao-escalonada-revisao-humana` é publicado diretamente quando o Extrator não atinge confiança em 1+ campo obrigatório.
+- [x] T011 [P] Domain: definir interfaces de repositório/gateway (`extracao-orcamento.repository.ts`, `agente-extrator.gateway.ts`, `leitura-bruta.gateway.ts`, `markitdown-conversao-extracao.acl.ts`) — sem implementação, apenas contratos TypeScript.
 - [ ] T012 Infrastructure: schema Drizzle das tabelas `extracoes_orcamento` (estado atual, `itens`/`condicoes_comerciais` JSONB — ADR-004) e `extracoes_orcamento_historico` (append-only, sem UPDATE/DELETE) + migração.
 - [ ] T013 Infrastructure: `DrizzleExtracaoOrcamentoRepository` implementando `ExtracaoOrcamentoRepository`, traduzindo linha↔agregado, nunca vazando tipo JSONB bruto para fora da Infra.
 - [ ] T014 [P] Infrastructure: `S3LeituraBrutaGateway` implementando `LeituraBrutaGateway` — read-only sobre `nexo-orcamentos-raw`, sem nenhuma permissão de escrita.
