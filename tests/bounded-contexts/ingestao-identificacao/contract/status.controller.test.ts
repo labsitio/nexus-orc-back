@@ -123,7 +123,61 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
     });
 
     expect(resposta.statusCode).toBe(200);
-    expect(resposta.json().status).toBe('PENDENTE_REVISAO_HUMANA');
+    const corpo = resposta.json();
+    expect(corpo.status).toBe('PENDENTE_REVISAO_HUMANA');
+    expect(corpo.resultadoAtual).toMatchObject({
+      nivelConfianca: 62,
+      agenteOrigem: 'CLASSIFICADOR',
+    });
+    expect(corpo.historico).toHaveLength(1);
+    expect(corpo.historico[0]).toMatchObject({
+      agente: 'CLASSIFICADOR',
+      resultado: { nivelConfianca: 62 },
+    });
+  });
+
+  it('200 PENDENTE_REVISAO_HUMANA seguido de confirmação humana — histórico do Classificador preservado', async () => {
+    const id = OrcamentoId.novo();
+    const orcamento = Orcamento.receber({
+      id,
+      canal: Canal.de('API_REST'),
+      referenciaBruta: criarReferenciaBruta(),
+    });
+    orcamento.registrarTentativaClassificador(
+      ResultadoClassificacao.criar({
+        fornecedorIdentificado: 'Fornecedor Incerto',
+        formatoIdentificado: 'PLANILHA_XLSX',
+        nivelConfianca: NivelConfianca.de(40),
+        agenteOrigem: 'CLASSIFICADOR',
+      }),
+    );
+    orcamento.registrarConfirmacaoHumana(
+      ResultadoClassificacao.criar({
+        fornecedorIdentificado: 'Distribuidora ABC Ltda',
+        formatoIdentificado: 'PDF_TABELA_PADRAO',
+        nivelConfianca: NivelConfianca.de(100),
+        agenteOrigem: 'HUMANO',
+      }),
+    );
+    await repositorio.salvar(orcamento);
+
+    const resposta = await app.inject({
+      method: 'GET',
+      url: `/v1/orcamentos/${id.toString()}/status`,
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    const corpo = resposta.json();
+    expect(corpo.status).toBe('CLASSIFICADO');
+    expect(corpo.historico).toHaveLength(2);
+    expect(corpo.historico[0]).toMatchObject({
+      agente: 'CLASSIFICADOR',
+      resultado: { nivelConfianca: 40, fornecedorIdentificado: 'Fornecedor Incerto' },
+    });
+    expect(corpo.historico[1]).toMatchObject({
+      agente: 'HUMANO',
+      resultado: { nivelConfianca: 100, fornecedorIdentificado: 'Distribuidora ABC Ltda' },
+    });
   });
 
   it('404 Problem Details para orcamentoId inexistente', async () => {
@@ -147,5 +201,29 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
 
     expect(resposta.statusCode).toBe(400);
     expect(resposta.headers['content-type']).toContain('application/problem+json');
+  });
+
+  it('propaga (500) erro inesperado do repositório sem mascarar como 404', async () => {
+    const appComRepositorioQuebrado = Fastify();
+    const repositorioQuebrado: OrcamentoRepository = {
+      salvar: () => {
+        throw new Error('não usado neste teste');
+      },
+      buscarPorId: () => {
+        throw new Error('falha inesperada de infraestrutura');
+      },
+    };
+    registrarRotaStatusOrcamento(
+      appComRepositorioQuebrado,
+      new ConsultarStatusOrcamento(repositorioQuebrado),
+    );
+
+    const resposta = await appComRepositorioQuebrado.inject({
+      method: 'GET',
+      url: `/v1/orcamentos/${OrcamentoId.novo().toString()}/status`,
+    });
+
+    expect(resposta.statusCode).toBe(500);
+    await appComRepositorioQuebrado.close();
   });
 });

@@ -133,3 +133,60 @@ PR (pertencem à trilha 001-E, em desenvolvimento paralelo no mesmo
 worktree). Não quebra build/lint/teste; sinalizado ao dev-back-end como
 possível arraste acidental de lockfile do worktree compartilhado, para
 avaliar remoção em commit separado.
+
+---
+
+# Relatório de execução — T044–T047 (issues #49–#52) — PR #404
+
+Commit testado: `56cf669` (PR #404, draft, branch `feat/001-e-us4-v2`, base
+`main`@`6eaab14`).
+
+## Comandos e resultados
+
+```
+$ source ~/.nvm/nvm.sh && nvm use 24
+Now using node v24.18.1
+
+$ pnpm install --frozen-lockfile
+Already up to date
+EXIT=0
+
+$ pnpm run typecheck        # tsc --noEmit
+EXIT=0 (sem output)
+
+$ pnpm run lint              # eslint .
+EXIT=0 (sem output)
+
+$ npx vitest run --coverage
+Test Files  12 passed (12)
+Tests       68 passed (68)      # 66 pré-existentes + 2 novos (QA)
+Statements 93.1% | Branches 94.82% | Functions 90.32% | Lines 93.02%
+EXIT=0
+```
+
+## Testes adicionados por QA (sem alterar produção)
+Em `tests/bounded-contexts/ingestao-identificacao/contract/status.controller.test.ts`:
+1. Reforço do teste `200 PENDENTE_REVISAO_HUMANA` — passou a afirmar
+   `historico[0]` (agente/nivelConfianca) e `resultadoAtual`, que antes só
+   checava `status`.
+2. Novo teste: `200 PENDENTE_REVISAO_HUMANA seguido de confirmação humana` —
+   valida via HTTP (`app.inject`) que o histórico da tentativa do
+   Classificador (40%) permanece intacto após `registrarConfirmacaoHumana`,
+   com a nova entrada (HUMANO, 100%) anexada — mesmo critério do T045, mas
+   exercitado na camada HTTP/serialização, não só no caso de uso.
+3. Novo teste: `propaga (500) erro inesperado do repositório sem mascarar
+   como 404` — cobre o branch de rethrow do controller (antes 75% branch,
+   0 teste).
+
+## Conclusão
+68/68 testes passando (0 falhas, 0 regressões). `tsc --noEmit` e `eslint .`
+limpos. Os 3 arquivos do diff de produção (T044/T046/T047) com 100%
+statements/lines. Nenhum defeito de produção encontrado. Critérios de
+aceite de US4 (3 estados consultáveis, 404 RFC 7807, histórico preservado
+após confirmação humana) verificados tanto no nível de contrato quanto de
+integração.
+
+## Limitação de ambiente aceita
+`DrizzleOrcamentoRepository` real (T011, issue #16) ainda não mergeado —
+sem wiring de produção contra Aurora nesta task; esperado e fora de escopo
+deste PR (confirmado pelo dev-back-end na invocação).

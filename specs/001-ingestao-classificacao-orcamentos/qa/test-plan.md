@@ -139,3 +139,65 @@ anteriores). `allure-results/` regenerado nesta execução.
   linhas), registrado para reforço futuro, não bloqueia esta entrega.
 - Repositório/persistência (T011) ainda não existe — T016 testa apenas
   criação em memória do agregado, não round-trip de persistência.
+
+---
+
+# Test Plan — T044–T047 (issues #49–#52) — PR #404
+
+## Escopo
+US4 (status consultável): `status.schema.ts` (T044), `ConsultarStatusOrcamento`
+(T046), `status.controller.ts`/`GET /v1/orcamentos/{orcamentoId}/status` (T047).
+
+## Fora de escopo
+`DrizzleOrcamentoRepository` real (T011, issue #16, ainda `ready`) —
+`ConsultarStatusOrcamento` depende só da interface `OrcamentoRepository`
+(T009), testado com fake in-memory. Wiring de produção contra Aurora fica
+para quando #16 for mergeada. IAM (T048), métrica CloudWatch (T049).
+
+## Riscos
+- Histórico da tentativa do Classificador sobrescrito por confirmação humana
+  posterior (viola critério de aceite "não apagar registro anterior").
+- 404 sem `content-type: application/problem+json` (RFC 7807).
+- `resultadoAtual` não refletir a última tentativa quando status é
+  `PENDENTE_REVISAO_HUMANA` (campo consultável mas confuso se null).
+- Erro inesperado do repositório mascarado como 404 (esconde falha real).
+
+## Níveis e tipos de teste
+Contrato (schema Zod isolado + controller via `fastify.inject`), integração
+(caso de uso against fake de `OrcamentoRepository`).
+
+## Ambientes e dependências
+Node 24.18.1 (nvm), pnpm 11.18.0, vitest 4.1.10, fastify (`app.inject`, sem
+subir servidor real).
+
+## Estratégia de dados
+Fixtures inline via VOs reais do domínio (`Orcamento.receber` +
+`registrarTentativaClassificador`/`registrarConfirmacaoHumana`).
+
+## Estratégia de mocks/fakes
+`OrcamentoRepositoryFake` in-memory (`Map`), já escrito pelo dev-back-end —
+reaproveitado; QA adicionou um repositório fake que lança erro síncrono para
+exercitar o branch de rethrow do controller.
+
+## Critérios de entrada
+PR #404 (draft), branch `feat/001-e-us4-v2`, commit `56cf669`, base `main`@`6eaab14`.
+
+## Critérios de saída
+Suíte completa passando, `tsc --noEmit`/`eslint .` limpos, os 3 arquivos do
+diff com 100% statements/lines, sem defeito crítico/alto aberto.
+
+## Abordagem Allure
+Reaproveitado `allure-vitest` já configurado.
+
+## Ordem de execução
+1. `pnpm install --frozen-lockfile`
+2. `pnpm run typecheck`
+3. `pnpm run lint`
+4. `pnpm exec vitest run --coverage`
+
+## Limitações
+- Sem `DrizzleOrcamentoRepository` real — aceito, fora de escopo deste PR
+  (issue #16 ainda `ready`).
+- Sem teste de carga/concorrência na consulta (query read-only sem estado
+  compartilhado — risco considerado baixo, não há escrita concorrente neste
+  caso de uso).
