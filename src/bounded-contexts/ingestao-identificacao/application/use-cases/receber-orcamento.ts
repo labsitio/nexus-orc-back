@@ -17,6 +17,13 @@ export interface ReceberOrcamentoParams {
   readonly referenciaExterna?: string;
   /** Header `Idempotency-Key` — opcional, os 3 canais de upload via API o suportam. */
   readonly idempotencyKey?: string;
+  /**
+   * `OrcamentoId` provisório já gerado por `POST /upload-url` (T021/#26) —
+   * `confirmar-upload` (T022/#27) o repassa aqui para que a identidade
+   * devolvida ao cliente na 1ª chamada seja a mesma persistida na 2ª.
+   * Omitido nos canais que não passam por upload-url (ex. SFTP, T023/#28).
+   */
+  readonly orcamentoId?: OrcamentoId;
 }
 
 /**
@@ -49,7 +56,7 @@ export class ReceberOrcamento {
     );
 
     const orcamento = Orcamento.receber({
-      id: OrcamentoId.novo(),
+      id: params.orcamentoId ?? OrcamentoId.novo(),
       canal,
       referenciaBruta,
       referenciaExterna: params.referenciaExterna,

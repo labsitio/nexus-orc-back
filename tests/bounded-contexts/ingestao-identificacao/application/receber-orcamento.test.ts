@@ -13,6 +13,7 @@ function armazenamentoFake(referencia: ReferenciaS3): ArmazenamentoBrutoGateway 
   return {
     armazenar: vi.fn().mockResolvedValue(referencia),
     lerConteudoBruto: vi.fn(),
+    gerarUrlUpload: vi.fn(),
   };
 }
 
