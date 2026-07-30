@@ -25,7 +25,7 @@
 
 **⚠️ CRITICAL**: nenhuma user story começa antes desta fase.
 
-- [ ] T005 Domain: implementar VOs `OrcamentoId`, `Dinheiro`, `PeriodoValidade` (redefinidos localmente neste BC, mesma validação das specs 001/002, sem import cruzado) em `src/bounded-contexts/validacao/domain/value-objects/`.
+- [x] T005 Domain: implementar VOs `OrcamentoId`, `Dinheiro`, `PeriodoValidade` (redefinidos localmente neste BC, mesma validação das specs 001/002, sem import cruzado) em `src/bounded-contexts/validacao/domain/value-objects/`.
 - [ ] T006 Domain: implementar VO `CNPJ` — valida formato (14 dígitos) e dígito verificador (algoritmo determinístico, sem chamada externa); lança erro de domínio se inválido. Critério de aceite: unit test com CNPJ de dígito verificador incorreto → erro de domínio, nunca aceito silenciosamente.
 - [ ] T007 [P] Domain: implementar VOs `FaixaPreco`, `CategoriaItem`, `InconsistenciaDetectada` (com campo `regra` enumerado e `detalhe` legível — critério de aceite spec.md "identifica especificamente qual regra falhou").
 - [ ] T008 [P] Domain: implementar VOs `DadosExtraidosParaValidacao`, `ItemParaValidacao` (preserva `extraido: boolean` do item de origem), `TentativaValidacao`.
