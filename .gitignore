@@ -7,3 +7,4 @@ dist/
 coverage/
 .husky/_/
 cdk.out/
+.claude/worktrees/
