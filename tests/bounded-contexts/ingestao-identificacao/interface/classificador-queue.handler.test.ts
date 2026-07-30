@@ -1,3 +1,4 @@
+import { pino } from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { criarClassificadorQueueHandler } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/events/classificador-queue.handler.js';
 import type { ClassificarOrcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/classificar-orcamento.js';
@@ -8,6 +9,16 @@ function useCaseFake(executar: (orcamentoId: string) => Promise<void>): Classifi
 
 function envelopeEventBridge(orcamentoId: string): string {
   return JSON.stringify({ detail: { orcamentoId } });
+}
+
+/** Logger pino real gravando em memória — permite inspecionar os campos logados (correlação). */
+function loggerDeTeste() {
+  const linhas: Record<string, unknown>[] = [];
+  const logger = pino(
+    { level: 'info' },
+    { write: (linha: string) => linhas.push(JSON.parse(linha) as Record<string, unknown>) },
+  );
+  return { logger, linhas };
 }
 
 describe('criarClassificadorQueueHandler', () => {
@@ -54,5 +65,30 @@ describe('criarClassificadorQueueHandler', () => {
 
     expect(executar).not.toHaveBeenCalled();
     expect(resposta.batchItemFailures).toEqual([{ itemIdentifier: 'm1' }]);
+  });
+
+  it('correlaciona todo log por orcamentoId e messageId (T036)', async () => {
+    const executar = vi.fn().mockResolvedValue(undefined);
+    const { logger, linhas } = loggerDeTeste();
+    const handler = criarClassificadorQueueHandler(useCaseFake(executar), logger);
+
+    await handler({ Records: [{ messageId: 'm1', body: envelopeEventBridge('id-1') }] });
+
+    expect(linhas).toHaveLength(2);
+    for (const linha of linhas) {
+      expect(linha.orcamentoId).toBe('id-1');
+      expect(linha.messageId).toBe('m1');
+    }
+  });
+
+  it('loga erro correlacionado por messageId mesmo sem orcamentoId extraído (envelope inválido)', async () => {
+    const { logger, linhas } = loggerDeTeste();
+    const handler = criarClassificadorQueueHandler(useCaseFake(vi.fn()), logger);
+
+    await handler({ Records: [{ messageId: 'm1', body: '{"algo":"invalido"}' }] });
+
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0]?.level).toBe(50); // pino: nível "error"
+    expect(linhas[0]?.messageId).toBe('m1');
   });
 });
