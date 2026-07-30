@@ -76,7 +76,7 @@
 
 ### Tests (US2)
 
-- [ ] T027 [P] [US2] Unit test `Orcamento.registrarTentativaClassificador` — confiança ≥80 transita para CLASSIFICADO; <80 transita direto para PENDENTE_REVISAO_HUMANA (publica `OrcamentoEscalonadoParaRevisaoHumana`); nunca aceita valor de confiança fora de 0–100.
+- [x] T027 [P] [US2] Unit test `Orcamento.registrarTentativaClassificador` — confiança ≥80 transita para CLASSIFICADO; <80 transita direto para PENDENTE_REVISAO_HUMANA (publica `OrcamentoEscalonadoParaRevisaoHumana`); nunca aceita valor de confiança fora de 0–100.
 - [ ] T028 [P] [US2] Unit test do `MarkItDownConversaoACL` (mock de saída do MarkItDown) — sanitização de conteúdo antes de compor prompt (mitigação de prompt injection).
 - [ ] T029 [P] [US2] Integration test consumidor SQS `classificador-queue` → publica evento correto conforme confiança simulada do gateway Bedrock mockado.
 
