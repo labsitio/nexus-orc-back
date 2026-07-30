@@ -15,6 +15,13 @@
       "when": 1785434593961,
       "tag": "0001_orcamentos_historico_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785436885651,
+      "tag": "0002_platform_conformidade_baseline",
+      "breakpoints": true
     }
   ]
 }
