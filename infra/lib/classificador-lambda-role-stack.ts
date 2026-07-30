@@ -18,6 +18,11 @@ export interface ClassificadorLambdaRoleStackProps extends StackProps {
  * - `bedrock:InvokeModel` restrito ao ARN do modelo aprovado (parâmetro de
  *   deploy, nunca wildcard `*` em `Resource`).
  * - `s3:GetObject` restrito ao bucket raw, sem `s3:DeleteObject`.
+ * - `lambda:InvokeFunction` restrito ao ARN do Lambda dedicado do MarkItDown
+ *   (T030) — sem essa permissão `MarkItDownConversaoACL` falha em runtime
+ *   com AccessDenied (backend-reviewer, achado MAJOR). Parâmetro de deploy
+ *   igual ao do modelo Bedrock: a stack que provisiona esse Lambda ainda não
+ *   existe nesta spec, então o ARN é passado externamente.
  * - Permissões mínimas de execução Lambda (logs) e de consumo da própria
  *   fila (`classificador-queue`) — sem elas o Lambda não roda, mas nenhuma
  *   delas concede acesso além do necessário para essa função específica.
@@ -33,6 +38,12 @@ export class ClassificadorLambdaRoleStack extends Stack {
       type: 'String',
       description:
         'ARN do modelo Bedrock aprovado para classificação (least privilege — nunca "*" em Resource).',
+    });
+
+    const markItDownLambdaArn = new CfnParameter(this, 'MarkItDownLambdaArn', {
+      type: 'String',
+      description:
+        'ARN do Lambda dedicado ao MarkItDown (T030) invocado por MarkItDownConversaoACL — least privilege, nunca "*" em Resource.',
     });
 
     this.classificadorLambdaRole = new iam.Role(this, 'ClassificadorLambdaRole', {
@@ -56,6 +67,14 @@ export class ClassificadorLambdaRoleStack extends Stack {
         sid: 'LerBrutoDoBucketRaw',
         actions: ['s3:GetObject', 's3:GetObjectVersion'],
         resources: [`${props.orcamentosRawBucket.bucketArn}/*`],
+      }),
+    );
+
+    this.classificadorLambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'InvocarMarkItDownLambda',
+        actions: ['lambda:InvokeFunction'],
+        resources: [markItDownLambdaArn.valueAsString],
       }),
     );
 

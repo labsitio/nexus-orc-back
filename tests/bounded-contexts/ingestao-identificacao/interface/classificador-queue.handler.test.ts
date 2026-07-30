@@ -1,6 +1,7 @@
 import { pino } from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { criarClassificadorQueueHandler } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/events/classificador-queue.handler.js';
+import { TransicaoInvalidaError } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
 import type { ClassificarOrcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/classificar-orcamento.js';
 
 function useCaseFake(executar: (orcamentoId: string) => Promise<void>): ClassificarOrcamento {
@@ -90,5 +91,22 @@ describe('criarClassificadorQueueHandler', () => {
     expect(linhas).toHaveLength(1);
     expect(linhas[0]?.level).toBe(50); // pino: nível "error"
     expect(linhas[0]?.messageId).toBe('m1');
+  });
+
+  it('trata TransicaoInvalidaError como sucesso idempotente (redelivery SQS at-least-once), nunca como batch item failure', async () => {
+    const executar = vi
+      .fn()
+      .mockRejectedValue(
+        new TransicaoInvalidaError('CLASSIFICADO', 'registrarTentativaClassificador'),
+      );
+    const { logger, linhas } = loggerDeTeste();
+    const handler = criarClassificadorQueueHandler(useCaseFake(executar), logger);
+
+    const resposta = await handler({
+      Records: [{ messageId: 'm1', body: envelopeEventBridge('id-ja-processado') }],
+    });
+
+    expect(resposta.batchItemFailures).toHaveLength(0);
+    expect(linhas.some((linha) => linha.level === 50)).toBe(false);
   });
 });

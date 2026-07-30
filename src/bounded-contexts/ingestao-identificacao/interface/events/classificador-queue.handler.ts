@@ -1,5 +1,6 @@
 import type { Logger } from 'pino';
 import type { ClassificarOrcamento } from '../../application/use-cases/classificar-orcamento.js';
+import { TransicaoInvalidaError } from '../../domain/orcamento.aggregate.js';
 import { criarLogger } from '../../infrastructure/observability/logger.js';
 
 /**
@@ -44,7 +45,12 @@ function ehEventBridgeEnvelope(valor: unknown): valor is EventBridgeEnvelope {
  * Reporta falhas item-a-item — uma mensagem malformada ou um erro de
  * classificação isolado nunca bloqueia as demais mensagens do lote, e a
  * mensagem falha retorna à fila (até `maxReceiveCount`, depois DLQ —
- * Princípio IV, exceção nunca silenciosa).
+ * Princípio IV, exceção nunca silenciosa). `TransicaoInvalidaError` é
+ * tratado como sucesso idempotente (log info, nunca batch item failure):
+ * SQS é at-least-once, uma redelivery de uma mensagem já processada com
+ * sucesso encontra o agregado fora de `RECEBIDO` — isso é redelivery
+ * normal, não falha real, e nunca deve ir para a DLQ nem disparar o alarme
+ * de T033 (backend-reviewer, achado MAJOR).
  *
  * Usa o logger pino compartilhado (T015/#20): `logger.child({orcamentoId,
  * messageId})` amarra cada log deste handler à mensagem/orçamento sendo
@@ -75,6 +81,13 @@ export function criarClassificadorQueueHandler(
         await classificarOrcamento.executar(orcamentoId);
         logDoOrcamento.info('Orçamento classificado com sucesso');
       } catch (erro) {
+        if (erro instanceof TransicaoInvalidaError) {
+          logDaMensagem.info(
+            { orcamentoId },
+            'Mensagem redelivered (at-least-once) para orçamento já processado — ignorada como sucesso idempotente',
+          );
+          continue;
+        }
         logDaMensagem.error({ orcamentoId, err: erro }, 'Falha ao classificar orçamento');
         falhas.push({ itemIdentifier: record.messageId });
       }
