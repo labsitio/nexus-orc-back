@@ -36,6 +36,20 @@
       "when": 1785451601545,
       "tag": "0004_validacao_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785453712702,
+      "tag": "0005_small_captain_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785453712703,
+      "tag": "0006_extracoes_orcamento_historico_append_only",
+      "breakpoints": true
     }
   ]
 }

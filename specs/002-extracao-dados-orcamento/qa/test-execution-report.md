@@ -1,3 +1,59 @@
+# Test Execution Report — SPEC 002
+
+## Leva T012 (issue #77, PR #423, commit `27409c6`)
+
+### Escopo
+Schema Drizzle `extracao.extracoes_orcamento` / `extracao.extracoes_orcamento_historico`
+(ADR-004) + migração `0005_small_captain_america.sql` (gerada) +
+`0006_extracoes_orcamento_historico_append_only.sql` (trigger hand-authored).
+
+### Ambiente
+- `docker compose up -d postgres` (Postgres 16, `pgvector/pgvector:pg16`, mesmo
+  `docker-compose.yml` do projeto).
+- Limitação de ambiente local: máquina de QA tem um Postgres nativo (não-Docker)
+  também escutando em `127.0.0.1:5432`; conexões via driver `pg`/Node em
+  `localhost:5432` foram roteadas para esse Postgres nativo em vez do container
+  (`role "nexo" does not exist`), enquanto `docker exec ... psql` (dentro do
+  container) conectava corretamente. Contornado remapeando a porta do container
+  (`POSTGRES_PORT=55432 docker compose up -d postgres`) — não afeta CI (sem esse
+  conflito de porta).
+
+### Execução
+1. Estático: `npx tsc --noEmit` — sem erros. `npx eslint` nos arquivos alterados
+   — sem erros. `npx drizzle-kit generate` — **"No schema changes, nothing to
+   migrate"** (schema TS já corresponde à migração commitada, sem diff pendente).
+2. Migração real: `npx drizzle-kit migrate` contra Postgres limpo (baseline
+   T002 aplicado) — **falha, exit 1**. Causa raiz isolada rodando
+   `drizzle/0005_small_captain_america.sql` direto via `psql`: `ERROR: type
+   "bigserial" does not exist` no primeiro statement (`ALTER COLUMN "id" SET
+   DATA TYPE bigserial`). Nenhuma coluna nova de T012 é criada em nenhuma das
+   duas tabelas.
+3. Teste de integração (`extracao-orcamento.schema.test.ts`, `DATABASE_URL`
+   setado, Postgres real): **5 de 7 casos falham** — os 2 que só tocam
+   `extracoes_orcamento` (não `extracoes_orcamento_historico`) passam; os 5
+   que inserem em `extracoes_orcamento_historico` falham com
+   `null value in column "id" ... violates not-null constraint`, porque a
+   coluna nunca foi migrada de `uuid` para `bigserial`.
+4. Sem `DATABASE_URL`: suíte é corretamente pulada (`describe.skipIf`) — 7
+   testes skipped, suíte geral não quebra.
+
+### Resultado
+**REPROVADO** — ver `bugs/BUG-003.md` (CRÍTICA). Migração gerada por
+`drizzle-kit generate` não é aplicável em Postgres real a partir do baseline
+T002; quebra `pnpm run db:migrate` do CI (`.github/workflows/ci.yml:63`) e o
+próprio teste de integração escrito para esta task.
+
+### Comandos usados (reprodutíveis)
+```bash
+docker compose up -d postgres
+export DATABASE_URL=postgresql://nexo:nexo@localhost:5432/nexo
+npx drizzle-kit generate   # confirma: sem diff pendente
+npx drizzle-kit migrate    # falha, exit 1
+npx vitest run tests/bounded-contexts/extracao/infrastructure/persistence/schema/extracao-orcamento.schema.test.ts
+```
+
+---
+
 # Test Execution Report — SPEC 002 (leva T001, T005-T011)
 
 ## Comando

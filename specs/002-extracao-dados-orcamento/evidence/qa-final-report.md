@@ -1,6 +1,166 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
-## Leva atual — T004 (issue #69)
+## Reteste — T012 (issue #77), BUG-003 corrigido
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #423 (draft), branch `feat/002-t012-extracao-schema-drizzle`, commit `97bf2fc`
+
+### Resumo executivo
+Correção da migração `drizzle/0005_small_captain_america.sql` (BUG-003):
+`ALTER COLUMN "id" SET DATA TYPE bigserial` (SQL inválido) substituído pela
+expansão manual real de `bigserial` — `DROP DEFAULT` → `ALTER COLUMN ... TYPE
+bigint USING NULL` → `CREATE SEQUENCE` própria → `SET DEFAULT nextval(...)` →
+`SET NOT NULL`. Constraint de PK original não foi tocada. Único arquivo de
+produção alterado é a migração; schema TS e teste de integração não mudaram.
+
+### Reteste independente do QA (não baseado no relato do dev-back-end)
+```bash
+docker run -d --name qa-bug003-pg -e POSTGRES_USER=nexo -e POSTGRES_PASSWORD=nexo \
+  -e POSTGRES_DB=nexo -p 0:5432 pgvector/pgvector:pg16
+for f in drizzle/000{0,1,2,3,4,5,6}*.sql; do
+  psql -h localhost -p <porta> -U nexo -d nexo -v ON_ERROR_STOP=1 -f "$f"
+done
+# todas as 7 migrações aplicaram sem erro
+
+DATABASE_URL=postgresql://nexo:nexo@localhost:<porta>/nexo \
+  npx vitest run tests/bounded-contexts/extracao/infrastructure/persistence/schema/extracao-orcamento.schema.test.ts
+# Test Files 1 passed (1) / Tests 7 passed (7)
+
+DATABASE_URL=... npx drizzle-kit generate
+# "No schema changes, nothing to migrate"
+
+npx vitest run
+# Test Files 38 passed | 4 skipped (42) / Tests 176 passed | 19 skipped (195)
+```
+`\d extracao.extracoes_orcamento_historico` confirmado: `id bigint not null
+default nextval('extracao.extracoes_orcamento_historico_id_seq'::regclass)`,
+PK `extracoes_orcamento_historico_pkey` intacta.
+
+### Resultado: aprovados, falhos, ignorados e instáveis
+7/7 no teste de integração alvo (antes: 2 passed/5 failed). 176 passed/19
+skipped na suíte completa, sem `DATABASE_URL` — mesma baseline da leva
+anterior, sem regressão.
+
+### Bugs por severidade e status
+- CRÍTICA (1): BUG-003 — **VALIDADO** pelo QA neste reteste.
+- Herdados, não relacionados a esta correção: BUG-001 (BAIXA, PRONTO PARA
+  RETESTE), BUG-002 (VALIDADO).
+
+### Riscos residuais
+Nenhum novo. BUG-001 (nit de encapsulamento, severidade BAIXA) segue aberto
+para reteste em leva futura, fora do escopo desta correção.
+
+### Parecer final
+**APROVADO PELO QA**
+
+Motivo: BUG-003 corrigido e validado de forma independente contra Postgres 16
+real, reproduzindo o cenário exato que causava a falha original (baseline T002
+→ aplicar 0005+0006). Sem regressão na suíte completa. Libera T013.
+
+---
+
+## Leva anterior (REPROVADA) — T012 (issue #77)
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #423 (draft), branch `feat/002-t012-extracao-schema-drizzle`, commit `27409c6`
+
+### Resumo executivo
+T012 evolui o schema Drizzle (baseline vazio da T002) para as colunas reais de
+`extracao.extracoes_orcamento` e `extracao.extracoes_orcamento_historico`
+(ADR-004: itens/condições comerciais em JSONB; histórico append-only via
+trigger hand-authored, mesmo padrão da spec 001). O código TypeScript do
+schema está correto e corresponde exatamente à migração commitada (`drizzle-kit
+generate` não aponta diff pendente), e o teste de integração escrito pelo
+dev-back-end é completo (CHECKs, índice, triggers, defaults). Porém a migração
+gerada (`0005_small_captain_america.sql`) contém um statement SQL inválido
+(`ALTER COLUMN ... SET DATA TYPE bigserial`) que quebra `drizzle-kit migrate`
+em Postgres real a partir do baseline — confirmado rodando contra um Postgres
+16 real via `docker compose`, não apenas por leitura de código. Isso derruba
+o próprio teste de integração (5/7 falhas) e o step `db:migrate` do CI. Ver
+BUG-003.
+
+### Requisitos cobertos e não cobertos
+Cobertos (estático + integração real):
+- Schema TS ≡ migração commitada (sem diff pendente em `drizzle-kit generate`).
+- Colunas, tipos e defaults de `extracoes_orcamento` conforme ADR-004
+  (verificado com Postgres real, apesar da migração 0005 falhar — as colunas
+  desta tabela específica migram com sucesso, só a mudança de tipo do `id`
+  de `extracoes_orcamento_historico` quebra).
+- CHECK de `status` e `referencia_classificacao_agente_origem` (verificado
+  em Postgres real).
+
+Não cobertos / bloqueado por BUG-003:
+- Migração aplicando de ponta a ponta em Postgres real a partir do baseline.
+- CHECKs e triggers de `extracoes_orcamento_historico` (agente_valido,
+  sucesso_xor_insucesso, append-only UPDATE/DELETE) — o teste que os exercita
+  falha antes de chegar à asserção de negócio, porque o INSERT básico já
+  falha (coluna `id` não migrada).
+
+### Suítes executadas e comandos
+```bash
+docker compose up -d postgres
+export DATABASE_URL=postgresql://nexo:nexo@localhost:5432/nexo
+npx tsc --noEmit                      # OK
+npx eslint src/.../extracao-orcamento.schema.ts tests/.../extracao-orcamento.schema.test.ts   # OK
+npx drizzle-kit generate              # "No schema changes, nothing to migrate"
+npx drizzle-kit migrate               # FAIL, exit 1
+npx vitest run tests/bounded-contexts/extracao/infrastructure/persistence/schema/extracao-orcamento.schema.test.ts
+# 5 failed | 2 passed (7)
+```
+
+### Quantidade de testes por tipo
+1 arquivo de teste de integração (Postgres real), 7 casos: 2 passaram, 5
+falharam por BUG-003. Sem testes unitários nesta task (escopo é só schema +
+migração, sem lógica de aplicação).
+
+### Resultado: aprovados, falhos, ignorados e instáveis
+- Sem `DATABASE_URL`: 7 skipped (comportamento correto, não quebra o restante
+  da suíte).
+- Com `DATABASE_URL` (Postgres real): 2 passed, 5 failed — determinístico,
+  reproduzido 2x.
+- `tsc --noEmit`: OK. `eslint`: OK.
+
+### Cobertura inicial e final
+N/A — task de schema/migração (DDL), sem lógica de aplicação; projeto não
+mede cobertura de arquivos de schema Drizzle (mesmo critério já registrado em
+`qa/coverage-baseline.md` para VOs/agregado desta spec).
+
+### Local do allure-results e do relatório Allure
+N/A nesta leva — sem execução via Vitest com reporter Allure habilitado
+(gap ambiental pré-existente, ver `qa/coverage-baseline.md`); evidência
+coletada via saída direta do `vitest run` e do `psql`.
+
+### Bugs por severidade e status
+- CRÍTICA (1): BUG-003 — migração 0005 (T012) quebra em Postgres real
+  (`ALTER COLUMN ... SET DATA TYPE bigserial` inválido). ABERTO, bloqueante.
+- Herdados de leva anterior, não relacionados a esta task: BUG-001 (BAIXA,
+  PRONTO PARA RETESTE), BUG-002 (VALIDADO).
+
+### Riscos residuais
+- BUG-003 bloqueia merge e bloqueia T013 (repositório) — ver handoff.
+- Ambiente de QA tinha Postgres nativo conflitando na porta 5432; contornado
+  com remapeamento de porta local — não afeta CI, apenas retardou o
+  diagnóstico (documentado em `qa/test-execution-report.md`).
+
+### Limitações do ambiente
+Nenhuma limitação bloqueante: Docker disponível, `docker-compose.yml` do
+projeto usado para subir Postgres 16 real e validar de fato as constraints/
+triggers/migração — não apenas compilação estática.
+
+### Parecer final
+**REPROVADO — DEVOLVIDO AO DEV-BACK-END**
+
+Motivo: BUG-003 (CRÍTICA) — a migração gerada para T012 não aplica em
+Postgres real a partir do baseline, quebrando `db:migrate` do CI e o próprio
+teste de integração escrito para esta task. O schema TypeScript e o teste de
+integração em si estão corretos e não precisam de alteração; o defeito está
+exclusivamente no SQL da migração `0005_small_captain_america.sql`.
+
+---
+
+## Leva anterior — T004 (issue #69)
 
 ### SPEC_ID e versão testada
 SPEC_ID: 002-extracao-dados-orcamento
