@@ -8,3 +8,5 @@ coverage/
 .husky/_/
 cdk.out/
 .claude/worktrees/
+allure-results/
+allure-report/

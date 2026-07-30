@@ -1,44 +1,64 @@
-# Test Plan — T001 (issue #6)
+# Test Plan — T004/T006–T009 (issues #9, #11, #12, #13, #14)
 
 ## Escopo
-T001 — scaffolding do monorepo (`package.json`, `tsconfig.json`, `.npmrc`,
-`.gitignore`, `src/index.ts` placeholder, `pnpm-lock.yaml`). Nenhum código de
-domínio, endpoint ou regra de negócio.
+Domain do BC Ingestão & Identificação: Value Objects (`OrcamentoId`, `Canal`,
+`NivelConfianca`, `ResultadoClassificacao`, `ReferenciaS3`,
+`TentativaClassificacao`), agregado `Orcamento`, 4 Domain Events, interfaces
+de repositório/gateway. `src/bounded-contexts/ingestao-identificacao/domain/**`.
 
 ## Fora de escopo
-Critérios de aceite funcionais do `spec.md` (Bounded Context Ingestão &
-Identificação): código ainda não existe, entra a partir de T004+.
+Application/Infrastructure/Interface (ainda não implementadas, T010+). CI
+(T003, ainda não existe). Lint/Husky (T002).
 
 ## Riscos
-- Config strict não pega efetivamente (falso senso de segurança de tipos).
-- `packageManager` pinado não é respeitado (build divergente entre máquinas/CI).
-- `tsc --noEmit` falha em ambiente limpo (Node 24 / corepack não habilitado).
+- Confiança < 80% não escalonar corretamente para `PENDENTE_REVISAO_HUMANA`
+  (regra crítica de negócio, Princípio não-negociável).
+- Transição de estado inválida do agregado não barrada (reentrega SQS
+  corrompendo estado).
+- Regra de negócio vazando para fora do Domain (import de infra/AWS).
+- `referenciaBruta` sendo sobrescrita (viola imutabilidade do dado bruto).
+- Ambiente de execução: sandbox de implementação usou Node 16 + vitest 0.34
+  (não commitado); repo declara Node >=24 + vitest ^4.1.10 — risco de
+  divergência de comportamento entre versões do runner.
 
-## Estratégia
-Sem lógica de negócio → sem teste unitário/integração/contrato/e2e aplicável.
-Verificação por smoke check manual, em worktree isolado, no commit exato do PR:
-1. `pnpm install` em ambiente limpo (Node 24 via nvm, corepack habilitado).
-2. `pnpm exec tsc --noEmit` — baseline deve passar.
-3. Injeção temporária de `.ts` inválido (tipo incompatível, argumento
-   obrigatório faltante) → `tsc --noEmit` deve falhar com exit code != 0.
-4. Injeção temporária de acesso a índice de array sem narrowing → deve falhar
-   por `noUncheckedIndexedAccess`.
-5. Confirmar que `pnpm --version` resolvido no worktree é a mesma versão
-   pinada em `packageManager`.
-6. Remover todo arquivo temporário e o worktree ao final (nenhum artefato de
-   smoke check entra no repositório).
+## Níveis e tipos de teste
+Unitário apenas (Domain puro, sem I/O). Sem integração/contrato/E2E aplicável
+nesta fase (não há repositório/gateway implementado).
+
+## Ambientes e dependências
+Node 24.14.1 (via nvm, sandbox QA tinha apenas Node 16/18 além do 24), pnpm
+11.18.0 (via corepack), vitest 4.1.10 real do projeto (não a 0.34 usada pelo
+dev-back-end).
+
+## Estratégia de dados
+Fixtures inline nos próprios arquivos de teste (builders locais tipo
+`novoOrcamento()`), sem fixture compartilhada — volume de dados é trivial.
+
+## Estratégia de mocks/fakes
+Nenhuma (Domain puro, sem dependência externa).
 
 ## Critérios de entrada
-PR #391 aberto, commit 11b1959, `backend-reviewer` com parecer emitido.
+PR #394 (draft), branch `feat/001-fundacao-domain`, commit `3b05061`.
 
 ## Critérios de saída
-Smoke checks 1–5 executados com resultado esperado, sem defeito de produção
-encontrado.
+40/40 testes existentes passando com vitest 4.x real; `tsc --noEmit` limpo;
+100% branch coverage nas invariantes de validação dos VOs e do agregado; sem
+regra de negócio vazando do Domain; sem defeito crítico/alto aberto.
 
-## Allure
-Não aplicável — não há teste automatizado de runtime para gerar
-`allure-results` nesta task (não há suíte de testes, não há framework de
-execução configurado ainda; T003 é quem introduz CI/testes).
+## Abordagem Allure
+Adicionado `allure-vitest` (reporter) + `vitest.config.ts` mínimo como
+infraestrutura de teste (autoridade de QA). `allure-results/` gerado em cada
+execução, ignorado no git (artefato de build, análogo a `coverage/`).
+
+## Ordem de execução
+1. `pnpm exec tsc --noEmit`
+2. `pnpm exec vitest run --coverage`
 
 ## Limitações
-Execução local (não em runner de CI do projeto, que ainda não existe — T003).
+- Sandbox de QA não tinha Node 24 nem pnpm 11 pré-instalados; usado Node
+  24.14.1 já disponível via nvm local e `corepack prepare pnpm@11.18.0
+  --activate` para reproduzir o ambiente real do projeto.
+- `pnpm install` regenerou `pnpm-lock.yaml` com as entradas de `vitest`,
+  `@vitest/coverage-v8` e `allure-vitest` (esperado — sinalizado no PR que o
+  lockfile ainda não tinha sido regenerado). Ação de commitar esse lockfile
+  atualizado cabe ao dev-back-end/DevOps (T003).
