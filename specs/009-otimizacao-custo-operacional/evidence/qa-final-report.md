@@ -113,3 +113,67 @@ Nenhum bug aberto nesta rodada.
 
 ## 12. Parecer final (T005)
 APROVADO PELO QA
+
+---
+
+# QA — T006 (spec-009)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: 009-otimizacao-custo-operacional
+- Branch: feat/009-otimizacao-custo-t006
+- Commit: eec0db2
+- PR: https://github.com/labsitio/nexus-orc-back/pull/440 (draft)
+
+## 2. Resumo executivo
+T006 entrega a interface `CacheIdentificacaoGateway` (contrato puro, sem implementação —
+implementação DynamoDB é T010, fora de escopo). Assinatura confere exatamente com
+tasks.md L31: `buscar(assinatura: AssinaturaEstrutural): Promise<SinalCacheIdentificacao | null>`
+e `registrar(assinatura: AssinaturaEstrutural, resultado: ResultadoClassificacao): Promise<void>`.
+`backend-reviewer` já aprovou (APPROVE, sem achados). Nenhum defeito de produção encontrado.
+
+## 3. Requisitos cobertos e não cobertos
+- Coberto: assinatura do contrato conforme tasks.md L31 (verificação por leitura + `tsc --noEmit`).
+- Fora de escopo de T006 (não avaliado aqui): implementação DynamoDB (T010), tratamento
+  de erro throttle/timeout (responsabilidade da implementação, não do contrato), injeção
+  de dependência (T018), testes de comportamento do caso de uso (T012–T015).
+
+## 4. Suítes executadas e comandos
+- `npx tsc --noEmit -p .`
+- `npx eslint src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.ts`
+- `npx vitest run --reporter=default` (regressão completa do repo)
+
+## 5. Quantidade de testes por tipo
+- Nenhum teste novo. Interface pura sem lógica executável — nenhum comportamento a
+  exercitar nesta task (ver justificativa em qa/test-execution-report.md).
+
+## 6. Resultado
+- Typecheck: sem erros.
+- Lint: sem erros/warnings.
+- Regressão completa do repo: 285 testes (258 passed, 27 skipped pré-existentes),
+  0 falhas, 62 arquivos (56 passed, 6 skipped). Os dois testes citados pelo dev-back-end
+  como flaky por timeout (`upload-url.controller.test.ts`, `auth-cognito.middleware.test.ts`)
+  passaram nesta execução, sem instabilidade observada.
+
+## 7. Cobertura inicial e final
+- Não aplicável: interface `type`-only não gera bytecode instrumentável, não aparece
+  em `coverage/coverage-summary.json`. Verificação de conformidade feita por typecheck
+  e revisão de assinatura, não por cobertura de execução.
+
+## 8. Allure
+- Mesma limitação pré-existente do adaptador `allure-vitest` já registrada em T005
+  (`Vitest failed to find the runner` sem `--reporter=default`). Não bloqueia o gate.
+
+## 9. Bugs por severidade e status
+Nenhum bug aberto nesta rodada.
+
+## 10. Riscos residuais
+- Nenhum risco novo introduzido. Risco de contrato ficar desalinhado com a futura
+  implementação (T010) é mitigado por `tsc` ao compilar `DynamoCacheIdentificacaoGateway`
+  contra esta interface quando T010 for implementada.
+
+## 11. Limitações do ambiente
+- Bug pré-existente do reporter `allure-vitest` (ver item 8), já conhecido e sem
+  impacto no gate desta task.
+
+## 12. Parecer final (T006)
+APROVADO PELO QA

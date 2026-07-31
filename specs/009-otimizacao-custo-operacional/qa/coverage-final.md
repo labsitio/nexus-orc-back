@@ -40,3 +40,12 @@ arquivo na visão em árvore quando há muitos arquivos na mesma pasta — confi
 `coverage/coverage-summary.json` que o arquivo está de fato instrumentado e 100% coberto
 em ambas as tasks. Cobertura agregada do repo não é aplicável a este gate (fora do diff
 destas tasks).
+
+## T006 — cache-identificacao.gateway.ts
+
+Arquivo é `interface` TypeScript pura (contrato, zero lógica executável) — não gera
+bytecode e não aparece em `coverage/coverage-summary.json` (comportamento esperado
+para declarações apenas de tipo, sem statements/branches/functions em runtime).
+Métrica de cobertura não se aplica; conformidade verificada por `tsc --noEmit`
+(0 erros) e revisão da assinatura contra tasks.md L31. Sem teste de comportamento
+criado — não há comportamento a exercitar (evitando teste vazio/sem valor de risco).

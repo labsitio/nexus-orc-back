@@ -1,4 +1,4 @@
-# Matriz de rastreabilidade — spec-009 (parcial, T004+T005)
+# Matriz de rastreabilidade — spec-009 (parcial, T004+T005+T006)
 
 | Task | Requisito/Critério | Nível | Cenário | Teste | Resultado | Evidência Allure |
 |---|---|---|---|---|---|---|
@@ -11,3 +11,11 @@
 Cobertura de linha das tasks: `assinatura-estrutural.ts` e `sinal-cache-identificacao.ts` — 100% statements/branches/functions/lines em ambos (ver coverage-final.md).
 
 Nota de escopo: cálculo do hash (algoritmo, entradas) é T010 — fora do escopo de T004/T005 e desta rodada de QA. Validação de `assinatura` e `resultadoAnterior` já é responsabilidade dos VOs `AssinaturaEstrutural`/`ResultadoClassificacao` (não duplicada em `SinalCacheIdentificacao`, conforme a implementação).
+
+| T006 | tasks.md L31: interface `CacheIdentificacaoGateway` com `buscar(assinatura: AssinaturaEstrutural): Promise<SinalCacheIdentificacao \| null>` e `registrar(assinatura: AssinaturaEstrutural, resultado: ResultadoClassificacao): Promise<void>` — sem implementação, apenas contrato | Contrato (tipo, sem lógica executável) | Conformidade de assinatura verificada por leitura + `tsc --noEmit` (compilação estrita das assinaturas) | `src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.ts` (revisão de código + typecheck; interface não gera runtime, não há branch/statement a testar) | PASS | não aplicável (sem teste de execução; ver nota) |
+
+Nota T006: interface pura (`type`-only, zero lógica) não produz bytecode instrumentável —
+`coverage-summary.json` não lista o arquivo (comportamento esperado do v8 coverage para
+declarações apenas de tipo). Verificação de conformidade feita por `tsc --noEmit` (zero erros)
+e conferência manual da assinatura contra tasks.md L31. Implementação real (T010) e seus testes
+de comportamento (T012–T015) ficam fora do escopo desta rodada.
