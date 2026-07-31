@@ -32,8 +32,17 @@ const contextoExtracao = ContextoExtracao.de({
   condicoesComerciaisResumo: '30 dias',
   houvePendenciaConfirmada: false,
 });
+const outroContextoExtracao = ContextoExtracao.de({
+  itensResumo: '5 itens divergentes',
+  condicoesComerciaisResumo: '30 dias',
+  houvePendenciaConfirmada: false,
+});
 
 const contextoValidacaoAprovavel = ContextoValidacao.de({ resultado: 'VALIDADO' });
+const outroContextoValidacao = ContextoValidacao.de({
+  resultado: 'VALIDADO_COM_RESSALVA',
+  inconsistenciasAceitas: [{ regra: 'PRECO_DIVERGENTE', detalhe: 'aceito pelo comprador' }],
+});
 const contextoValidacaoComRessalva = ContextoValidacao.de({
   resultado: 'VALIDADO_COM_RESSALVA',
   inconsistenciasAceitas: [{ regra: 'PRECO_DIVERGENTE', detalhe: 'aceito pelo comprador' }],
@@ -86,7 +95,7 @@ describe('DecisaoWorkflow', () => {
       expect(decisao.contextoClassificacao).toBe(contextoClassificacao);
     });
 
-    it('rejeita reentrega com payload divergente do já registrado — ContextoImutavelError', () => {
+    it('rejeita reentrega com payload divergente do já registrado — ContextoImutavelError (classificação)', () => {
       const decisao = DecisaoWorkflow.criar(orcamentoId);
       decisao.registrarContextoClassificacao(contextoClassificacao);
 
@@ -94,6 +103,26 @@ describe('DecisaoWorkflow', () => {
         ContextoImutavelError,
       );
       expect(decisao.contextoClassificacao).toBe(contextoClassificacao);
+    });
+
+    it('rejeita reentrega com payload divergente do já registrado — ContextoImutavelError (extração)', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      decisao.registrarContextoExtracao(contextoExtracao);
+
+      expect(() => decisao.registrarContextoExtracao(outroContextoExtracao)).toThrow(
+        ContextoImutavelError,
+      );
+      expect(decisao.contextoExtracao).toBe(contextoExtracao);
+    });
+
+    it('rejeita reentrega com payload divergente do já registrado — ContextoImutavelError (validação)', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
+
+      expect(() => decisao.registrarContextoValidacao(outroContextoValidacao)).toThrow(
+        ContextoImutavelError,
+      );
+      expect(decisao.contextoValidacao).toBe(contextoValidacaoAprovavel);
     });
   });
 
@@ -106,6 +135,15 @@ describe('DecisaoWorkflow', () => {
     it('lança ContextoIncompletoError e permanece AGUARDANDO_CONTEXTO quando falta contexto', () => {
       const decisao = DecisaoWorkflow.criar(orcamentoId);
       decisao.registrarContextoClassificacao(contextoClassificacao);
+
+      expect(() => decisao.consolidarContexto()).toThrow(ContextoIncompletoError);
+      expect(decisao.status).toBe('AGUARDANDO_CONTEXTO');
+    });
+
+    it('lança ContextoIncompletoError quando falta especificamente contextoClassificacao', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      decisao.registrarContextoExtracao(contextoExtracao);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
 
       expect(() => decisao.consolidarContexto()).toThrow(ContextoIncompletoError);
       expect(decisao.status).toBe('AGUARDANDO_CONTEXTO');
