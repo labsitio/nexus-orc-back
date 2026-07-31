@@ -2,6 +2,9 @@ import { App } from 'aws-cdk-lib';
 import { ClassificadorLambdaRoleStack } from '../lib/classificador-lambda-role-stack.ts';
 import { ClassificadorQueueStack } from '../lib/classificador-queue-stack.ts';
 import { ConfirmarRevisaoHumanaLambdaRoleStack } from '../lib/confirmar-revisao-humana-lambda-role-stack.ts';
+import { ContextoClassificacaoQueueStack } from '../lib/contexto-classificacao-queue-stack.ts';
+import { ContextoExtracaoQueueStack } from '../lib/contexto-extracao-queue-stack.ts';
+import { DecisaoWorkflowQueueStack } from '../lib/decisao-workflow-queue-stack.ts';
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
 import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
@@ -53,4 +56,17 @@ new ValidadorQueueStack(app, 'ValidadorQueueStack', {
   description:
     'Fila validador-queue + DLQ + alarme, roteada por regra EventBridge — spec 003, T003/T004.',
   dominioBus: dominioEventBusStack.dominioBus,
+});
+
+new ContextoClassificacaoQueueStack(app, 'ContextoClassificacaoQueueStack', {
+  description:
+    'Fila contexto-classificacao-queue + DLQ + alarme (BC Orquestração) — spec 005, T003.',
+});
+
+new ContextoExtracaoQueueStack(app, 'ContextoExtracaoQueueStack', {
+  description: 'Fila contexto-extracao-queue + DLQ + alarme (BC Orquestração) — spec 005, T003.',
+});
+
+new DecisaoWorkflowQueueStack(app, 'DecisaoWorkflowQueueStack', {
+  description: 'Fila decisao-workflow-queue + DLQ + alarme (BC Orquestração) — spec 005, T003.',
 });
