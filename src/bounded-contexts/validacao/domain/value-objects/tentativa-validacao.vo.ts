@@ -7,7 +7,12 @@ export class TentativaValidacaoInvalidaError extends ErroDominio {
   }
 }
 
-export type ResultadoTentativaValidacao = 'VALIDADO' | 'INCONSISTENTE' | 'ACEITE_COM_RESSALVA';
+export const RESULTADOS_TENTATIVA_VALIDACAO = [
+  'VALIDADO',
+  'INCONSISTENTE',
+  'ACEITE_COM_RESSALVA',
+] as const;
+export type ResultadoTentativaValidacao = (typeof RESULTADOS_TENTATIVA_VALIDACAO)[number];
 
 /**
  * Entrada de histórico imutável (append-only) de uma avaliação de regras de
