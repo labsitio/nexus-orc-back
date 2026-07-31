@@ -1,5 +1,81 @@
 # Test Execution Report — SPEC 002
 
+## Leva T022 (issue #87, PR #480, commits `ec1f868` + `aaff5d4`)
+
+### Escopo
+`ExtrairDadosOrcamento` (Application, novo) — consumidor de `OrcamentoClassificado`
+(dados já resolvidos, resolução SQS é T023): recupera/cria `ExtracaoOrcamento`,
+lê bruto S3, converte via MarkItDown ACL, invoca `AgenteExtratorGateway`, aplica
+`registrarTentativaExtrator` (T009), persiste e publica `OrcamentoExtraido` ou
+`ExtracaoEscalonadaParaRevisaoHumana`. Commit `aaff5d4` corrige NIT do
+backend-reviewer (non-null assertion em `condicoesComerciais` → `ExtracaoInconsistenteError`
+explícito). Único arquivo de produção: `extrair-dados-orcamento.ts`.
+Arquivos de teste: `extrair-dados-orcamento.test.ts` (novo, 4 casos) e
+`extrair-dados-orcamento.integration.test.ts` (pré-existente, T020, 3 casos —
+já fixava a orquestração esperada antes de T022 existir).
+
+### Comando e resultado
+```bash
+npx vitest run tests/bounded-contexts/extracao
+# Test Files  49 passed | 4 skipped (53)
+#      Tests  206 passed | 24 skipped (230)
+```
+`extrair-dados-orcamento.test.ts`: 4/4 PASS. `extrair-dados-orcamento.integration.test.ts`: 3/3 PASS.
+4 skipped = integração Postgres pré-existente sem `DATABASE_URL`, não relacionado a T022.
+
+```bash
+npx vitest run
+# Test Files  161 passed | 14 skipped (175)
+#      Tests  793 passed | 60 skipped (853)
+```
+Full suite sem regressão.
+
+### Estático
+- `npx tsc --noEmit` — sem erros.
+- `npx eslint` no arquivo de produção e nos 2 arquivos de teste — sem erros.
+
+### Verificação independente (não apenas leitura do relato do dev-back-end)
+- Idempotência: teste "nunca reprocessa..." confirma `leituraBruta.chamadas === 0`
+  e `agenteExtrator.chamadas === 0` quando `existente.status !== 'PENDENTE'` —
+  não apenas que o evento não foi publicado, mas que nenhum efeito colateral
+  (I/O externo, custo de invocação do Bedrock) ocorre na entrega duplicada.
+- Non-null assertion removida (commit `aaff5d4`): confirmado por leitura do
+  diff — `extracao.condicoesComerciais!` virou checagem explícita `if (!condicoesComerciais) throw new ExtracaoInconsistenteError(...)`.
+  Branch é inalcançável dado o invariante atual de `ExtracaoOrcamento.registrarTentativaExtrator`
+  (função `completo()` exige `condicoesComerciais !== undefined` para chegar a
+  `EXTRAIDO`) — guarda defensiva correta contra regressão futura no agregado,
+  não uma lacuna de teste evitável sem alterar produção.
+- Concorrência otimista (2º NIT do backend-reviewer): confirmado por leitura de
+  `DrizzleExtracaoOrcamentoRepository.salvar` (T013, já em `main`) — usa
+  `SELECT ... FOR UPDATE` antes do UPSERT, cobrindo a corrida entre duas
+  execuções concorrentes do mesmo `orcamentoId`. Fora do diff desta PR
+  (arquivo não alterado), confirmado apenas como verificação de escopo.
+
+### Cobertura do arquivo novo
+```bash
+npx vitest run tests/bounded-contexts/extracao/application --coverage \
+  --coverage.include='src/bounded-contexts/extracao/application/use-cases/extrair-dados-orcamento.ts'
+```
+- Statements 92% (23/25), Branches 90% (9/10), Functions 75% (3/4), Lines 92% (23/25).
+- Não coberto: construtor de `ExtracaoInconsistenteError` e o `throw` que o invoca
+  (linhas 32 e 92) — guarda de invariante "nunca deveria ocorrer" dado o estado
+  atual do agregado (T009); forçar a cobertura exigiria simular um agregado
+  inconsistente por fora do domínio real (quebrar o encapsulamento de produção
+  só para o teste), o que violaria o próprio propósito do guard. Classificado
+  como "código inviável de testar sem refatoração de produção" — risco residual
+  aceito, documentado, não bloqueante.
+
+### Resultado
+**PASS.** Nenhum defeito de produção encontrado. Todos os critérios de aceite
+de T022 (`tasks.md`) cobertos por teste automatizado, ver `qa/traceability-matrix.md`.
+Risco residual (fora do escopo desta leva): BUG-001 segue `PRONTO PARA RETESTE`
+no handoff, porém a leitura do código atual (`extracao-orcamento.aggregate.ts:123-125`)
+mostra que o getter `historico` já retorna cópia defensiva (`[...this._historico]`)
+— não reaberto/revalidado formalmente nesta leva por estar fora do escopo de
+T022 e não ter sido informado pelo dev-back-end como pronto para reteste nesta PR.
+
+---
+
 ## Leva T020 (issue #85, PR #460, commit `be208e5`)
 
 ### Escopo
