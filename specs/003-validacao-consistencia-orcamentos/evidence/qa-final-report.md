@@ -262,3 +262,127 @@ Nenhum bug encontrado.
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T009 (issue #119)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: `003-validacao-consistencia-orcamentos`
+- Branch `feat/003-validacao`, commit `f1d0a46`, PR #450 (draft)
+- Task: T009 (issue #119) — Domain: agregado `OrcamentoValidacao`
+  (`orcamento-validacao.aggregate.ts`)
+- `backend-reviewer`: APPROVE WITH NITS em duas rodadas — 1ª rodada MINOR
+  (rótulo de histórico incorreto em `ACEITE_COM_RESSALVA`, corrigido no
+  commit atual); 2ª rodada 1 NIT residual não bloqueante em
+  `TentativaValidacao.de` (ver seção 10)
+- Primeira validação (sem BUG-XXX prévio)
+
+## 2. Resumo executivo
+T009 adiciona o agregado raiz `OrcamentoValidacao` com máquina de estados
+`PENDENTE -> VALIDADO | PENDENTE_REVISAO_HUMANA -> VALIDADO |
+VALIDADO_COM_RESSALVA`, histórico append-only via `TentativaValidacao`, e a
+invariante não-negociável do Princípio IV: nunca existe segunda tentativa
+automática a partir de `PENDENTE_REVISAO_HUMANA` — só `registrarDecisaoHumana`
+reavalia. `dadosExtraidos` é imutável após criação (`atualizarDadosExtraidos`
+sempre lança). Sem defeito de produção encontrado.
+
+## 3. Requisitos cobertos e não cobertos
+- Coberto (critério de aceite da task): "unit test que tenta forçar
+  transição para VALIDADO com 1+ inconsistência pendente e espera erro de
+  domínio" — teste "nunca transita para VALIDADO com inconsistência
+  pendente" chama `avaliarRegrasDeConsistencia` uma segunda vez a partir de
+  `PENDENTE_REVISAO_HUMANA` e espera `TransicaoInvalidaValidacaoError`;
+  status permanece `PENDENTE_REVISAO_HUMANA` após a tentativa (efeito
+  colateral também verificado, não só a exceção).
+- Coberto: transição limpa `PENDENTE -> VALIDADO` (histórico com 1 entrada
+  `VALIDADO`); `PENDENTE -> PENDENTE_REVISAO_HUMANA` com inconsistência(s)
+  (histórico `INCONSISTENTE`); `registrarDecisaoHumana` com
+  `CORRECAO_APLICADA` reavaliando para `VALIDADO` ou permanecendo em revisão
+  humana se ainda falhar (nunca autoaprova); `ACEITE_COM_RESSALVA` terminal
+  (`VALIDADO_COM_RESSALVA`, histórico preserva a(s) inconsistência(s)
+  aceita(s), nunca as apaga); `registrarDecisaoHumana` só válido a partir de
+  `PENDENTE_REVISAO_HUMANA`; imutabilidade de `dadosExtraidos`.
+- Coberto (VO irmão desta task, `tentativa-validacao.vo.ts`): 3º resultado
+  `ACEITE_COM_RESSALVA` aceito com invariante `resultado` × `inconsistencias`
+  preservada (não força lista vazia, ao contrário de `VALIDADO`).
+- Não aplicável nesta task: as 4 regras determinísticas em si (T010, ainda
+  `[ ]` em `tasks.md`), Domain Events (T011), persistência (T013/T014),
+  Application/`ValidarOrcamento` (T024/T034), contrato de API — T009 é
+  Domain puro, agregado testável isoladamente sem infra.
+
+## 4. Suítes executadas e comandos
+1. `corepack pnpm vitest run tests/bounded-contexts/validacao/domain/`
+   → 11 arquivos, 47 testes, 0 falhas.
+2. `corepack pnpm vitest run tests/bounded-contexts/validacao/domain/
+   --coverage --coverage.include="src/bounded-contexts/validacao/domain/**"`
+   → ver seção 7.
+3. `corepack pnpm run typecheck` (`tsc --noEmit`, repositório inteiro) →
+   0 erros.
+4. `corepack pnpm run lint` (`eslint .`, repositório inteiro) → 0 erros.
+
+## 5. Quantidade de testes por tipo
+Unitários (Domain): 9 testes do agregado `orcamento-validacao.aggregate.test.ts`
++ 6 testes de `tentativa-validacao.vo.test.ts` (VO ajustado nesta mesma task
+para o achado de review) diretamente relacionados a T009. Suíte completa do
+diretório `domain/` (inclui VOs de T005–T008): 47 testes, 11 arquivos.
+
+## 6. Resultado
+- Aprovados: 47
+- Falhos: 0
+- Ignorados: 0
+- Instáveis: 0
+
+## 7. Cobertura inicial e final
+Escopo: `src/bounded-contexts/validacao/domain/**` (agregado + todas as VOs
+do BC até aqui).
+- Statements: 95.74% (135/141)
+- Branches: 95.08% (58/61)
+- Functions: 91.52% (54/59)
+- Lines: 95.71% (134/140)
+
+`orcamento-validacao.aggregate.ts`: 90.9% statements/lines, 100% branches,
+85.71% functions — linhas não cobertas 87-95 correspondem ao método estático
+`reconstituir` (usado pelo repositório, ainda não implementado — T014) e a
+getters não exercitados diretamente pelos testes atuais (exercitados
+indiretamente via `criar`). Classificação: risco ainda não testado, coberto
+naturalmente quando T014 (repositório) e seus testes de integração
+existirem — não é lacuna introduzida por T009 fora do escopo da task.
+
+Lacunas residuais pré-existentes (não introduzidas por T009, já registradas
+em relatórios anteriores desta suíte): `dinheiro.vo.ts` (80%/75%),
+`periodo-validade.vo.ts` (85.71%). `tentativa-validacao.vo.ts` (VO alterado
+nesta task) e `cnpj.vo.ts` aparecem sem linha não coberta relevante ao
+3º resultado adicionado.
+
+## 8. Allure
+Não gerado — repositório não tem adaptador Allure configurado no runner
+Vitest (mesma lacuna já registrada em T001/T004/T008; fora do escopo desta
+task alterar tooling de relatório sem ADR prévio).
+
+## 9. Bugs por severidade e status
+Nenhum bug de produção encontrado. Nenhum BUG-XXX aberto.
+
+## 10. Riscos residuais
+- NIT residual do `backend-reviewer` (2ª rodada, não bloqueante, verificado
+  e confirmado nesta validação por leitura do código): `TentativaValidacao.de`
+  não valida `inconsistencias.length > 0` para o resultado
+  `ACEITE_COM_RESSALVA` — hoje inofensivo porque o único chamador
+  (`OrcamentoValidacao.registrarDecisaoHumana`) só alcança esse resultado a
+  partir de `PENDENTE_REVISAO_HUMANA`, estado que já garante
+  `this._inconsistencias.length > 0` por invariante do próprio agregado
+  (toda transição para `PENDENTE_REVISAO_HUMANA` exige `inconsistencias.length
+  > 0` em `aplicarResultadoAvaliacao`). Risco só se materializa se o VO for
+  chamado de outro ponto do código no futuro sem passar por essa invariante.
+  Não bloqueia este gate — registrado como observação para reavaliação se
+  `TentativaValidacao.de` ganhar novo chamador fora do agregado.
+- `reconstituir` (linha 86-88 do agregado) sem teste unitário direto — será
+  naturalmente exercitado pelos testes de integração de T014
+  (`DrizzleOrcamentoValidacaoRepository`); sinalizar se T014 não cobrir.
+
+## 11. Limitações do ambiente
+- `pnpm` fora do PATH padrão do Bash desta worktree; executado via
+  `corepack pnpm`, sem impacto no resultado.
+
+## 12. Parecer final
+APROVADO PELO QA
