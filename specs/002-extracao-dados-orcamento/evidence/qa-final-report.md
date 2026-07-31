@@ -1,5 +1,101 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
+## Validação — T023 (issue #88), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #485, branch `feat/002-t023-extrator-queue-handler`, commit `9d2d2e8`
+(pós-rebase em `origin/main`).
+
+### Resumo executivo
+`criarExtratorQueueHandler` (Interface, novo) — handler Lambda consumidor de
+`extrator-queue`. Parseia o envelope EventBridge de `OrcamentoClassificado`
+(`detail.orcamentoId`, `detail.resultado.{fornecedorIdentificado,
+formatoIdentificado,agenteOrigem}`, `detail.referenciaBruta.{bucket,key,
+versionId}` — este último campo existe graças ao ADR-003/PR #483, já
+mergeado), invoca `ExtrairDadosOrcamento.executar` (T022, já mergeado, código
+de produção não alterado nesta PR), reporta batch item failures item-a-item
+(Princípio IV — exceção nunca silenciosa, mensagem malformada ou erro isolado
+não bloqueia as demais do lote), usa `criarLogger` (T016) para correlação por
+`orcamentoId`+`messageId`. `backend-reviewer` já aprovou (APPROVE WITH NITS);
+o único NIT (narrowing real de `agenteOrigem` contra o union
+`'CLASSIFICADOR' | 'HUMANO'` em vez de só `typeof === 'string'`) foi corrigido
+no próprio commit `9d2d2e8` — confirmado por leitura de diff, não apenas pelo
+relato do dev-back-end.
+
+### Requisitos cobertos (T023, tasks.md)
+Todos os 7 cenários do arquivo de teste cobrem os critérios de aceite — ver
+`qa/traceability-matrix.md` § "Leva T023" para o mapeamento cenário-a-cenário:
+invocação com dados corretos do envelope, batch item failure isolado, envelope
+inválido, envelope sem `referenciaBruta` (dependência do ADR-003 confirmada),
+correlação de log, log de erro sem `orcamentoId` extraído, entrega duplicada
+não quebra o handler (idempotência é responsabilidade de T022, handler só não
+trata retorno normal como falha).
+
+### Suítes executadas e comandos
+```bash
+npx vitest run
+# Test Files  87 passed | 8 skipped (95) / Tests  431 passed | 40 skipped (471)
+# sem regressão
+
+npx vitest run tests/bounded-contexts/extracao/interface/extrator-queue.handler.test.ts --coverage
+# 7/7 PASS
+# extrator-queue.handler.ts: Stmts 89.65% / Branch 84.61% / Funcs 100% / Lines 89.65%
+
+npx tsc --noEmit -p .
+# sem erros
+
+npx eslint src/bounded-contexts/extracao/interface/events/extrator-queue.handler.ts \
+  tests/bounded-contexts/extracao/interface/extrator-queue.handler.test.ts
+# sem erros
+```
+8 skipped na suíte completa = integração Postgres pré-existente sem
+`DATABASE_URL`, não relacionado a esta PR.
+
+### Cobertura (arquivo novo)
+`extrator-queue.handler.ts`: Statements 89.65% (26/29), Branches 84.61%
+(11/13), Functions 100%, Lines 89.65%. Não coberto: linhas 43/51/62 —
+variações do guard `ehEventBridgeEnvelope` (root não-objeto; `orcamentoId`
+ausente isoladamente; fallthrough de `resultado` inválido), mesma família de
+branch defensivo já exercitada por 2 outros cenários de envelope inválido.
+Classificado como cobertura estrutural residual de baixo risco, não caminho
+de negócio distinto — não bloqueante.
+
+### Diff da PR (escopo confirmado)
+```
+specs/002-extracao-dados-orcamento/tasks.md        |   2 +-
+.../interface/events/extrator-queue.handler.ts     | 133 +++++++++++
+.../interface/extrator-queue.handler.test.ts       | 166 +++++++++++
+```
+Nenhum arquivo de produção fora do handler foi tocado; `ExtrairDadosOrcamento`
+(T022) não foi alterado.
+
+### Bugs
+Nenhum defeito de produção encontrado.
+
+### Riscos residuais (fora do escopo desta PR, não bloqueante)
+- `ExtrairDadosOrcamento` (T022, já mergeado) é idempotente apenas contra
+  duplicidade **sequencial** de mensagens SQS (2ª mensagem chega depois que a
+  1ª já persistiu com status != `PENDENTE`). Duas mensagens da mesma entrega
+  duplicada processadas **concorrentemente** (at-least-once + Lambda com
+  concorrência > 1) é uma race condition teoricamente possível, não coberta.
+  Já registrado como MINOR pelo `backend-reviewer` e corretamente documentado
+  como fora de escopo deste diff (pertence ao código de T022, não a este
+  handler) — não gera BUG bloqueante nesta PR.
+
+### Parecer final
+**APROVADO PELO QA.**
+
+Motivo: todos os critérios de aceite de T023 cobertos por teste automatizado
+determinístico (7/7), incluindo batch item failure isolado, dependência do
+ADR-003 (`referenciaBruta`), correlação de log e comportamento correto frente
+a entrega duplicada; suíte completa sem regressão; typecheck e lint limpos;
+NIT do backend-reviewer confirmado corrigido por leitura de diff; race
+condition de concorrência em T022 corretamente identificada como risco
+residual fora de escopo, não bloqueante para esta PR.
+
+---
+
 ## Validação — T026 (issue #91), primeira validação
 
 ### SPEC_ID e versão testada
