@@ -129,3 +129,16 @@ Verificação de fidelidade ao contrato real (sem antecipar T021/T022):
 
 ### Fora desta leva
 - `ExtrairDadosOrcamento` (Application, T022/#87) e o handler Lambda de `extrator-queue` (Interface, T023) não existem ainda — este teste fixa a especificação executável que a implementação real deverá seguir; não substitui o teste de integração real (LocalStack) nem a medição de p95 ponta a ponta (T042, após T021/T023).
+
+## Leva T029 (issue #94, PR #492, commit `f48e0c0`)
+
+| Critério de aceite (spec.md US2 / tasks.md) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| Campo obrigatório ambíguo/ilegível conhecido → Extrator nunca preenche com valor inventado/estimado | Financeiro/silencioso (crítico) | Integração (handler SQS real → caso de uso real → agregado real) | `AgenteExtratorGatewayFake` devolve `CampoExtraido.naoExtraido` para `precoUnitario` (confiança 15) | `extrator-queue.handler.integration.test.ts` (1 teste) | PASS — assert `extraido: false` / `valor: null` no VO real |
+| `ExtracaoEscalonadaParaRevisaoHumana` publicado diretamente pelo Extrator, sem passo de revisor de IA (ADR-003, agente removido) | Orquestração/contrato de evento | Integração | 1 mensagem SQS → 1 evento publicado, `detailType` e `motivo` conferidos | `extrator-queue.handler.integration.test.ts` (mesmo teste) | PASS |
+| Status reflete a pendência (`PENDENTE_REVISAO_HUMANA`) no estado persistido do agregado | Consistência de estado | Integração | `RepositorioFake.salvar` capturado, `extracao.status` verificado no agregado real | `extrator-queue.handler.integration.test.ts` (mesmo teste) | PASS |
+
+Diferencial desta leva frente a T020/T027 (não redundante): único teste que percorre a pilha via `criarExtratorQueueHandler` real (parse de mensagem SQS/EventBridge, `batchItemFailures`) — T020 reimplementa a orquestração inline sem o handler, T027 é unit test do agregado isolado. Fakes apenas nas bordas de infra (S3, MarkItDown, Bedrock, EventBridge), mesmo padrão já aprovado em T020.
+
+### Fora desta leva
+- Consulta de status via HTTP (`GET /v1/orcamentos/{id}/extracao/status`, T024) não implementada ainda — "status reflete a pendência" verificado no estado persistido do agregado (`ExtracaoOrcamentoRepository.salvar`), fonte de dados de onde o futuro endpoint lerá.
