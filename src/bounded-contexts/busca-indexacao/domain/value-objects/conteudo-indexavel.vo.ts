@@ -46,9 +46,9 @@ export class ConteudoIndexavel {
 
     return new ConteudoIndexavel(
       props.resumoFornecedor,
-      props.itensDescricao,
+      [...props.itensDescricao],
       props.condicoesResumo,
-      props.categorias,
+      [...props.categorias],
     );
   }
 

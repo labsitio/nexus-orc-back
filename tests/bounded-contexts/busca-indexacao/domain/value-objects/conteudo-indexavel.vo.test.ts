@@ -62,6 +62,23 @@ describe('ConteudoIndexavel', () => {
     expect(texto).toContain('Informática, Periféricos');
   });
 
+  it('não reflete mutação do array original após a construção (cópia defensiva)', () => {
+    const itensDescricao = ['Item original'];
+    const categorias = ['Categoria original'];
+    const conteudo = ConteudoIndexavel.de({
+      resumoFornecedor: '',
+      itensDescricao,
+      condicoesResumo: '',
+      categorias,
+    });
+
+    itensDescricao.push('Item adicionado depois');
+    categorias.push('Categoria adicionada depois');
+
+    expect(conteudo.itensDescricao).toEqual(['Item original']);
+    expect(conteudo.categorias).toEqual(['Categoria original']);
+  });
+
   it('paraTexto omite campos vazios sem gerar linhas em branco', () => {
     const conteudo = ConteudoIndexavel.de({
       resumoFornecedor: '',
