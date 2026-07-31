@@ -282,3 +282,115 @@ esperado é o runbook, não a execução.
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# Validação adicional — T005 (SPEC_ID: 007-isolamento-multitenant-dados)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: 007-isolamento-multitenant-dados
+- Issue: #268
+- PR: #475 (draft, aprovado pelo backend-reviewer com veredito APPROVE WITH NITS)
+- Branch: feat/007-isolamento-multitenant
+- Worktree: `.claude/worktrees/agent-007-multitenant`
+- Commit testado: 5951f78 (conteúdo relevante; HEAD atual após merge de reconciliação 511accf)
+- Tipo de validação: primeira validação (sem reteste anterior)
+
+## 2. Resumo executivo
+T005 entrega o `TenantContextMiddleware` (plugin Fastify) — guardrail crítico de segurança da
+Fase 2 (Foundational) da spec. Verifica o JWT Cognito, extrai a claim `custom:tenant_id`, valida
+como `TenantId` (Shared Kernel, UUID v7) e popula `request.tenantContext`; rejeita com 401 Problem
+Details em toda via de falha (sem token, token inválido, claim ausente, claim malformada), sempre
+antes de qualquer código de Application. Nunca lê `tenantId` de query/path/body — comprovado por
+teste adversarial dedicado. O diff também promove um helper único de verificação JWT
+(`cognito-jwt-verifier.ts`, ADR-007) e um contrato `ProblemDetails` compartilhado, ambos consumidos
+também por `auth-cognito.middleware.ts` (spec 001, já em produção) — refactor mecânico sem mudança
+de comportamento externo, confirmado pela suíte de regressão pré-existente.
+
+## 3. Requisitos cobertos e não cobertos
+Cobertos (7 critérios de aceite do pedido de validação — ver matriz de rastreabilidade para o
+mapeamento completo):
+1. Sem header `Authorization` -> 401.
+2. Token JWT inválido/expirado -> 401.
+3. Claim `custom:tenant_id` ausente -> 401.
+4. Claim presente mas não é UUID v7 válido -> 401.
+5. Claim válida -> 200, `request.tenantContext` populado com o `TenantId` correto.
+6. `tenantId` forjado em query string é ignorado — só a claim do JWT é usada.
+7. Refactor do helper compartilhado (ADR-007) não quebrou `auth-cognito.middleware.ts` — 5 testes
+   pré-existentes continuam passando sem alteração.
+
+Não cobertos (fora do escopo de T005, dependem de tasks futuras já mapeadas em `tasks.md`):
+- Execução real do runbook Cognito em produção (T004, issue #469 — pendente, rastreada
+  separadamente; sem o atributo `custom:tenant_id` real no User Pool, o middleware está correto em
+  código mas não operável em produção até essa execução ocorrer).
+- Suíte adversarial completa de isolamento cross-tenant em nível de repositório/DB (T008, T010 —
+  RLS, `SET LOCAL`, `DrizzleTenantScopedRepositoryBase` ainda não implementados; T005 cobre apenas
+  a camada de Interface).
+
+## 4. Suítes executadas e comandos
+```
+cd .claude/worktrees/agent-007-multitenant
+npx vitest run tests/interface/shared tests/bounded-contexts/ingestao-identificacao/interface/http
+npx vitest run tests/interface/shared tests/bounded-contexts/ingestao-identificacao/interface/http --coverage
+npx eslint .
+```
+Sem limitação de ambiente nesta validação — todos os comandos acima executaram sem gap de
+dependência. O gap conhecido de dependências não instaladas (pino, alguns `@aws-sdk/*`) que afeta
+`npm run typecheck` e outros arquivos de teste não relacionados é pré-existente desta spec (já
+reportado em ciclos anteriores) e não foi reproduzido nos comandos acima, que não tocam esses
+módulos.
+
+## 5. Quantidade de testes por tipo
+- Integração (Fastify `inject`, dependência AWS mockada): 11 testes — 6 em
+  `tenant-context.middleware.test.ts` (novo, T005) + 5 em `auth-cognito.middleware.test.ts`
+  (pré-existente, regressão do refactor ADR-007).
+- Unitário: 5 testes em `cognito-jwt-verifier.test.ts` (novo, helper isolado).
+
+## 6. Resultado
+- Aprovados: 16
+- Falhos: 0
+- Ignorados: 0
+- Instáveis: 0
+- Lint (`npx eslint .`): limpo, sem violação.
+
+## 7. Cobertura (arquivos tocados por T005, via `npx vitest run ... --coverage`)
+- Statements: 97,56% (40/41)
+- Branches: 100% (12/12)
+- Functions: 100% (8/8)
+- Lines: 97,56% (40/41)
+
+Única linha não coberta: definição do schema Zod `problemDetailsSchema` em
+`src/interface/shared/problem-details.schema.ts` (campo `title`) — schema construído no import do
+módulo, mas nenhum teste invoca `.parse()`/`.safeParse()`; consumo atual é só via tipo inferido
+`ProblemDetails`. Sem risco funcional identificado para o comportamento de T005 (ver observação na
+matriz de rastreabilidade).
+
+## 8. Allure
+Não gerado nesta validação (não solicitado no pedido; comando padrão `allure generate` do projeto
+pode ser usado quando necessário). `allure-results/` não configurado para esta execução pontual de
+`vitest run` sem o reporter Allure habilitado explicitamente — nenhum dado sensível envolvido nos
+testes (tokens/claims são valores sintéticos, sem PII real).
+
+## 9. Bugs por severidade e status
+Nenhum bug encontrado. Código de produção revisado linha a linha (`tenant-context.middleware.ts`,
+`cognito-jwt-verifier.ts`, `problem-details.schema.ts`) contra os 7 critérios de aceite — nenhuma
+via de rejeição deixa passar requisição sem `request.tenantContext` populado corretamente; nenhuma
+leitura de `tenantId` fora da claim do JWT encontrada.
+
+## 10. Riscos residuais
+- NIT do backend-reviewer (não bloqueante): `tenant-context.middleware.test.ts` não tem cenário
+  próprio de header `Authorization` sem prefixo `Bearer`. Avaliado e aceito sem exigir novo teste
+  — mesmo `extrairBearerToken` (ADR-007) já coberto no nível unitário e no nível de integração do
+  middleware irmão que compartilha o código-caminho idêntico (ver matriz de rastreabilidade para o
+  detalhamento).
+- Execução real do runbook Cognito (T004, issue #469) segue pendente — T005 está correto e testado
+  em código, mas não operável em produção até o custom attribute existir de fato no User Pool.
+  Risco de infraestrutura/operação, não de código; já rastreado desde a validação de T004.
+- Trade-off aceito do ADR-007 (dupla verificação JWT em runtime quando mais de um middleware roda
+  na mesma rota) — decisão de design documentada, não um defeito.
+
+## 11. Limitações do ambiente
+Nenhuma limitação de ambiente impediu a validação dos 7 critérios de aceite desta task.
+
+## 12. Parecer final
+APROVADO PELO QA
