@@ -4,7 +4,10 @@ import {
   IndiceOrcamentoInconsistenteError,
   OrigemValidacaoImutavelError,
 } from '../../../../../src/bounded-contexts/busca-indexacao/domain/aggregates/indice-orcamento.aggregate.js';
-import { TentativaIndexacaoInvalidaError } from '../../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/tentativa-indexacao.vo.js';
+import {
+  TentativaIndexacao,
+  TentativaIndexacaoInvalidaError,
+} from '../../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/tentativa-indexacao.vo.js';
 import { ConteudoIndexavel } from '../../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/conteudo-indexavel.vo.js';
 import { Embedding } from '../../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/embedding.vo.js';
 import { OrcamentoId } from '../../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/orcamento-id.vo.js';
@@ -130,6 +133,55 @@ describe('IndiceOrcamento', () => {
     expect(() => {
       indice.origemValidacao = OrigemValidacao.de('VALIDADO_COM_RESSALVA');
     }).toThrow(OrigemValidacaoImutavelError);
+  });
+
+  it('expõe conteudoIndexavel e origemValidacao definidos no construtor', () => {
+    const indice = criarIndice();
+    expect(indice.conteudoIndexavel).toBe(conteudoIndexavel);
+    expect(indice.origemValidacao).toBe(origemValidacao);
+  });
+
+  it('reconstitui agregado em FALHA_INDEXACAO com histórico prévio, sem exigir embedding', () => {
+    const tentativaFalha = TentativaIndexacao.de({
+      resultado: 'FALHA_TECNICA',
+      timestamp,
+      motivoFalha: 'timeout do gateway',
+    });
+
+    const indice = IndiceOrcamento.reconstituir({
+      orcamentoId,
+      conteudoIndexavel,
+      origemValidacao,
+      estado: 'FALHA_INDEXACAO',
+      embedding: undefined,
+      historico: [tentativaFalha],
+    });
+
+    expect(indice.estado).toBe('FALHA_INDEXACAO');
+    expect(indice.embedding).toBeUndefined();
+    expect(indice.historico).toHaveLength(1);
+  });
+
+  it('reconstitui com cópia defensiva do histórico — array de origem não afeta o agregado', () => {
+    const tentativaFalha = TentativaIndexacao.de({
+      resultado: 'FALHA_TECNICA',
+      timestamp,
+      motivoFalha: 'timeout do gateway',
+    });
+    const historicoOrigem = [tentativaFalha];
+
+    const indice = IndiceOrcamento.reconstituir({
+      orcamentoId,
+      conteudoIndexavel,
+      origemValidacao,
+      estado: 'FALHA_INDEXACAO',
+      embedding: undefined,
+      historico: historicoOrigem,
+    });
+
+    historicoOrigem.push(tentativaFalha);
+
+    expect(indice.historico).toHaveLength(1);
   });
 
   it('reconstitui agregado já indexado a partir de estado persistido', () => {
