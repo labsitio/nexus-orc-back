@@ -62,7 +62,7 @@ export class TentativaDecisaoWorkflow {
       props.agente,
       props.timestamp,
       undefined,
-      props.motivoInsucesso,
+      props.motivoInsucesso.trim(),
     );
   }
 }
