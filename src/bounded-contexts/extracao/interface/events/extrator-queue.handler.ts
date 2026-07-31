@@ -56,7 +56,8 @@ function ehEventBridgeEnvelope(valor: unknown): valor is EventBridgeEnvelope {
     resultado === null ||
     typeof (resultado as Record<string, unknown>).fornecedorIdentificado !== 'string' ||
     typeof (resultado as Record<string, unknown>).formatoIdentificado !== 'string' ||
-    typeof (resultado as Record<string, unknown>).agenteOrigem !== 'string'
+    ((resultado as Record<string, unknown>).agenteOrigem !== 'CLASSIFICADOR' &&
+      (resultado as Record<string, unknown>).agenteOrigem !== 'HUMANO')
   ) {
     return false;
   }
