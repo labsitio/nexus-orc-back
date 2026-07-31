@@ -1,4 +1,4 @@
-# Relatório de execução — T004 (spec-009)
+# Relatório de execução — T004/T005 (spec-009)
 
 Commit testado: `ba72484`
 Branch: `feat/009-otimizacao-custo`
@@ -51,3 +51,58 @@ Não bloqueia o gate desta task.
 relacionados a esta task (limitação de ambiente já conhecida, pré-existente).
 Verificação pontual do lint via ESLint (que faz parsing TS) não indicou erro de
 tipos no arquivo novo.
+
+---
+
+# T005 (spec-009)
+
+Commit testado: `d9185d5`
+Branch: `feat/009-otimizacao-custo-t005`
+PR: https://github.com/labsitio/nexus-orc-back/pull/438 (draft)
+
+## Suíte da task
+```
+npx vitest run --reporter=default tests/bounded-contexts/ingestao-identificacao/domain/value-objects/sinal-cache-identificacao.test.ts
+```
+Resultado: 1 arquivo, 2 testes, 2 passed, 0 failed.
+
+## Cobertura da task
+```
+npx vitest run --coverage --coverage.reporter=json-summary tests/bounded-contexts/ingestao-identificacao/domain/value-objects/sinal-cache-identificacao.test.ts
+```
+`sinal-cache-identificacao.ts`: 100% statements/branches/functions/lines (ver coverage-final.md).
+
+## Lint do diff
+```
+npx eslint src/bounded-contexts/ingestao-identificacao/domain/value-objects/sinal-cache-identificacao.ts \
+  tests/bounded-contexts/ingestao-identificacao/domain/value-objects/sinal-cache-identificacao.test.ts
+```
+Resultado: sem erros/warnings.
+
+## Typecheck
+```
+npx tsc --noEmit
+```
+Resultado: sem erros (repositório completo — diferente do estado registrado em T004,
+o typecheck completo do repo passa limpo neste momento; dependências AWS SDK/pino/aws-lambda
+já presentes no worktree atual).
+
+## Regressão — suíte completa do repositório
+```
+npx vitest run --reporter=default
+```
+Resultado: 61 arquivos (55 passed, 6 skipped — skips pré-existentes de integração
+com banco/infra, não relacionados a este diff), 276 testes (249 passed, 27 skipped),
+0 falhas. Diff de T005 (`sinal-cache-identificacao.ts` + teste) não introduziu
+nenhuma regressão.
+
+## Allure
+`npx vitest run` (sem `--reporter=default`, deixando o reporter `allure-vitest`
+configurado em `vitest.config.ts` atuar) falha com:
+```
+Error: Vitest failed to find the runner ... allure-vitest/src/setup.ts:15:0
+```
+Confirma o bug pré-existente do adaptador `allure-vitest` neste repositório
+(já relatado por outros agentes). Contornado ao rodar com `--reporter=default`,
+que desativa a geração de `allure-results/` nesta rodada — limitação de ambiente,
+não bloqueia o gate desta task (nenhum requisito de T005 depende de Allure).
