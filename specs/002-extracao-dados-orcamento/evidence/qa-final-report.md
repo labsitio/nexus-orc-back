@@ -1,5 +1,97 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
+## Validação — T022 (issue #87), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #480 (draft), branch `feat/002-t022-extrair-dados-orcamento`, commits
+`ec1f868` (implementação) + `aaff5d4` (correção de NIT do backend-reviewer).
+
+### Resumo executivo
+`ExtrairDadosOrcamento` (Application, novo) — caso de uso central de US1/US2:
+consome `OrcamentoClassificado` já resolvido (orcamentoId, referenciaClassificacao,
+referenciaBrutaS3 — resolução SQS é T023, fora de escopo), cria ou recupera
+idempotentemente o agregado `ExtracaoOrcamento`, lê o bruto via `LeituraBrutaGateway`,
+converte via `MarkItDownConversaoExtracaoACL`, invoca `AgenteExtratorGateway`,
+aplica `registrarTentativaExtrator` (regra de negócio no agregado, T009 — a
+Application nunca decide o status), persiste via `ExtracaoOrcamentoRepository.salvar`
+e publica `OrcamentoExtraido` ou `ExtracaoEscalonadaParaRevisaoHumana` conforme
+o status resultante do domínio. `backend-reviewer` já aprovou (APPROVE WITH NITS);
+o único MINOR relevante (non-null assertion em `condicoesComerciais`) foi
+corrigido em `aaff5d4` (lança `ExtracaoInconsistenteError` explícito em vez de
+assumir); o segundo MINOR (concorrência otimista) já está coberto por
+`SELECT ... FOR UPDATE` em `DrizzleExtracaoOrcamentoRepository.salvar` (T013,
+já em `main`, fora do diff desta PR).
+
+### Requisitos cobertos (T022, tasks.md / spec.md)
+Todos os critérios de aceite listados no handoff desta task estão cobertos por
+teste automatizado — ver `qa/traceability-matrix.md` § "Leva T022" para o
+mapeamento cenário-a-cenário. Destaques verificados de forma independente (não
+apenas pelo relato do dev-back-end):
+- Idempotência contra entrega duplicada SQS: teste confirma que nenhum efeito
+  colateral ocorre (`leituraBruta.chamadas === 0`, `agenteExtrator.chamadas === 0`,
+  nada salvo, nada publicado) quando a extração já saiu de `PENDENTE` — não
+  apenas que o evento final está ausente.
+- Invariante "nunca inventa valor": teste do caminho de baixa confiança assere
+  `precoUnitario.valor === null` diretamente no agregado persistido, não apenas
+  no evento publicado.
+- Guarda `ExtracaoInconsistenteError`: branch defensivo, correto por leitura de
+  código, porém inalcançável dado o invariante atual do agregado (`completo()`
+  exige `condicoesComerciais` preenchido antes de `EXTRAIDO`) — classificado
+  como "código inviável de testar sem refatoração de produção", não é lacuna
+  evitável.
+
+### Suítes executadas e comandos
+```bash
+npx vitest run tests/bounded-contexts/extracao
+# Test Files  49 passed | 4 skipped (53) / Tests  206 passed | 24 skipped (230)
+# (4 skipped = integração Postgres pré-existente sem DATABASE_URL)
+
+npx vitest run
+# Test Files  161 passed | 14 skipped (175) / Tests  793 passed | 60 skipped (853)
+# sem regressão
+
+npx tsc --noEmit
+# sem erros
+
+npx eslint src/bounded-contexts/extracao/application/use-cases/extrair-dados-orcamento.ts \
+  tests/bounded-contexts/extracao/application/extrair-dados-orcamento.test.ts \
+  tests/bounded-contexts/extracao/application/extrair-dados-orcamento.integration.test.ts
+# sem erros
+```
+Reporter Allure (`allure-vitest`, já configurado em `vitest.config.ts`, mesma
+convenção do projeto) gerou `allure-results/` normalmente nesta execução
+(1431 arquivos `*-result.json`) — sem a falha ambiental relatada em levas
+anteriores (`qa/coverage-baseline.md`); nenhuma configuração nova introduzida.
+
+### Cobertura (arquivo novo)
+`extrair-dados-orcamento.ts`: Statements 92% (23/25), Branches 90% (9/10),
+Functions 75% (3/4), Lines 92% (23/25). Não coberto: guarda `ExtracaoInconsistenteError`
+(linhas 32/92) — ver justificativa acima e em `qa/test-execution-report.md`.
+
+### Bugs
+Nenhum defeito de produção encontrado nesta leva.
+
+### Riscos residuais (fora do escopo desta leva)
+- BUG-001 (severidade BAIXA, P3) segue `PRONTO PARA RETESTE` no handoff; leitura
+  do código atual (`extracao-orcamento.aggregate.ts:123-125`) mostra que o
+  getter `historico` já devolve cópia defensiva — não fechado formalmente aqui
+  por não ter sido informado pelo dev-back-end como pronto para reteste nesta PR,
+  e por não pertencer ao diff de T022.
+- Handler Lambda de `extrator-queue` (T023) e endpoint de status (T024) ainda
+  não existem — fora de escopo, não bloqueiam T022 isoladamente.
+
+### Parecer final
+**APROVADO PELO QA.**
+
+Motivo: todos os critérios de aceite de T022 cobertos por teste automatizado
+determinístico, incluindo idempotência (cenário crítico contra duplicidade
+SQS at-least-once) e a invariante "nunca inventa valor"; nenhuma regressão na
+suíte completa; typecheck e lint limpos; NIT do backend-reviewer confirmado
+corrigido por leitura de diff, não apenas por declaração do dev-back-end.
+
+---
+
 ## Validação — T019 (issue #84), primeira validação
 
 ### SPEC_ID e versão testada

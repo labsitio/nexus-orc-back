@@ -1,3 +1,20 @@
+## Leva T022 (issue #87, PR #480, commits `ec1f868`+`aaff5d4`)
+
+| Critério de aceite (spec.md / plan.md / tasks.md) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| Caso de uso consome dados já resolvidos do evento (`orcamentoId`, `referenciaClassificacao`, `referenciaBrutaS3`), sem resolver mensagem SQS (fora de escopo, T023) | Escopo/contrato | Unit | `ExtrairDadosOrcamentoParams` só aceita os 3 campos já resolvidos | `extrair-dados-orcamento.test.ts` (todos os 4 testes) | PASS |
+| Cria o agregado na 1ª tentativa, ou recupera o existente para o mesmo `orcamentoId` (idempotência contra SQS at-least-once) | Duplicidade/idempotência (crítico) | Unit | `existente=undefined` → `ExtracaoOrcamento.criar`; `existente` com status `PENDENTE` → reaproveita a mesma instância (`toBe(existente)`) | `extrair-dados-orcamento.test.ts` (2 dos 4 testes) | PASS |
+| Nunca reprocessa nem republica evento quando a extração já saiu de `PENDENTE` (entrega duplicada da fila) | Duplicidade/publicação duplicada (crítico) | Unit | `existente` com status `EXTRAIDO` → `leituraBruta`/`agenteExtrator` não são chamados, nada é salvo nem publicado | `extrair-dados-orcamento.test.ts` (1 dos 4 testes) | PASS |
+| Lê o bruto (read-only) → converte via MarkItDown ACL → invoca Agente Extrator → aplica `registrarTentativaExtrator` (regra de negócio no agregado, Application nunca decide o status) | Orquestração/separação de camadas | Unit + Integração simulada | fluxo completo com fakes; decisão de evento lê `extracao.status` resultante do agregado real, não uma regra duplicada no caso de uso | `extrair-dados-orcamento.test.ts` (4 testes) + `extrair-dados-orcamento.integration.test.ts` (3 testes, pré-existente T020) | PASS |
+| Persiste via `ExtracaoOrcamentoRepository.salvar` | Persistência | Unit | `repositorio.salvos` contém a instância após cada tentativa nova (idempotência não impede persistir 1x) | `extrair-dados-orcamento.test.ts` (3 dos 4 testes) | PASS |
+| Publica `OrcamentoExtraido` quando `EXTRAIDO` (todos os campos obrigatórios com confiança suficiente), payload com itens/condições estruturados | Contrato de evento | Unit | item completo + condições completas → 1 evento `OrcamentoExtraido`, `itens.length === 1` | `extrair-dados-orcamento.test.ts` (1 dos 4 testes) | PASS |
+| Publica `ExtracaoEscalonadaParaRevisaoHumana` quando `PENDENTE_REVISAO_HUMANA` (1+ campo obrigatório sem confiança), nenhum valor inventado | Financeiro/silencioso (crítico) | Unit | item com `precoUnitario` sem confiança → 1 evento `ExtracaoEscalonadaParaRevisaoHumana`; assert explícito `valor: null` no campo pendente após persistir | `extrair-dados-orcamento.test.ts` (1 dos 4 testes) | PASS |
+| Nunca lança exceção silenciosa: `EXTRAIDO` sem `condicoesComerciais` (violação de invariante) lança `ExtracaoInconsistenteError`, não mascara/assume | Robustez/invariante de domínio | Estático + leitura de código | branch defensivo (linha 89-93 do caso de uso) — inalcançável com o agregado atual (`completo()` garante `condicoesComerciais !== undefined` antes de `EXTRAIDO`), corretamente classificado como guarda de invariante, não testável sem quebrar produção | não coberto por teste automatizado (ver `qa/coverage-baseline.md`/relatório final, categoria "código inviável de testar sem refatoração de produção") | N/A — guarda defensiva correta, dead-code intencional e documentado |
+
+### Fora desta leva
+- Handler Lambda consumidor de `extrator-queue` (T023) — resolução da mensagem SQS real (parse do body, `OrcamentoClassificado`) não existe ainda; este caso de uso já assume os 3 campos resolvidos, conforme `tasks.md`.
+- Endpoint de status (T024) — não consome este caso de uso, é leitura separada.
+
 ## Leva T019 (issue #84, PR #457, commit `61c4670`)
 
 | Critério de aceite (spec.md / plan.md) | Risco | Nível | Cenário | Teste | Resultado |
