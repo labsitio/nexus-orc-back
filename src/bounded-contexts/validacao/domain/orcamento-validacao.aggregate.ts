@@ -1,0 +1,165 @@
+import { ErroDominio } from './errors/erro-dominio.js';
+import type { DadosExtraidosParaValidacao } from './value-objects/dados-extraidos-para-validacao.vo.js';
+import type { InconsistenciaDetectada } from './value-objects/inconsistencia-detectada.vo.js';
+import type { OrcamentoId } from './value-objects/orcamento-id.vo.js';
+import { TentativaValidacao } from './value-objects/tentativa-validacao.vo.js';
+
+export const STATUS_VALIDACAO = [
+  'PENDENTE',
+  'VALIDADO',
+  'PENDENTE_REVISAO_HUMANA',
+  'VALIDADO_COM_RESSALVA',
+] as const;
+export type StatusValidacao = (typeof STATUS_VALIDACAO)[number];
+
+export class DadosExtraidosImutavelError extends ErroDominio {
+  constructor(campo: string) {
+    super(`"${campo}" não pode ser sobrescrito após a criação de OrcamentoValidacao`);
+  }
+}
+
+export class TransicaoInvalidaValidacaoError extends ErroDominio {
+  constructor(statusAtual: StatusValidacao, acao: string) {
+    super(`Transição inválida: "${acao}" a partir do status ${statusAtual}`);
+  }
+}
+
+/**
+ * Decisão humana registrada a partir de `PENDENTE_REVISAO_HUMANA`.
+ * `CORRECAO_APLICADA` reavalia as regras com as inconsistências
+ * recalculadas pela Application sobre os dados corrigidos (nunca autoaprova
+ * — se ainda houver inconsistência, permanece em revisão humana).
+ * `ACEITE_COM_RESSALVA` é decisão terminal, aceita explicitamente apesar da(s)
+ * inconsistência(s) remanescente(s).
+ */
+export type DecisaoHumanaValidacao =
+  | {
+      readonly tipo: 'CORRECAO_APLICADA';
+      readonly inconsistencias: readonly InconsistenciaDetectada[];
+    }
+  | { readonly tipo: 'ACEITE_COM_RESSALVA' };
+
+export interface OrcamentoValidacaoProps {
+  readonly orcamentoId: OrcamentoId;
+  readonly dadosExtraidos: DadosExtraidosParaValidacao;
+  readonly status: StatusValidacao;
+  readonly inconsistencias: readonly InconsistenciaDetectada[];
+  readonly historico: readonly TentativaValidacao[];
+}
+
+/**
+ * Agregado raiz do BC Validação — 1:1 com o `orcamentoId` da Ingestão,
+ * própria identidade correlata (mesmo padrão de duplicação aceito na
+ * spec 002). Nunca decide sozinho aceitar campo com pendência confirmada
+ * pela Extração: cada BC responde sua própria pergunta de negócio.
+ */
+export class OrcamentoValidacao {
+  private readonly _orcamentoId: OrcamentoId;
+  private readonly _dadosExtraidos: DadosExtraidosParaValidacao;
+  private _status: StatusValidacao;
+  private _inconsistencias: readonly InconsistenciaDetectada[];
+  private readonly _historico: TentativaValidacao[];
+
+  private constructor(props: OrcamentoValidacaoProps) {
+    this._orcamentoId = props.orcamentoId;
+    this._dadosExtraidos = props.dadosExtraidos;
+    this._status = props.status;
+    this._inconsistencias = [...props.inconsistencias];
+    this._historico = [...props.historico];
+  }
+
+  /** Cria o agregado no momento em que `OrcamentoExtraido` é traduzido pelo ACL. */
+  static criar(
+    orcamentoId: OrcamentoId,
+    dadosExtraidos: DadosExtraidosParaValidacao,
+  ): OrcamentoValidacao {
+    return new OrcamentoValidacao({
+      orcamentoId,
+      dadosExtraidos,
+      status: 'PENDENTE',
+      inconsistencias: [],
+      historico: [],
+    });
+  }
+
+  /** Reconstrói o agregado a partir de estado persistido (uso do repositório). */
+  static reconstituir(props: OrcamentoValidacaoProps): OrcamentoValidacao {
+    return new OrcamentoValidacao(props);
+  }
+
+  get orcamentoId(): OrcamentoId {
+    return this._orcamentoId;
+  }
+
+  get dadosExtraidos(): DadosExtraidosParaValidacao {
+    return this._dadosExtraidos;
+  }
+
+  get status(): StatusValidacao {
+    return this._status;
+  }
+
+  get inconsistencias(): readonly InconsistenciaDetectada[] {
+    return [...this._inconsistencias];
+  }
+
+  get historico(): readonly TentativaValidacao[] {
+    return [...this._historico];
+  }
+
+  /** `dadosExtraidos` nunca é sobrescrito — correção passa por `registrarDecisaoHumana`. */
+  atualizarDadosExtraidos(): never {
+    throw new DadosExtraidosImutavelError('dadosExtraidos');
+  }
+
+  /**
+   * Avalia o resultado das 4 regras determinísticas de consistência (T010).
+   * Só válida a partir de `PENDENTE` — nunca existe uma segunda tentativa
+   * automática (ADR-001); a única forma de reavaliar após inconsistência é
+   * `registrarDecisaoHumana`. Todas as regras passando → `VALIDADO`; 1+
+   * regra falhando → `PENDENTE_REVISAO_HUMANA` direto, nunca parcialmente.
+   */
+  avaliarRegrasDeConsistencia(inconsistencias: readonly InconsistenciaDetectada[]): void {
+    if (this._status !== 'PENDENTE') {
+      throw new TransicaoInvalidaValidacaoError(this._status, 'avaliarRegrasDeConsistencia');
+    }
+    this.aplicarResultadoAvaliacao(inconsistencias);
+  }
+
+  /**
+   * Só válida a partir de `PENDENTE_REVISAO_HUMANA`. Nunca apaga `historico`,
+   * apenas anexa — decisão humana é sempre auditável.
+   */
+  registrarDecisaoHumana(decisao: DecisaoHumanaValidacao): void {
+    if (this._status !== 'PENDENTE_REVISAO_HUMANA') {
+      throw new TransicaoInvalidaValidacaoError(this._status, 'registrarDecisaoHumana');
+    }
+
+    if (decisao.tipo === 'CORRECAO_APLICADA') {
+      this.aplicarResultadoAvaliacao(decisao.inconsistencias);
+      return;
+    }
+
+    this._historico.push(
+      TentativaValidacao.de(
+        this._inconsistencias.length === 0 ? 'VALIDADO' : 'INCONSISTENTE',
+        this._inconsistencias,
+        new Date(),
+      ),
+    );
+    this._status = 'VALIDADO_COM_RESSALVA';
+  }
+
+  private aplicarResultadoAvaliacao(inconsistencias: readonly InconsistenciaDetectada[]): void {
+    this._inconsistencias = [...inconsistencias];
+
+    if (inconsistencias.length === 0) {
+      this._historico.push(TentativaValidacao.de('VALIDADO', [], new Date()));
+      this._status = 'VALIDADO';
+      return;
+    }
+
+    this._historico.push(TentativaValidacao.de('INCONSISTENTE', inconsistencias, new Date()));
+    this._status = 'PENDENTE_REVISAO_HUMANA';
+  }
+}
