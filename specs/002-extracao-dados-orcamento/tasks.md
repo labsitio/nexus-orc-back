@@ -51,7 +51,7 @@
 ### Tests (US1)
 
 - [x] T017 [P] [US1] Unit test do agregado `ExtracaoOrcamento.criar(referenciaClassificacao, referenciaBrutaS3)` + `registrarTentativaExtrator` com todos os campos obrigatórios completos → transita para `EXTRAIDO`. Já coberto por `tests/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.test.ts` (escrito junto de T009) — nenhum código novo necessário. #82
-- [ ] T018 [P] [US1] Unit test do `MarkItDownConversaoExtracaoACL` (mock de saída do MarkItDown) — sanitização de conteúdo antes de compor prompt (mitigação de prompt injection, mesmo padrão da spec 001).
+- [x] T018 [P] [US1] Unit test do `MarkItDownConversaoExtracaoACL` (mock de saída do MarkItDown) — sanitização de conteúdo antes de compor prompt (mitigação de prompt injection, mesmo padrão da spec 001). Implementação (Infrastructure) criada junto, réplica do padrão de `ingestao-identificacao` (nenhuma outra task do BC previa essa implementação). #83
 - [ ] T019 [P] [US1] Contract test `GET /v1/orcamentos/{orcamentoId}/extracao/status` em `tests/bounded-contexts/extracao/contract/`.
 - [ ] T020 [P] [US1] Integration test: `OrcamentoClassificado` publicado → `OrcamentoExtraido` publicado, payload com itens/condições estruturados, p95 medido em ambiente de teste local (LocalStack).
 
