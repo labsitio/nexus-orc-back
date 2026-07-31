@@ -1,3 +1,33 @@
+## Leva T023 (issue #88, PR #485, commit `9d2d2e8`)
+
+| Critério de aceite (spec.md / plan.md / tasks.md) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| Handler consome mensagem SQS, parseia envelope EventBridge (`detail.orcamentoId`, `detail.resultado.*`, `detail.referenciaBruta.*`) e invoca `ExtrairDadosOrcamento.executar` com os campos extraídos | Contrato/integração | Unit | envelope válido, 2 mensagens → `executar` chamado 2x com os campos corretos | `extrator-queue.handler.test.ts` (1/7) | PASS |
+| Falha em 1 mensagem do lote reporta batch item failure só daquele item, sem interromper as demais (Princípio IV, exceção nunca silenciosa) | Resiliência | Unit | 2 mensagens, 1 lança erro no caso de uso → `batchItemFailures` só com o item falho, `executar` chamado 2x | `extrator-queue.handler.test.ts` (2/7) | PASS |
+| Envelope inválido (shape errado) nunca lança — reporta batch item failure | Robustez/entrada não confiável | Unit | corpo `{"algo":"invalido"}` → `executar` não chamado, item reportado como falha | `extrator-queue.handler.test.ts` (3/7) | PASS |
+| Envelope sem `referenciaBruta` (dependência do ADR-003/PR #483) é rejeitado como inválido | Contrato entre specs (regressão) | Unit | envelope sem `detail.referenciaBruta` → `executar` não chamado, item reportado como falha | `extrator-queue.handler.test.ts` (4/7) | PASS |
+| Todo log do processamento de uma mensagem é correlacionado por `orcamentoId`+`messageId` (T016) | Observabilidade | Unit | logger real (pino) gravando em memória → todas as linhas emitidas contêm ambos os campos | `extrator-queue.handler.test.ts` (5/7) | PASS |
+| Log de erro é emitido mesmo quando `orcamentoId` não pôde ser extraído (envelope inválido antes do parse chegar a `detail.orcamentoId`) | Observabilidade/robustez | Unit | envelope inválido → 1 linha de log nível error (50), com `messageId`, `orcamentoId` ausente/undefined | `extrator-queue.handler.test.ts` (6/7) | PASS |
+| Entrega duplicada (SQS at-least-once) não quebra o handler — idempotência é responsabilidade do caso de uso (T022), handler só precisa não tratar retorno normal como falha | Duplicidade/idempotência | Unit | `executar` resolve normalmente (void) para "reprocessamento" → nenhum batch item failure | `extrator-queue.handler.test.ts` (7/7) | PASS |
+| `agenteOrigem` do envelope é narrowed contra o union real (`'CLASSIFICADOR' \| 'HUMANO'`), não apenas `typeof === 'string'` (NIT do backend-reviewer, corrigido nesta PR) | Contrato/type-safety | Estático + Unit | `ehEventBridgeEnvelope` rejeita `agenteOrigem` fora do union; todos os testes usam `'CLASSIFICADOR'` real, exercitando o narrowing | `extrator-queue.handler.test.ts` (todos) + leitura de código | PASS |
+
+### Risco residual documentado, fora do escopo desta PR
+`ExtrairDadosOrcamento` (T022, já mergeado) cobre idempotência apenas contra
+duplicidade **sequencial** (2ª mensagem chega depois que a 1ª já persistiu com
+status != `PENDENTE`). Duas mensagens da mesma entrega duplicada processadas
+**concorrentemente** (SQS at-least-once + Lambda com concorrência > 1) é uma
+race condition teoricamente possível, não coberta por este handler nem pelo
+caso de uso atual. Pertence ao código de T022 (produção já mergeada, fora do
+diff desta PR) — não é defeito introduzido por T023, registrado como risco
+residual, não bloqueante.
+
+### Fora desta leva
+- Não coberto por teste automatizado: branches "root não é objeto"
+  (`ehEventBridgeEnvelope`, linha 43) e "`orcamentoId` ausente isoladamente"
+  (linha 51) — variações do mesmo guard já exercitado por 2 cenários de
+  envelope inválido; classificado como cobertura estrutural residual de baixo
+  risco (mesma família de branch defensivo, não caminho de negócio distinto).
+
 ## Leva T022 (issue #87, PR #480, commits `ec1f868`+`aaff5d4`)
 
 | Critério de aceite (spec.md / plan.md / tasks.md) | Risco | Nível | Cenário | Teste | Resultado |

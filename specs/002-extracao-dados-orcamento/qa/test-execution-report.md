@@ -1,5 +1,67 @@
 # Test Execution Report — SPEC 002
 
+## Leva T023 (issue #88, PR #485, commit `9d2d2e8`)
+
+### Escopo
+`criarExtratorQueueHandler` (Interface, novo) — handler Lambda consumidor de
+`extrator-queue`: parseia envelope EventBridge de `OrcamentoClassificado`
+(`detail.orcamentoId`, `detail.resultado.*`, `detail.referenciaBruta.*` —
+este último campo existe graças ao ADR-003/PR #483), invoca
+`ExtrairDadosOrcamento.executar` (T022), reporta batch item failures
+item-a-item, usa `criarLogger` (T016) para correlação. Único arquivo de
+produção: `extrator-queue.handler.ts`. Arquivo de teste: novo,
+`extrator-queue.handler.test.ts`, 7 casos.
+
+### Comando e resultado
+```bash
+npx vitest run tests/bounded-contexts/extracao/interface/extrator-queue.handler.test.ts
+# Test Files  1 passed (1) / Tests  7 passed (7)
+
+npx vitest run
+# Test Files  87 passed | 8 skipped (95)
+#      Tests  431 passed | 40 skipped (471)
+```
+Full suite sem regressão. 8 skipped = integração Postgres pré-existente sem
+`DATABASE_URL`, não relacionado a T023.
+
+### Estático
+- `npx tsc --noEmit -p .` — sem erros.
+- `npx eslint` no arquivo de produção e no arquivo de teste — sem erros.
+
+### Cobertura (arquivo novo)
+```bash
+npx vitest run tests/bounded-contexts/extracao/interface/extrator-queue.handler.test.ts --coverage
+```
+`extrator-queue.handler.ts`: Statements 89.65%, Branches 84.61%, Functions
+100%, Lines 89.65%. Não coberto: linhas 43/51/62 — branches defensivos do
+guard `ehEventBridgeEnvelope` (root não-objeto; `orcamentoId` ausente
+isoladamente; fallthrough de `resultado` inválido) não exercitados por um
+cenário próprio — mesma família de branch já coberta por 2 outros cenários de
+envelope inválido (corpo totalmente inválido, `referenciaBruta` ausente).
+Classificado como cobertura estrutural residual de baixo risco, não caminho
+de negócio distinto.
+
+### Verificação independente (não apenas leitura do relato do dev-back-end)
+- Narrowing de `agenteOrigem` (NIT do backend-reviewer, corrigido nesta PR):
+  confirmado por leitura do diff — `ehEventBridgeEnvelope` valida
+  `agenteOrigem !== 'CLASSIFICADOR' && agenteOrigem !== 'HUMANO'` em vez de só
+  `typeof === 'string'`.
+- Batch item failure isolado: teste confirma `executar` chamado 2x (ambas
+  mensagens processadas) e `batchItemFailures` só com o item que lançou —
+  não apenas que a resposta final está correta.
+- Correlação de log: logger pino real gravando em memória, não apenas mock —
+  confirma `orcamentoId`/`messageId` em toda linha emitida.
+- Dependência do ADR-003 (PR #483, `referenciaBruta` no payload): confirmado
+  por leitura do tipo `EventBridgeEnvelope` e do teste dedicado — envelope sem
+  `referenciaBruta` é corretamente rejeitado como inválido.
+
+### Risco residual (fora do escopo desta PR)
+`ExtrairDadosOrcamento` (T022, já mergeado, produção) idempotente apenas
+contra duplicidade sequencial, não contra 2 mensagens da mesma entrega
+duplicada processadas concorrentemente (SQS at-least-once + Lambda com
+concorrência > 1). Já documentado como MINOR pelo backend-reviewer, fora de
+escopo do diff desta PR — não gera BUG bloqueante.
+
 ## Leva T022 (issue #87, PR #480, commits `ec1f868` + `aaff5d4`)
 
 ### Escopo
