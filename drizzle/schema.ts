@@ -5,3 +5,4 @@ export * from '../src/bounded-contexts/ingestao-identificacao/infrastructure/per
 export * from '../src/platform/conformidade/infrastructure/persistence/schema/platform.schema.js';
 export * from '../src/bounded-contexts/extracao/infrastructure/persistence/schema/extracao-orcamento.schema.js';
 export * from '../src/bounded-contexts/validacao/infrastructure/persistence/schema/validacao-orcamento.schema.js';
+export * from '../src/bounded-contexts/busca-indexacao/infrastructure/persistence/schema/indice-orcamento.schema.js';

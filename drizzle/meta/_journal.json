@@ -64,6 +64,13 @@
       "when": 1785492252098,
       "tag": "0008_enable_pgvector_extension",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785503597995,
+      "tag": "0009_busca_indexacao_baseline",
+      "breakpoints": true
     }
   ]
 }
