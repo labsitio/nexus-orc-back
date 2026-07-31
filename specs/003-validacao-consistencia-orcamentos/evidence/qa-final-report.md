@@ -504,3 +504,112 @@ esperada pela ordem do `tasks.md`.
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T013 (issue #123)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: `003-validacao-consistencia-orcamentos`
+- Branch `feat/003-validacao`, commit `ceca7b6`, PR #481 (draft)
+- Task: T013 (issue #123) — schema Drizzle `validacoes_orcamento` +
+  `validacoes_orcamento_historico`, migração `0011`, faixas de preço em reais
+- `backend-reviewer`: APPROVE (re-revisão pós-correção)
+- Reteste de bloqueio de ambiente da 1ª validação (commit `8d3e61e`), não
+  BUG-XXX formal — sem Postgres/docker local para rodar a migração 0011
+
+## 2. Resumo executivo
+1ª validação: `BLOQUEADO POR AMBIENTE` — docker daemon indisponível nesta
+worktree, suíte de integração do schema (`validacao-orcamento.schema.test.ts`,
+8 testes) ficou skip, sem forma de confirmar a migração 0011 contra Postgres
+real localmente.
+
+Entre a 1ª validação e este reteste, o CI real do PR #481 rodou a migração
+0011 contra Postgres e encontrou exatamente o tipo de defeito que a limitação
+de ambiente não deixou capturar: o nome padrão de FK gerado pelo Drizzle
+(`validacoes_orcamento_historico_orcamento_validacao_id_validacoes_orcamento_id_fk`,
+80 bytes) excedia `NAMEDATALEN` (63 bytes) do Postgres e foi truncado
+silenciosamente, quebrando o teste "FK orcamento_validacao_id rejeita
+histórico órfão" (esperava o nome exato na mensagem de erro).
+
+Correção no commit `ceca7b6`: FK renomeada explicitamente via
+`foreignKey({ name: 'validacoes_orcamento_historico_orcamento_validacao_id_fk' })`
+(56 bytes, dentro do limite) em
+`src/bounded-contexts/validacao/infrastructure/persistence/schema/validacao-orcamento.schema.ts:77`,
+migração 0011 regenerada do schema corrigido, regex do teste
+(`validacao-orcamento.schema.test.ts:148`) atualizado para o novo nome.
+Verificado por leitura direta dos 3 arquivos — nome do teste, nome no schema
+e nome na migração SQL batem exatamente.
+
+## 3. Requisitos cobertos e não cobertos
+- Coberto: `gh pr checks 481` confirmado por mim mesmo neste reteste →
+  `ci  pass  1m5s` no commit `ceca7b6` — a migração 0011 corrigida já foi
+  executada contra Postgres real via CI e os 8 testes de integração do
+  schema `validacao` passaram de verdade (não apenas localmente/skip).
+- Não aplicável: mesma limitação de ambiente da 1ª validação permanece —
+  sem Postgres local nesta worktree (`docker ps` falha:
+  `failed to connect to the docker API ... dockerDesktopLinuxEngine`), os 8
+  testes de integração do schema continuam skip localmente. A evidência de
+  execução real vem do CI, não deste ambiente.
+
+## 4. Suítes executadas e comandos (neste reteste)
+1. `gh pr checks 481` → `ci  pass  1m5s` (run
+   https://github.com/labsitio/nexus-orc-back/actions/runs/30650770664/job/91223180718).
+2. `corepack pnpm typecheck` (`tsc --noEmit`) → 0 erros.
+3. `corepack pnpm lint` (`eslint .`) → 0 erros.
+4. `corepack pnpm test` (vitest, suíte completa) → 424 passed, 40 skipped
+   (464 total); 86 arquivos passed, 8 skipped (94) — os 8 skipped são todos
+   de integração dependente de Postgres (`docker:up`), incluindo
+   `validacao-orcamento.schema.test.ts` (8 testes), mesma causa já
+   documentada na 1ª validação.
+5. Leitura direta de
+   `tests/bounded-contexts/validacao/infrastructure/persistence/schema/validacao-orcamento.schema.test.ts:148`,
+   `src/bounded-contexts/validacao/infrastructure/persistence/schema/validacao-orcamento.schema.ts:77`
+   e `drizzle/0011_validacoes_orcamento_faixas_preco_reais.sql:31` → nome da
+   FK idêntico nos 3 lugares
+   (`validacoes_orcamento_historico_orcamento_validacao_id_fk`, 56 bytes,
+   confirmado por contagem de bytes).
+
+## 5. Quantidade de testes por tipo
+Sem teste novo criado por este reteste (correção é rename de constraint +
+regex de teste já existente, feita pelo dev-back-end). Regressão local: 424
+testes passed, 0 falhas, 40 skipped (integração dependente de
+Postgres/docker, mesma lacuna de ambiente já registrada).
+
+## 6. Resultado
+- CI (GitHub Actions, PR #481, commit `ceca7b6`): `pass`.
+- Local — typecheck: OK. lint: OK. test: 424 passed / 0 failed / 40 skipped.
+
+## 7. Cobertura inicial e final
+Não medida separadamente neste reteste — mudança de produção é rename de uma
+constraint (mesma linha de código antes coberta pelos 8 testes de integração
+que, aqui, permanecem skip por ambiente; cobertos no CI).
+
+## 8. Allure
+Não gerado — mesma lacuna já registrada nas validações anteriores desta spec
+(sem tooling de publicação de relatório configurada em CI).
+
+## 9. Bugs por severidade e status
+Nenhum bug de produção aberto. O defeito de truncamento de FK (achado pelo
+CI real entre a 1ª validação e este reteste) já foi corrigido pelo
+dev-back-end no commit `ceca7b6` e confirmado neste reteste — não requer
+BUG-XXX formal por ter sido corrigido antes do fechamento do gate.
+
+## 10. Riscos residuais
+- Ambiente local desta worktree permanece sem Postgres/docker — qualquer
+  regressão futura em constraint de nome longo só será pega pelo CI, não
+  localmente. Risco a monitorar: `NAMEDATALEN` (63 bytes) do Postgres é um
+  limite silencioso do Drizzle (trunca em vez de falhar) — sinalizar para
+  o dev-back-end nomear explicitamente FKs/índices longos em tasks futuras
+  do BC Validação (T014+) antes de depender do nome default gerado.
+
+## 11. Limitações do ambiente
+- Docker Desktop indisponível nesta worktree
+  (`dockerDesktopLinuxEngine` não encontrado) — os 8 testes de integração
+  do schema `validacao` continuam skip localmente; evidência de execução
+  real vem do CI (`gh pr checks 481`), verificado por mim neste reteste.
+- `pnpm` fora do PATH padrão do Bash desta worktree; executado via
+  `corepack pnpm`, sem impacto no resultado.
+
+## 12. Parecer final
+APROVADO PELO QA
