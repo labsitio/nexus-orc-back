@@ -29,7 +29,7 @@ Monorepo único, conforme `plan.md` desta spec — `src/shared-kernel/`, `src/bo
 
 - [x] T001 Criar `src/shared-kernel/tenant/tenant-id.vo.ts` — VO `TenantId`, UUID v7, validação de formato, sem lógica de negócio (ADR-004 do plan.md). (#264, PR #454)
 - [x] T002 [P] Criar `src/shared-kernel/tenant/tenant-context.ts` — tipo `TenantContext` (request-scoped, nunca estado global mutável). (#265)
-- [ ] T003 [P] Configurar lint rule/checklist de PR documentando que `src/shared-kernel/tenant/` é a única exceção autorizada de import direto entre Bounded Contexts (ADR-004).
+- [x] T003 [P] Configurar lint rule/checklist de PR documentando que `src/shared-kernel/tenant/` é a única exceção autorizada de import direto entre Bounded Contexts (ADR-004). (#266)
 
 **Checkpoint**: Shared Kernel disponível para todas as fases seguintes.
 
