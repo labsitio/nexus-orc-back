@@ -9,6 +9,7 @@ import type { OrcamentoRepository } from '../../../../src/bounded-contexts/inges
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
 import { registrarRotaConfirmarUpload } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/http/confirmar-upload.controller.js';
+import type { SftpTenantResolverGateway } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/sftp-tenant-resolver.gateway.js';
 import { criarHandlerSftpUpload } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/events/sftp-upload.handler.js';
 
 /**
@@ -72,7 +73,8 @@ async function receberViaConfirmarUpload(
 
 async function receberViaTriggerSftp(publisher: EventPublisher): Promise<void> {
   const receberOrcamento = new ReceberOrcamento(repositorioFake(), publisher, idempotenciaFake());
-  const handler = criarHandlerSftpUpload(receberOrcamento);
+  const resolverTenant: SftpTenantResolverGateway = { resolver: vi.fn().mockResolvedValue(undefined) };
+  const handler = criarHandlerSftpUpload(receberOrcamento, resolverTenant);
 
   await handler(
     {
