@@ -66,3 +66,19 @@ shape de retorno documentado do SDK (`FailedEntryCount`/`Entries[].ErrorMessage`
 Réplica mecânica do par já validado em spec-001 (`sanitizar-conteudo-documento.ts`/`markitdown-conversao.acl.ts`) — mesma lógica de sanitização, zero decisão de design nova; apenas o limite de tempo do teste de DoS diverge (500ms vs 200ms), justificado no commit e confirmado empiricamente nesta validação.
 
 Risco residual (fora do escopo desta leva): BUG-001 (spec 002, severidade BAIXA, P3) segue `PRONTO PARA RETESTE`, não relacionado a T018/arquivos desta PR. O par de spec-001 do teste de DoS (200ms) reproduziu-se como flaky sob `--coverage` (full-suite run desta validação, teste passou isolado) — confirma o relato do dev-back-end/backend-reviewer; nenhum arquivo de spec-001 foi tocado por esta PR, então nenhum BUG novo foi aberto por esse achado pré-existente.
+
+## Leva T020 (issue #85, PR #460, commit `be208e5`)
+
+| Critério de aceite (spec.md / tasks.md) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| `OrcamentoClassificado` consumido → `OrcamentoExtraido` publicado com itens/condições estruturados quando todo campo obrigatório tem confiança suficiente | Orquestração/contrato de evento | Integração simulada (fakes em memória) | fluxo completo ler bruto → converter → extrair → `registrarTentativaExtrator` → publicar; assert no shape do evento (`detailType`, `schemaVersion`, `itens`, `condicoesComerciais`) | `extrair-dados-orcamento.integration.test.ts` (1 dos 3 testes) | PASS |
+| 1+ campo obrigatório sem confiança → `ExtracaoEscalonadaParaRevisaoHumana`, nunca valor inventado | Financeiro/silencioso (crítico) | Integração simulada | item com `precoUnitario` sem confiança → status `PENDENTE_REVISAO_HUMANA`; assert explícito `valor: null`/`extraido: false` no campo pendente | `extrair-dados-orcamento.integration.test.ts` (1 dos 3 testes) | PASS |
+| Tempo até extração disponível (p95) até 5 minutos (spec.md, meta compartilhada com spec 001) | Performance (proxy) | Integração simulada (20 execuções em memória) | mede p95 da orquestração local contra meta de 5min | `extrair-dados-orcamento.integration.test.ts` (1 dos 3 testes) | PASS — proxy local explícito (comentário `ponytail:` no teste); não valida a meta ponta a ponta real (rede AWS/Bedrock/cold start), isso é T042 |
+
+Verificação de fidelidade ao contrato real (sem antecipar T021/T022):
+- Assinaturas dos fakes (`LeituraBrutaGatewayFake.ler`, `MarkItDownConversaoExtracaoACLFake.converter`, `AgenteExtratorGatewayFake.extrair`, `EventPublisherFake.publicar`) conferem, campo a campo, com as interfaces reais em `src/bounded-contexts/extracao/domain/gateways/*.ts` — nenhuma assinatura inventada.
+- `registrarTentativaExtrator(itens, condicoesComerciais)` chamado exatamente como definido em `extracao-orcamento.aggregate.ts`; a decisão de evento (`EXTRAIDO` → `OrcamentoExtraido`, senão `ExtracaoEscalonadaParaRevisaoHumana`) lê `extracao.status` resultante do agregado — o teste não decide a regra de negócio por conta própria, só orquestra em torno da decisão do domínio.
+- `CampoExtraido.naoExtraido`/`extraido` (VO real) garante estruturalmente `extraido === false ⟺ valor === null` — o teste 2 não afirma isso por mock, afirma sobre o VO real do domínio.
+
+### Fora desta leva
+- `ExtrairDadosOrcamento` (Application, T022/#87) e o handler Lambda de `extrator-queue` (Interface, T023) não existem ainda — este teste fixa a especificação executável que a implementação real deverá seguir; não substitui o teste de integração real (LocalStack) nem a medição de p95 ponta a ponta (T042, após T021/T023).

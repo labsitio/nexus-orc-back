@@ -1,5 +1,63 @@
 # Test Execution Report — SPEC 002
 
+## Leva T020 (issue #85, PR #460, commit `be208e5`)
+
+### Escopo
+Integration test simulado (fakes em memória) que fixa a orquestração esperada
+de `ExtrairDadosOrcamento` (Application, T022/#87, ainda não implementado):
+lê bruto S3 → converte via MarkItDown ACL → invoca Agente Extrator → aplica
+`registrarTentativaExtrator` (agregado real, T009) → publica `OrcamentoExtraido`
+ou `ExtracaoEscalonadaParaRevisaoHumana`. Único arquivo novo:
+`tests/bounded-contexts/extracao/application/extrair-dados-orcamento.integration.test.ts`.
+Mesmo padrão já aprovado em spec-001 (`classificar-orcamento.integration.test.ts`, T029).
+
+### Comando e resultado
+```bash
+./node_modules/.bin/vitest run tests/bounded-contexts/extracao --reporter=default
+```
+- 22 arquivos passaram, 2 skipped (integração Postgres, mesma limitação
+  pré-existente sem `DATABASE_URL`) — 91 testes passaram, 12 skipped, 0 falhas.
+- `extrair-dados-orcamento.integration.test.ts`: 3/3 PASS.
+
+```bash
+./node_modules/.bin/vitest run --reporter=default
+```
+- Full suite: 73 arquivos passaram, 6 skipped — 365 testes passaram, 27 skipped,
+  0 falhas. Nenhuma regressão.
+
+### Estático
+- `npx tsc --noEmit` — sem erros.
+- `npx eslint` no arquivo de teste novo — sem erros.
+
+### Verificação de fidelidade da orquestração simulada
+Confirmado, lendo o código de produção real (não apenas o teste):
+- Assinaturas dos 4 fakes conferem exatamente com as interfaces reais em
+  `src/bounded-contexts/extracao/domain/gateways/*.ts` (`LeituraBrutaGateway.ler(ReferenciaS3)`,
+  `MarkItDownConversaoExtracaoACL.converter(Buffer)`, `AgenteExtratorGateway.extrair(AgenteExtratorInput)`,
+  `EventPublisher.publicar(DomainEventEnvelope)`) — nenhuma assinatura inventada.
+- A escolha do evento publicado lê `extracao.status` **depois** de
+  `registrarTentativaExtrator` (agregado real `extracao-orcamento.aggregate.ts`),
+  não uma regra duplicada no teste — o teste orquestra em torno da decisão do
+  domínio, não decide por conta própria.
+- `CampoExtraido.naoExtraido` (VO real) garante estruturalmente
+  `extraido === false ⟺ valor === null`; o teste 2 assere isso sobre o VO real,
+  não sobre um mock.
+- Teste 3 (p95): comentário `ponytail:` no próprio teste deixa explícito que o
+  p95 medido é da orquestração em memória (proxy local), não da meta real
+  ponta a ponta do spec.md (rede AWS/Bedrock/cold start Lambda) — isso é T042,
+  após T021 (BedrockExtratorGateway) e T023 (handler Lambda) existirem. Não há
+  afirmação enganosa de que a meta real foi validada.
+
+### Resultado
+**PASS.** Nenhum defeito de produção encontrado (não há código de produção
+nesta leva — apenas teste). Critério de aceite de T020 (`tasks.md`) satisfeito:
+integration test simulado fixando a orquestração esperada de
+`OrcamentoClassificado` → `OrcamentoExtraido`/`ExtracaoEscalonadaParaRevisaoHumana`,
+com p95 medido como proxy local documentado. Risco residual (fora do escopo
+desta leva, não relacionado a T020): BUG-001 segue `PRONTO PARA RETESTE`.
+
+---
+
 ## Leva T018 (issue #83, PR #451, commit `a8ff244`)
 
 ### Escopo
