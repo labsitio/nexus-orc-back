@@ -68,3 +68,80 @@ describe.each([
     expect(new Date(evento.ocorreuEm).toISOString()).toBe(evento.ocorreuEm);
   });
 });
+
+describe('payload — campos preservados por construtor', () => {
+  it('SolicitacaoEsquecimentoRegistrada mantém os campos recebidos', () => {
+    const evento = new SolicitacaoEsquecimentoRegistrada(
+      solicitacaoId,
+      titularReferencia,
+      ['ingestao-identificacao'],
+      '2026-08-30T00:00:00.000Z',
+    );
+    expect(evento.solicitacaoId).toBe(solicitacaoId);
+    expect(evento.titularReferencia).toBe(titularReferencia);
+    expect(evento.contextosEsperados).toEqual(['ingestao-identificacao']);
+    expect(evento.prazoLimite).toBe('2026-08-30T00:00:00.000Z');
+  });
+
+  it('DadoPessoalAnonimizadoNoContexto mantém os campos recebidos, incluindo camposAnonimizados vazio', () => {
+    const evento = new DadoPessoalAnonimizadoNoContexto(
+      solicitacaoId,
+      orcamentoId,
+      'ingestao-identificacao',
+      [],
+    );
+    expect(evento.solicitacaoId).toBe(solicitacaoId);
+    expect(evento.orcamentoId).toBe(orcamentoId);
+    expect(evento.boundedContext).toBe('ingestao-identificacao');
+    expect(evento.camposAnonimizados).toEqual([]);
+  });
+
+  it('SolicitacaoEsquecimentoConcluida mantém os campos recebidos', () => {
+    const evento = new SolicitacaoEsquecimentoConcluida(solicitacaoId, titularReferencia, [
+      'ingestao-identificacao',
+    ]);
+    expect(evento.solicitacaoId).toBe(solicitacaoId);
+    expect(evento.titularReferencia).toBe(titularReferencia);
+    expect(evento.contextosConfirmados).toEqual(['ingestao-identificacao']);
+  });
+
+  it('SolicitacaoEsquecimentoPrazoExcedido mantém os campos recebidos', () => {
+    const evento = new SolicitacaoEsquecimentoPrazoExcedido(
+      solicitacaoId,
+      titularReferencia,
+      '2026-08-30T00:00:00.000Z',
+      ['ingestao-identificacao'],
+    );
+    expect(evento.solicitacaoId).toBe(solicitacaoId);
+    expect(evento.titularReferencia).toBe(titularReferencia);
+    expect(evento.prazoLimite).toBe('2026-08-30T00:00:00.000Z');
+    expect(evento.contextosPendentes).toEqual(['ingestao-identificacao']);
+  });
+
+  it('RetencaoAplicadaNoContexto mantém os campos recebidos', () => {
+    const evento = new RetencaoAplicadaNoContexto(
+      'ingestao-identificacao',
+      'ORCAMENTO_FORNECEDOR',
+      3,
+      '30d',
+    );
+    expect(evento.boundedContext).toBe('ingestao-identificacao');
+    expect(evento.categoria).toBe('ORCAMENTO_FORNECEDOR');
+    expect(evento.quantidadeAfetada).toBe(3);
+    expect(evento.janelaAplicada).toBe('30d');
+  });
+
+  it('ocorreuEm usa Date.now por padrão quando não informado', () => {
+    const antes = Date.now();
+    const evento = new RetencaoAplicadaNoContexto(
+      'ingestao-identificacao',
+      'ORCAMENTO_FORNECEDOR',
+      0,
+      '30d',
+    );
+    const depois = Date.now();
+    const ocorreuEmMs = new Date(evento.ocorreuEm).getTime();
+    expect(ocorreuEmMs).toBeGreaterThanOrEqual(antes);
+    expect(ocorreuEmMs).toBeLessThanOrEqual(depois);
+  });
+});
