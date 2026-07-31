@@ -165,3 +165,100 @@ limitação documentada em T003 pelo dev-back-end.
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T008 (issue #118)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: `003-validacao-consistencia-orcamentos`
+- Branch `feat/003-validacao`, commit `5919889`, PR #431 (draft)
+- Task: T008 (issue #118) — Domain VOs `DadosExtraidosParaValidacao`, `ItemParaValidacao`, `TentativaValidacao`
+- `backend-reviewer`: APPROVE (2 achados MINOR não bloqueantes, ambos aceitos: `DadosExtraidosParaValidacao` não valida coerência cruzada `periodoValidade`/`dataEmissaoProposta` — escopo de T010, comentário já referencia)
+- Primeira validação (sem BUG-XXX prévio)
+
+## 2. Resumo executivo
+T008 adiciona 3 VOs imutáveis do BC Validação: `DadosExtraidosParaValidacao` (payload
+traduzido de `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, valida
+lista de itens não vazia e `dataEmissaoProposta` válida), `ItemParaValidacao`
+(valida `descricao` não vazia e `quantidade > 0`; preserva `extraido: boolean` e
+`categoria` opcional), `TentativaValidacao` (entrada de histórico append-only,
+valida invariante `resultado` × `inconsistencias.length` e `timestamp` válido).
+Sem defeito de produção encontrado.
+
+## 3. Requisitos cobertos e não cobertos
+- Coberto: critério de aceite da task — VOs preservam `extraido: boolean` do item
+  de origem (`item-para-validacao.vo.test.ts`, caso "aceita item completo" com
+  `extraido: true` e caso "aceita item sem categoria" com `extraido: false`);
+  decisão de negócio (item com pendência confirmada ainda pode reprovar regra de
+  campo obrigatório) fica testável a partir daqui — a asserção da regra em si é
+  T031/T019, fora do escopo de T008 (aqui só o VO existe e preserva o dado).
+- Coberto: validações de domínio dos 3 VOs — sucesso e falha para cada regra
+  (itens vazio, data inválida, descrição vazia, quantidade ≤ 0, invariante
+  resultado/inconsistências, timestamp inválido).
+- Não aplicável nesta task: coerência cruzada `periodoValidade` ×
+  `dataEmissaoProposta` (achado MINOR do backend-reviewer, escopo de T010),
+  agregado `OrcamentoValidacao` (T009, ainda não implementado), regras de
+  consistência (T010), contrato de API, segurança, resiliência — T008 é Domain
+  VO puro, sem infraestrutura nem caso de uso.
+
+## 4. Suítes executadas e comandos
+1. `corepack pnpm vitest run tests/bounded-contexts/validacao/domain/value-objects/`
+   → 10 arquivos, 37 testes, 0 falhas.
+2. `corepack pnpm vitest run tests/bounded-contexts/validacao/domain/value-objects/ --coverage`
+   (escopo `src/bounded-contexts/validacao/domain/value-objects/**`) → ver seção 7.
+3. `corepack pnpm typecheck` (`tsc --noEmit`, repositório inteiro) → 0 erros.
+4. `corepack pnpm eslint` nos 3 arquivos de produção + 3 arquivos de teste de T008
+   → 0 erros.
+
+## 5. Quantidade de testes por tipo
+Unitários (Domain VO): 10 testes novos relacionados a T008 (4 de `ItemParaValidacao`,
+3 de `DadosExtraidosParaValidacao`, 3 de `TentativaValidacao`) — criados pelo
+dev-back-end. Suíte completa do diretório (incluindo VOs de T005–T007): 37 testes.
+
+## 6. Resultado
+- Aprovados: 37
+- Falhos: 0
+- Ignorados: 0
+- Instáveis: 0
+
+## 7. Cobertura inicial e final
+Escopo: `src/bounded-contexts/validacao/domain/value-objects/**` (todas as VOs do
+BC até aqui, T005–T008).
+- Statements: 97.16% (103/106)
+- Branches: 94.33% (50/53)
+- Functions: 93.18% (41/44)
+- Lines: 97.14% (102/105)
+Os 3 arquivos de T008 (`dados-extraidos-para-validacao.vo.ts`,
+`item-para-validacao.vo.ts`, `tentativa-validacao.vo.ts`) aparecem com 100% no
+relatório (nenhuma linha listada em "Uncovered Line #s" para eles). As lacunas
+residuais (`dinheiro.vo.ts` 80%, `periodo-validade.vo.ts` 85.71%) são de VOs de
+T005, pré-existentes a esta task, não introduzidas nem agravadas por T008 —
+registradas como risco residual, não bloqueiam este gate.
+
+## 8. Allure
+Não gerado — repositório não tem adaptador Allure configurado no runner Vitest
+(mesma lacuna já registrada em T001/T004; fora do escopo desta task alterar
+tooling de relatório sem ADR prévio).
+
+## 9. Bugs por severidade e status
+Nenhum bug encontrado.
+
+## 10. Riscos residuais
+- Cobertura de `dinheiro.vo.ts` (80% linha/75% branch) e `periodo-validade.vo.ts`
+  (85.71% linha) pré-existente de T005, não coberta por esta validação de T008 —
+  sinalizar para quando essas VOs forem revisitadas.
+- `DadosExtraidosParaValidacao` não valida coerência cruzada entre
+  `periodoValidade` e `dataEmissaoProposta` — aceito como escopo de T010 (regra
+  de "coerência de prazo de validade"), não é lacuna de T008.
+- T009 (agregado `OrcamentoValidacao`) ainda não implementado — a decisão de
+  negócio "campo com pendência confirmada ainda reprova regra obrigatória"
+  (T031) só é testável de ponta a ponta a partir daí; T008 apenas garante que o
+  dado (`extraido`) chega intacto ao VO.
+
+## 11. Limitações do ambiente
+- `pnpm` fora do PATH padrão do Bash desta worktree; executado via
+  `corepack pnpm`, sem impacto no resultado.
+
+## 12. Parecer final
+APROVADO PELO QA
