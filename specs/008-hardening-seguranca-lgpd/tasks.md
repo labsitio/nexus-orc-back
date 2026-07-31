@@ -35,7 +35,7 @@ Conforme `plan.md` desta spec e convenção herdada de 001: `src/platform/confor
 
 **CRITICAL**: nenhuma User Story abaixo pode começar antes desta fase.
 
-- [ ] T004 [P] Implementar VO `CategoriaDocumento` (enum fechado, valor inicial `ORCAMENTO_FORNECEDOR`) em `src/platform/shared-value-objects/domain/categoria-documento.vo.ts` — teste unit em `tests/platform/shared-value-objects/categoria-documento.spec.ts`.
+- [x] T004 [P] Implementar VO `CategoriaDocumento` (enum fechado, valor inicial `ORCAMENTO_FORNECEDOR`) em `src/platform/shared-value-objects/domain/categoria-documento.vo.ts` — teste unit em `tests/platform/shared-value-objects/categoria-documento.spec.ts`. (#305)
 - [ ] T005 [P] Implementar VO `PoliticaRetencao` (`categoria`, `prazoEmDias` positivo, `baseLegal`, `atualizadaEm`) em `src/platform/shared-value-objects/domain/politica-retencao.vo.ts` — teste unit cobrindo rejeição de `prazoEmDias <= 0`.
 - [ ] T006 [P] Implementar VO `DadoAnonimizado` (`campoOriginal`, `metodo: MASCARAMENTO|REMOCAO`, `aplicadoEm`, `solicitacaoId`, sem construtor que aceite valor original de volta) em `src/platform/shared-value-objects/domain/dado-anonimizado.vo.ts` — teste unit garantindo que a API do VO não expõe getter de valor original.
 - [ ] T007 [P] Implementar VO `ReferenciaTitular` em `src/platform/conformidade/domain/value-objects/referencia-titular.vo.ts`.
