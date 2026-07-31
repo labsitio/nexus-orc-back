@@ -39,3 +39,17 @@ Limitação: sem LocalStack neste worktree — sem teste de integração real co
 EventBridge (`PutEventsCommand` de verdade). Risco residual: comportamento real
 do SDK AWS (retries, throttling) não exercitado; mitigado por ser mock fiel ao
 shape de retorno documentado do SDK (`FailedEntryCount`/`Entries[].ErrorMessage`).
+
+## Leva T018 (issue #83, PR #451, commit `a8ff244`)
+
+| Critério de aceite (tasks.md) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| `MarkItDownConversaoExtracaoACL.converter` invoca Lambda dedicado do BC (ADR-002, instância própria) com conteúdo em base64 | Contrato/integração | Unit (mock `LambdaClient`) | `send` chamado com `FunctionName` e `Payload` corretos; texto sanitizado devolvido | `markitdown-conversao-extracao.acl.test.ts` (1 teste) | PASS |
+| Texto do MarkItDown sempre sanitizado antes de sair do ACL — nunca repassa texto bruto ao Application/Domain | Segurança (prompt injection) | Unit | resposta do Lambda com `\x00` + payload de injeção → ACL devolve sem caractere de controle | `markitdown-conversao-extracao.acl.test.ts` (1 teste) | PASS |
+| Erros do Lambda (`FunctionError`, `Payload` ausente, JSON inválido, shape inesperado) nunca propagam payload cru, sempre erro descritivo | Confiabilidade | Unit | 4 cenários de falha | `markitdown-conversao-extracao.acl.test.ts` (4 testes) | PASS |
+| Sanitização remove caractere de controle (inclusive usado para ofuscar prompt injection) preservando `\t\n\r`, trunca em 50_000 chars por code point completo, nunca lança erro | Segurança/DoS | Unit | texto normal, controle+ANSI, truncamento, entrada vazia, fronteira de emoji (surrogate pair), documento adversarial 10M chars, injeção literal preservada como texto | `sanitizar-conteudo-extracao.test.ts` (7 testes) | PASS |
+| Mitigação de DoS: loop nunca varre o `textoBruto` inteiro quando composto majoritariamente de caracteres de controle | Segurança/DoS | Unit (timing) | limite de 500ms (vs 200ms do par de spec-001, ajustado por já ter sido reportado como flaky sob `--coverage`) | `sanitizar-conteudo-extracao.test.ts` (1 dos 7 testes acima) | PASS — verificado: impl. atual ~102ms sob `--coverage`; regressão simulada sem o limite de varredura ~1676ms sob `--coverage` (teste continua útil, não está frouxo) |
+
+Réplica mecânica do par já validado em spec-001 (`sanitizar-conteudo-documento.ts`/`markitdown-conversao.acl.ts`) — mesma lógica de sanitização, zero decisão de design nova; apenas o limite de tempo do teste de DoS diverge (500ms vs 200ms), justificado no commit e confirmado empiricamente nesta validação.
+
+Risco residual (fora do escopo desta leva): BUG-001 (spec 002, severidade BAIXA, P3) segue `PRONTO PARA RETESTE`, não relacionado a T018/arquivos desta PR. O par de spec-001 do teste de DoS (200ms) reproduziu-se como flaky sob `--coverage` (full-suite run desta validação, teste passou isolado) — confirma o relato do dev-back-end/backend-reviewer; nenhum arquivo de spec-001 foi tocado por esta PR, então nenhum BUG novo foi aberto por esse achado pré-existente.

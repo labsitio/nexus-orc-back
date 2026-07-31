@@ -1,5 +1,74 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
+## Validação — T018 (issue #83), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #451, branch `feat/002-t018-markitdown-conversao-extracao-acl`, commit `a8ff244`
+
+### Resumo executivo
+`sanitizarConteudoExtracao` (Infrastructure, novo) + `MarkItDownConversaoExtracaoACL`
+(Infrastructure, novo, implementa contrato de T011) do BC Extração. Nenhuma
+outra task do BC previa a implementação real do ACL — criada junto com o unit
+test de T018 por exigir uma implementação real para exercitar; réplica
+mecânica byte-a-byte da lógica de sanitização já aprovada em spec-001
+(`sanitizar-conteudo-documento.ts` / `markitdown-conversao.acl.ts`), instância
+própria deste BC (ADR-002). `backend-reviewer` já aprovou (APPROVE WITH NITS,
+2 NITs cosméticos não bloqueantes sobre o limite de 500ms do teste de DoS).
+
+### Requisitos cobertos (T018, tasks.md)
+- Unit test do `MarkItDownConversaoExtracaoACL` mockando saída do MarkItDown.
+- Sanitização de conteúdo antes de compor prompt — mitigação de prompt
+  injection (caracteres de controle usados para ofuscar instrução removidos,
+  texto literal preservado, nunca interpretado).
+- Mitigação de DoS: limite de tamanho de saída (50.000 chars) e limite de
+  varredura de entrada (10x o limite de saída) — verificado empiricamente que
+  o teste de 500ms não está frouxo (ver `qa/test-execution-report.md`).
+
+### Achado verificado (não é defeito) — limite de 500ms do teste de DoS
+Medido sob `--coverage`: implementação atual ~102ms, regressão simulada (sem o
+limite de varredura de entrada) ~1676ms. Margem suficiente nos dois sentidos —
+teste continua útil.
+
+### Lacuna conhecida / risco residual (fora do escopo desta leva)
+- BUG-001 (severidade BAIXA, P3, spec 002) segue `PRONTO PARA RETESTE`, não
+  relacionado a T018.
+- Par de spec-001 do teste de DoS (limite de 200ms) reproduziu-se como flaky
+  sob `--coverage` no full-suite run desta validação (passou isolado) —
+  confirma o relato do dev-back-end/backend-reviewer. Nenhum arquivo de
+  spec-001 foi alterado nesta PR; nenhum BUG novo aberto por este achado.
+
+### Suítes executadas e comandos
+```bash
+npx vitest run
+# Test Files  67 passed | 6 skipped (73)
+#      Tests  322 passed | 27 skipped (349)
+
+npx vitest run --coverage
+# mesmo resultado, exceto 1 falha isolada no par de spec-001 (ver acima)
+
+npx tsc --noEmit
+# sem erros
+
+npx eslint src/bounded-contexts/extracao/infrastructure/sanitizar-conteudo-extracao.ts \
+  src/bounded-contexts/extracao/infrastructure/markitdown-conversao-extracao.acl.ts \
+  tests/bounded-contexts/extracao/infrastructure/sanitizar-conteudo-extracao.test.ts \
+  tests/bounded-contexts/extracao/infrastructure/markitdown-conversao-extracao.acl.test.ts
+# sem erros
+```
+
+### Cobertura (arquivos novos)
+- `sanitizar-conteudo-extracao.ts`: 100% stmts/functions/lines, 96.29% branches.
+- `markitdown-conversao-extracao.acl.ts`: 100% stmts/branches/functions/lines.
+
+### Bugs
+Nenhum defeito de produção encontrado.
+
+### Parecer
+**APROVADO PELO QA.**
+
+---
+
 ## Validação — T015 (issue #80), primeira validação
 
 ### SPEC_ID e versão testada
