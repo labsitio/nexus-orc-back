@@ -386,3 +386,121 @@ Nenhum bug de produção encontrado. Nenhum BUG-XXX aberto.
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T012 (issue #122)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: `003-validacao-consistencia-orcamentos`
+- Branch `feat/003-t012-interfaces-repositorio-gateway`, commit `f2b74b9`, PR #479 (draft)
+- Task: T012 (issue #122) — Domain: interfaces de repositório/gateway/ACL
+  (`orcamento-validacao.repository.ts`, `agente-categorizador-item.gateway.ts`,
+  `fornecedor-cadastrado.gateway.ts`, `parametro-faixa-preco.gateway.ts`,
+  `orcamento-extraido-event.acl.ts`) — sem implementação, apenas contratos TypeScript.
+- `backend-reviewer`: APPROVE, sem achados (diff `origin/main...feat/003-t012-interfaces-repositorio-gateway`).
+- Primeira validação (sem BUG-XXX prévio).
+
+## 2. Resumo executivo
+T012 adiciona 5 arquivos, todos interfaces TypeScript puras (nenhum corpo de
+função, nenhuma lógica executável) em `src/bounded-contexts/validacao/domain/{repositories,gateways}/`:
+`OrcamentoValidacaoRepository` (`salvar`/`buscarPorOrcamentoId`), `AgenteCategorizadorItemGateway`
+(`categorizar`, com `AgenteCategorizadorItemInput` restrito a `descricaoItem` + `catalogoCategorias`),
+`FornecedorCadastradoGateway` (`estaCadastrado`), `ParametroFaixaPrecoGateway` (`listarTodas`) e
+`OrcamentoExtraidoEventACL` (`traduzir(payloadBruto: unknown)`, retorno tipado
+`OrcamentoExtraidoEventACLResultado`). Todas as assinaturas batem com o desenho de
+Domain/Application/ACL descrito em `plan.md` (seções "Application — Casos de uso",
+"Infrastructure" e "Anti-Corruption Layer obrigatória") e com as tasks subsequentes que as
+implementam (T014 repositório, T015 ACL, T022 fornecedor, T023 faixa de preço, T041
+categorizador), citadas no JSDoc de cada contrato. Nenhuma implementação concreta encontrada
+nos 5 arquivos. Sem defeito de produção encontrado.
+
+## 3. Requisitos cobertos e não cobertos
+- Coberto (critério de aceite da task): os 5 arquivos contêm exclusivamente `interface`
+  (e um único type auxiliar de input/output por gateway, também sem lógica) — verificado por
+  leitura integral dos 5 arquivos; nenhum `class`, nenhum corpo de método, nenhuma dependência
+  de SDK AWS/Bedrock/Drizzle importada.
+- Coberto: nomes de arquivo e localização (`domain/repositories/`, `domain/gateways/`)
+  conferem exatamente com `plan.md` § Project Structure.
+- Coberto: assinatura de `FornecedorCadastradoGateway.estaCadastrado(cnpj: CNPJ): Promise<boolean>`
+  consistente com spec.md ("conferência de CNPJ" contra base de fornecedores conhecidos) e
+  plan.md (regra de negócio separada da validação de formato do VO `CNPJ`).
+- Coberto: `AgenteCategorizadorItemGateway` restringe a saída a `CategoriaItem` e a entrada
+  inclui `catalogoCategorias` explícito — consistente com ADR-002 (saída restrita ao catálogo
+  configurado, IA nunca decide consistência).
+- Coberto: `OrcamentoExtraidoEventACL.traduzir(payloadBruto: unknown)` usa `unknown` de
+  propósito (não um shape suposto do evento upstream) — consistente com a Anti-Corruption
+  Layer obrigatória do plan.md ("nunca importando tipos de domínio do BC Extração").
+- Não aplicável nesta task: qualquer implementação concreta (T013–T016, T022–T024, T041),
+  contrato de API, segurança, resiliência, persistência — T012 é puramente definição de
+  tipo, sem comportamento em runtime a exercitar. Nenhum teste de compilação/contrato
+  adicional foi criado por não agregar valor real além do já garantido por `tsc --noEmit`
+  (que já cobre "os 5 arquivos compilam e são type-safe" de forma determinística e sem
+  duplicar cobertura); interfaces TypeScript são apagadas na emissão de JS e não produzem
+  comportamento a testar em runtime — decisão de não forçar teste artificial ("coverage
+  theater"), consistente com a nota de teste do BC Validação em `plan.md` § Project Structure.
+
+## 4. Suítes executadas e comandos
+1. `npm run typecheck` (`tsc --noEmit`, repositório inteiro) → 0 erros.
+2. `npm run lint` (`eslint .`, repositório inteiro) → 0 erros.
+3. `npx vitest run tests/bounded-contexts/validacao --reporter=default` → 12 arquivos
+   passaram, 1 skipped (`validacao-orcamento.schema.test.ts`, dependente de `DATABASE_URL`,
+   mesma lacuna pré-existente das tasks anteriores desta spec), 61 testes passaram, 1 skipped.
+4. `npx vitest run --reporter=default` (suíte completa do monorepo, regressão) → 83 arquivos
+   passaram, 7 skipped (90 total), 410 testes passaram, 30 skipped — nenhuma falha.
+5. `gh pr checks 479` → `ci` (lint + typecheck + typecheck:infra + cdk synth + migração +
+   `pnpm run test` + audit) `pass` no commit `f2b74b9`.
+
+Nota de ambiente: nesta worktree, `npx vitest run <path>` sem `--reporter=default` falha com
+`Vitest failed to find the runner` originado em `allure-vitest/src/setup.ts` — reproduzido
+igualmente em BCs não relacionados a esta task (`extracao`, `ingestao-identificacao`) e
+ausente no CI do GitHub Actions (`pnpm run test`, que passou no commit testado). Classificado
+como problema de ambiente local (conflito do reporter `allure-vitest` quando invocado via CLI
+override fora do script `test` do `package.json`), não relacionado a T012 e não bloqueante —
+contornado usando `--reporter=default` e confirmado pela execução verde do CI da PR.
+
+## 5. Quantidade de testes por tipo
+Nenhum teste novo criado para T012 (interfaces puras, sem comportamento em runtime — ver
+justificativa na seção 3). Regressão executada: suíte completa (410 testes) e suíte
+específica do BC Validação (61 testes), ambas sem falha.
+
+## 6. Resultado
+- Aprovados: 410 (suíte completa) / 61 (BC Validação)
+- Falhos: 0
+- Ignorados: 30 (suíte completa, pré-existentes, dependentes de `DATABASE_URL`) / 1 (BC
+  Validação, mesma causa)
+- Instáveis: 0
+
+## 7. Cobertura inicial e final
+Não aplicável — T012 adiciona apenas `interface`/`type` TypeScript, apagados na emissão de
+JS; não altera statements, branches, functions nem lines executáveis do relatório de
+cobertura v8. Nenhuma configuração de threshold de cobertura existe hoje em
+`vitest.config.ts` (sem regressão de baseline a registrar).
+
+## 8. Allure
+Não gerado — mesma lacuna já registrada em T001/T004/T008/T009: adaptador `allure-vitest`
+está configurado no `vitest.config.ts`, mas a publicação do relatório HTML consolidado é
+responsabilidade de tooling de CI ainda não configurada nesta spec; fora do escopo desta task
+alterar sem ADR prévio. `allure-results/` é gerado localmente pela execução via script `test`
+do `package.json` quando não há conflito de reporter (ver seção 4).
+
+## 9. Bugs por severidade e status
+Nenhum bug de produção encontrado. Nenhum BUG-XXX aberto.
+
+## 10. Riscos residuais
+Nenhum risco novo introduzido por T012. Os contratos ainda não têm implementação concreta
+(T013–T016, T022–T024, T041 seguem `[ ]` em `tasks.md`) — comportamento real desses gateways
+(timeout/retry do `FornecedorCadastradoHttpGateway`, saída estruturada restrita ao catálogo do
+`BedrockCategorizadorItemGateway`, tradução do payload bruto no `OrcamentoExtraidoEventACL`)
+só será testável quando essas tasks forem implementadas; nenhuma lacuna nova além da já
+esperada pela ordem do `tasks.md`.
+
+## 11. Limitações do ambiente
+- `npm` usado nesta validação (node_modules já instalado via `pnpm`, conforme
+  `node_modules/.modules.yaml`); scripts `npm run typecheck`/`npm run lint` equivalem aos
+  scripts do `package.json` independente do gerenciador usado para invocá-los.
+- Ver nota de ambiente sobre `allure-vitest`/`--reporter` na seção 4 — contornada, não
+  bloqueante, confirmada como não-regressão via CI verde da PR #479.
+
+## 12. Parecer final
+APROVADO PELO QA
