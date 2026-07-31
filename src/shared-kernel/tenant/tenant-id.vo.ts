@@ -1,7 +1,18 @@
 import { randomBytes } from 'node:crypto';
-import { ErroDominio } from './errors/erro-dominio.js';
 
 const UUID_V7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Base do erro de domínio deste VO. Inline (não em arquivo separado) porque
+ * ADR-004 (specs/007-isolamento-multitenant-dados/plan.md) restringe o
+ * Shared Kernel a um único arquivo: `tenant-id.vo.ts`.
+ */
+abstract class ErroDominio extends Error {
+  protected constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
 
 export class TenantIdInvalidoError extends ErroDominio {
   constructor(valor: string) {
