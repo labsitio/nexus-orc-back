@@ -50,7 +50,7 @@
 ### Tests (US1)
 
 - [x] T016 [P] [US1] Unit test do agregado `Orcamento.criar(canal, referenciaBruta, ...)` — garante criação válida e rejeição de canal fora dos 4 fixos.
-- [ ] T017 [P] [US1] Contract test `POST /v1/orcamentos/upload-url` e `POST /v1/orcamentos/{id}/confirmar-upload` em `tests/bounded-contexts/ingestao-identificacao/contract/`.
+- [x] T017 [P] [US1] Contract test `POST /v1/orcamentos/upload-url` e `POST /v1/orcamentos/{id}/confirmar-upload` em `tests/bounded-contexts/ingestao-identificacao/contract/`. Já entregue em `upload-url.controller.test.ts`/`confirmar-upload.controller.test.ts` no PR #426 (T020-T026); tasks.md não refletia. #22
 - [ ] T018 [P] [US1] Integration test: os 4 canais (presigned upload x3 + trigger S3 SFTP) produzem o mesmo evento `OrcamentoRecebido` com o mesmo shape de payload.
 
 ### Implementation (US1)
