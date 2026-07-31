@@ -18,7 +18,7 @@
 - [ ] T002 [P] Migração Drizzle Kit: schema inicial do BC Orquestração (tabelas vazias, baseline) — ADR-001 da spec 001, herdado.
 - [x] T003 [P] Provisionar 3 filas SQS (`contexto-classificacao-queue`, `contexto-extracao-queue`, `decisao-workflow-queue`), cada uma com DLQ própria + alarme CloudWatch em mensagem na DLQ (IaC — Ricardo/DevOps).
 - [x] T004 [P] Provisionar regra EventBridge no bus `nexo-dominio-bus` roteando `detail-type: OrcamentoClassificado`, `source: nexo.ingestao-identificacao` → `contexto-classificacao-queue`.
-- [ ] T005 [P] Provisionar regra EventBridge roteando `detail-type: OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, `source: nexo.extracao` → `contexto-extracao-queue`.
+- [x] T005 [P] Provisionar regra EventBridge roteando `detail-type: OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, `source: nexo.extracao` → `contexto-extracao-queue`.
 - [ ] T006 [P] Provisionar regra EventBridge roteando `detail-type: OrcamentoValidado`/`OrcamentoValidadoComRessalva`, `source: nexo.validacao` → `decisao-workflow-queue`.
 
 > **Nota (revisão)**: T007 (regra EventBridge `DecisaoWorkflowBaixaConfiancaDetectada` → `revisor-workflow-queue`) foi **removida** — o Agente Revisor de Workflow deixou de existir. A fila `revisor-workflow-queue` também foi removida (T003). O ID T007 não existe mais; os demais IDs foram mantidos estáveis para preservar a rastreabilidade das issues do GitHub.
