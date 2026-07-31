@@ -4,6 +4,7 @@ import type { LeituraBrutaGateway } from '../../domain/gateways/leitura-bruta.ga
 import type { MarkItDownConversaoExtracaoACL } from '../../domain/gateways/markitdown-conversao-extracao.acl.js';
 import { ExtracaoEscalonadaParaRevisaoHumana } from '../../domain/events/extracao-escalonada-revisao-humana.event.js';
 import { OrcamentoExtraido } from '../../domain/events/orcamento-extraido.event.js';
+import { ErroDominio } from '../../domain/errors/erro-dominio.js';
 import { ExtracaoOrcamento } from '../../domain/extracao-orcamento.aggregate.js';
 import type { ExtracaoOrcamentoRepository } from '../../domain/repositories/extracao-orcamento.repository.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
@@ -24,6 +25,15 @@ export interface ExtrairDadosOrcamentoParams {
 
 /** Motivo registrado em `ExtracaoEscalonadaParaRevisaoHumana` (plan.md/ADR-003). */
 const MOTIVO_CAMPO_SEM_CONFIANCA = '1+ campo obrigatório sem confiança suficiente';
+
+/** Nunca deveria ocorrer — invariante de `ExtracaoOrcamento.registrarTentativaExtrator` (T009). */
+export class ExtracaoInconsistenteError extends ErroDominio {
+  constructor(orcamentoId: string) {
+    super(
+      `ExtracaoOrcamento ${orcamentoId} está EXTRAIDO sem condicoesComerciais — invariante do agregado violada`,
+    );
+  }
+}
 
 /**
  * Consumidor do evento `OrcamentoClassificado` via SQS `extrator-queue` (T022/#87).
@@ -73,17 +83,25 @@ export class ExtrairDadosOrcamento {
     extracao.registrarTentativaExtrator(resultado.itens, resultado.condicoesComerciais);
     await this.repositorio.salvar(extracao);
 
-    const evento =
-      extracao.status === 'EXTRAIDO'
-        ? new OrcamentoExtraido(
-            extracao.orcamentoId.toString(),
-            extracao.itens.map((item) => item.paraPayload()),
-            extracao.condicoesComerciais!.paraPayload(),
-          )
-        : new ExtracaoEscalonadaParaRevisaoHumana(
-            extracao.orcamentoId.toString(),
-            MOTIVO_CAMPO_SEM_CONFIANCA,
-          );
+    let evento: OrcamentoExtraido | ExtracaoEscalonadaParaRevisaoHumana;
+    if (extracao.status === 'EXTRAIDO') {
+      const condicoesComerciais = extracao.condicoesComerciais;
+      if (!condicoesComerciais) {
+        // Invariante do agregado (T009): status só chega a EXTRAIDO quando
+        // `condicoesComerciais` está preenchido (`completo()`) — nunca deveria faltar aqui.
+        throw new ExtracaoInconsistenteError(extracao.orcamentoId.toString());
+      }
+      evento = new OrcamentoExtraido(
+        extracao.orcamentoId.toString(),
+        extracao.itens.map((item) => item.paraPayload()),
+        condicoesComerciais.paraPayload(),
+      );
+    } else {
+      evento = new ExtracaoEscalonadaParaRevisaoHumana(
+        extracao.orcamentoId.toString(),
+        MOTIVO_CAMPO_SEM_CONFIANCA,
+      );
+    }
     await this.eventPublisher.publicar(evento);
   }
 }
