@@ -16,4 +16,12 @@ describe('TenantContext', () => {
       ctx.tenantId = TenantId.novo();
     }).toThrow(TypeError);
   });
+
+  it('cada chamada produz uma instância independente — sem estado global compartilhado entre requisições', () => {
+    const ctxA = criarTenantContext(TenantId.novo());
+    const ctxB = criarTenantContext(TenantId.novo());
+
+    expect(ctxA).not.toBe(ctxB);
+    expect(ctxA.tenantId).not.toBe(ctxB.tenantId);
+  });
 });
