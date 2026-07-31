@@ -198,3 +198,55 @@ tabela text do reporter v8 não lista `dado-anonimizado.vo.ts`/
 diretório e o arquivo `categoria-documento.vo.ts`) — mesma limitação de
 ferramental já registrada. Cobertura funcional confirmada por leitura de
 código + execução dos 10 casos.
+
+## T007 — VO `ReferenciaTitular` (PR #441, commit `47c19bc`)
+
+Ambiente: Node 24, worktree `.claude/worktrees/agent-a0d48660cf561881c`.
+
+```
+$ npx vitest run --reporter=default tests/platform/conformidade
+ tests/platform/conformidade/referencia-titular.vo.test.ts (7 tests) 6ms
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+```
+
+Casos cobertos: valor valido aceito; normalizacao (lowercase + trim de
+espacos nas bordas); rejeicao de vazio/whitespace-only (`it.each`); rejeicao
+acima de 320 chars; aceite de exatamente 320 chars (limite); `equals`
+comparando pelo valor ja normalizado (positivo e negativo). Criterio de
+aceite da task ("VO ReferenciaTitular... identifica o titular de forma
+estavel entre BCs... sem expor a modelagem interna de nenhum BC", `plan.md`
+L106) satisfeito: VO e opaco por design — `de(valor)` nao interpreta formato
+(e-mail, CNPJ+contato ou outro), apenas normaliza para correlacao estavel.
+
+`npx tsc --noEmit -p .` e `npx eslint . --ext .ts`: sem erro nos arquivos do
+diff (erros pre-existentes de modulos ausentes, ver regressao completa
+abaixo).
+
+### Regressao completa (HEAD `47c19bc`)
+
+```
+$ npx vitest run --reporter=default
+ Test Files  7 failed | 51 passed | 6 skipped (64)
+      Tests  249 passed | 27 skipped (276)
+```
+
+Os 7 arquivos falhos sao os mesmos ja registrados em T005/T006 — `Cannot
+find package` para `pino`, `@opentelemetry/instrumentation-aws-lambda` e
+demais pacotes AWS/observability em modulos de `bounded-contexts/extracao` e
+`bounded-contexts/ingestao-identificacao/infrastructure`. Confirmado via
+`git show 47c19bc --stat`: o diff contem apenas os 3 arquivos citados no
+handoff (VO, erro base, teste) — nenhum deles toca modulos de
+extracao/ingestao-identificacao. Nenhuma regressao introduzida por T007.
+
+### Cobertura
+
+```
+$ npx vitest run --coverage --coverage.reporter=json tests/platform/conformidade
+```
+
+`coverage/coverage-final.json` filtrado por caminho: `referencia-titular.vo.ts`
+com 9/9 statements cobertos (100%). A tabela texto do reporter v8 (`--coverage`
+sem `--coverage.reporter=json`) nao lista o arquivo individualmente — mesma
+limitacao de ferramental ja registrada em T005/T006, contornada lendo o JSON
+bruto em vez da tabela agregada.
