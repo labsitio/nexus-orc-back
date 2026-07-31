@@ -1,5 +1,52 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
+## Validação — T029 (issue #94), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #492, branch `feat/002-t029-integration-test-campo-ambiguo`, commit `f48e0c0`.
+
+### Resumo executivo
+Nenhum código de produção alterado. PR adiciona apenas
+`tests/bounded-contexts/extracao/interface/extrator-queue.handler.integration.test.ts`
+(1 teste) e marca T029 concluída em `tasks.md`. O teste percorre a pilha real
+ponta a ponta — mensagem SQS (envelope EventBridge) → `criarExtratorQueueHandler`
+real (T023) → `ExtrairDadosOrcamento` real (T022) →
+`ExtracaoOrcamento.registrarTentativaExtrator` real (T009) — com fakes só nas
+bordas de infra (repositório, S3, MarkItDown, Bedrock, EventBridge), mesmo
+padrão já aprovado em T020. Não é redundante a T020 (orquestração reimplementada
+inline, sem handler) nem a T027 (unit test do agregado isolado): é o único
+cenário que exercita `criarExtratorQueueHandler` de fato.
+
+### Requisitos cobertos (T029, tasks.md / spec.md US2)
+Ver `qa/traceability-matrix.md` § "Leva T029" para o mapeamento cenário-a-cenário:
+(a) campo obrigatório ambíguo/ilegível conhecido nunca preenchido com valor
+inventado/estimado (`extraido: false`/`valor: null` no VO real); (b)
+`ExtracaoEscalonadaParaRevisaoHumana` publicado diretamente pelo Extrator, sem
+passo de revisor de IA (ADR-003); (c) status `PENDENTE_REVISAO_HUMANA` refletido
+no estado persistido do agregado real. Consulta de status via HTTP (T024) fora
+de escopo — endpoint ainda não implementado.
+
+### Suítes executadas
+```
+npx vitest run tests/bounded-contexts/extracao/interface/extrator-queue.handler.integration.test.ts
+→ 1 passed
+
+npx vitest run tests/bounded-contexts/extracao
+→ 27 passed | 2 skipped (29 arquivos) — 113 passed | 12 skipped (125 testes)
+  (skips pré-existentes: testes de integração Drizzle dependentes de banco local,
+  não relacionados a esta PR)
+```
+`tsc --noEmit` e `eslint` no arquivo de teste novo: sem erros.
+
+### Bugs encontrados
+Nenhum.
+
+### Parecer final
+APROVADO PELO QA.
+
+---
+
 ## Validação — T023 (issue #88), primeira validação
 
 ### SPEC_ID e versão testada
