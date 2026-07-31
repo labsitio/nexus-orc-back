@@ -27,6 +27,23 @@ describe('DadosExtraidosParaValidacao', () => {
     expect(dados.itens).toHaveLength(1);
   });
 
+  it('paraPayload serializa cnpj, itens, datas ISO e periodoValidade', () => {
+    const dados = DadosExtraidosParaValidacao.de({
+      cnpjFornecedor: '11222333000181',
+      itens: [item()],
+      condicoesComerciais: 'à vista',
+      dataEmissaoProposta: new Date('2026-01-10T00:00:00.000Z'),
+      periodoValidade: PeriodoValidade.de(new Date('2026-02-10T00:00:00.000Z')),
+    });
+    expect(dados.paraPayload()).toEqual({
+      cnpjFornecedor: '11222333000181',
+      itens: [item().paraPayload()],
+      condicoesComerciais: 'à vista',
+      dataEmissaoProposta: '2026-01-10T00:00:00.000Z',
+      periodoValidade: '2026-02-10T00:00:00.000Z',
+    });
+  });
+
   it('rejeita lista de itens vazia', () => {
     expect(() =>
       DadosExtraidosParaValidacao.de({

@@ -1,5 +1,5 @@
 import { CategoriaItem } from './categoria-item.vo.js';
-import { Dinheiro } from './dinheiro.vo.js';
+import { Dinheiro, type DinheiroPayload } from './dinheiro.vo.js';
 import { ErroDominio } from '../errors/erro-dominio.js';
 
 export class ItemParaValidacaoInvalidoError extends ErroDominio {
@@ -13,6 +13,14 @@ export interface ItemParaValidacaoProps {
   readonly quantidade: number;
   readonly precoUnitario: Dinheiro;
   readonly categoria?: CategoriaItem;
+  readonly extraido: boolean;
+}
+
+export interface ItemParaValidacaoPayload {
+  readonly descricao?: string;
+  readonly quantidade: number;
+  readonly precoUnitario: DinheiroPayload;
+  readonly categoria?: string;
   readonly extraido: boolean;
 }
 
@@ -55,5 +63,15 @@ export class ItemParaValidacao {
       props.descricao?.trim(),
       props.categoria,
     );
+  }
+
+  paraPayload(): ItemParaValidacaoPayload {
+    return {
+      quantidade: this.quantidade,
+      precoUnitario: this.precoUnitario.paraPayload(),
+      extraido: this.extraido,
+      ...(this.descricao !== undefined ? { descricao: this.descricao } : {}),
+      ...(this.categoria !== undefined ? { categoria: this.categoria.paraPayload() } : {}),
+    };
   }
 }
