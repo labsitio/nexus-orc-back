@@ -44,9 +44,7 @@ export class TransicaoInvalidaDecisaoWorkflowError extends ErroDominio {
 
 export class JustificativaHumanaAusenteError extends ErroDominio {
   constructor() {
-    super(
-      'Decisão humana exige criterio/justificativa não vazia, para auditoria — DecisaoRoteamento.criar não valida isso quando agenteOrigem é HUMANO',
-    );
+    super('Decisão humana exige criterio/justificativa não vazia, para auditoria');
   }
 }
 
