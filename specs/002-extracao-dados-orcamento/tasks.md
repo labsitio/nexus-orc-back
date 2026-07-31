@@ -62,7 +62,7 @@
 - [ ] T023 [US1] Interface: handler Lambda consumidor SQS de `extrator-queue`, invocando `ExtrairDadosOrcamento`.
 - [ ] T024 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/extracao/status` (query, Zod schema de response, Problem Details para erro).
 - [ ] T025 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema da spec 001.
-- [ ] T026 [US1] IAM: role dedicada `ExtratorLambdaRole` (least privilege: `bedrock:InvokeModel` restrito ao ARN do modelo aprovado, `s3:GetObject` restrito ao prefixo do bucket raw, sem `PutObject`/`DeleteObject`).
+- [x] T026 [US1] IAM: role dedicada `ExtratorLambdaRole` (least privilege: `bedrock:InvokeModel` restrito ao ARN do modelo aprovado, `s3:GetObject` restrito ao prefixo do bucket raw, sem `PutObject`/`DeleteObject`). #91
 
 **Checkpoint**: US1 funcional e testável isoladamente — orçamento classificado com documento bem formado é extraído com sucesso, sem intervenção manual.
 

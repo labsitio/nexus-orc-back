@@ -6,6 +6,7 @@ import { ContextoClassificacaoQueueStack } from '../lib/contexto-classificacao-q
 import { ContextoExtracaoQueueStack } from '../lib/contexto-extracao-queue-stack.ts';
 import { DecisaoWorkflowQueueStack } from '../lib/decisao-workflow-queue-stack.ts';
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
+import { ExtratorLambdaRoleStack } from '../lib/extrator-lambda-role-stack.ts';
 import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
 import { IndexadorQueueStack } from '../lib/indexador-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
@@ -47,10 +48,16 @@ new ConfirmarRevisaoHumanaLambdaRoleStack(app, 'ConfirmarRevisaoHumanaLambdaRole
     'Role IAM least-privilege da Lambda de confirmação humana (sem Bedrock/S3 raw) — spec 001, T054.',
 });
 
-new ExtratorQueueStack(app, 'ExtratorQueueStack', {
+const extratorQueueStack = new ExtratorQueueStack(app, 'ExtratorQueueStack', {
   description:
     'Fila extrator-queue + DLQ + alarme, roteada por regra EventBridge — spec 002, T003/T004.',
   dominioBus: dominioEventBusStack.dominioBus,
+});
+
+new ExtratorLambdaRoleStack(app, 'ExtratorLambdaRoleStack', {
+  description: 'Role IAM least-privilege da Lambda Extrator — spec 002, T026.',
+  orcamentosRawBucket: storageStack.orcamentosRawBucket,
+  extratorQueue: extratorQueueStack.extratorQueue,
 });
 
 new ValidadorQueueStack(app, 'ValidadorQueueStack', {
