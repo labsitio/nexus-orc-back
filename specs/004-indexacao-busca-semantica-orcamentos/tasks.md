@@ -28,7 +28,7 @@
 **⚠️ CRITICAL**: nenhuma user story começa antes desta fase.
 
 - [x] T007 Domain: implementar VOs `OrcamentoId`, `Dinheiro` (redefinidos localmente neste BC, mesma validação das specs 001–003, sem import cruzado) em `src/bounded-contexts/busca-indexacao/domain/value-objects/`.
-- [ ] T008 [P] Domain: implementar VO `ConteudoIndexavel` — construtor valida não-vazio (erro de domínio se vazio, nunca "indexação válida" de conteúdo nulo); estrutura `{ resumoFornecedor, itensDescricao: string[], condicoesResumo, categorias }`.
+- [x] T008 [P] Domain: implementar VO `ConteudoIndexavel` — construtor valida não-vazio (erro de domínio se vazio, nunca "indexação válida" de conteúdo nulo); estrutura `{ resumoFornecedor, itensDescricao: string[], condicoesResumo, categorias }`.
 - [ ] T009 [P] Domain: implementar VO `Embedding` — construtor valida `vetor.length === dimensao`; sem lógica de similaridade (isso é query, não Domain).
 - [ ] T010 [P] Domain: implementar VO `OrigemValidacao` (enum fechado `VALIDADO | VALIDADO_COM_RESSALVA`) e VO `TentativaIndexacao` (histórico imutável).
 - [ ] T011 [P] Domain: implementar VOs `CriterioBusca` e `ResultadoBusca` (usados pelo caso de uso de busca, US2).
