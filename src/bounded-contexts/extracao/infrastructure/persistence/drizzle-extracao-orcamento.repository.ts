@@ -11,7 +11,10 @@ import {
   type AgenteOrigemCampo,
   type CampoExtraidoPayload,
 } from '../../domain/value-objects/campo-extraido.vo.js';
-import { CondicoesComerciais } from '../../domain/value-objects/condicoes-comerciais.vo.js';
+import {
+  CondicoesComerciais,
+  type CondicoesComerciaisPayload,
+} from '../../domain/value-objects/condicoes-comerciais.vo.js';
 import { Dinheiro, type DinheiroPayload } from '../../domain/value-objects/dinheiro.vo.js';
 import { DescricaoProduto, type DescricaoProdutoPayload } from '../../domain/value-objects/descricao-produto.vo.js';
 import { ItemOrcamento, type ItemOrcamentoPayload } from '../../domain/value-objects/item-orcamento.vo.js';
@@ -60,11 +63,7 @@ function condicoesComerciaisDaLinha(linha: LinhaExtracaoOrcamento): CondicoesCom
   if (linha.condicoesComerciais === null) {
     return undefined;
   }
-  const payload = linha.condicoesComerciais as {
-    condicoesPagamento: CampoExtraidoPayload<string>;
-    prazoValidade: CampoExtraidoPayload<string>;
-    condicoesEntrega: CampoExtraidoPayload<string>;
-  };
+  const payload = linha.condicoesComerciais as CondicoesComerciaisPayload;
   return CondicoesComerciais.de({
     condicoesPagamento: campoDaPayload(payload.condicoesPagamento, (v) => v as string),
     prazoValidade: campoDaPayload(payload.prazoValidade, (v) => PeriodoValidade.de(new Date(v as string))),
