@@ -1,5 +1,92 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
+## Validação — T026 (issue #91), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #482, branch `feat/002-t026-extrator-lambda-role`, commit `88f86ba`
+(pós-rebase em `origin/main`, ancestralidade confirmada com
+`git merge-base --is-ancestor origin/main HEAD`).
+
+### Resumo executivo
+`ExtratorLambdaRoleStack` (infra, novo) — role IAM dedicada da Lambda do
+Extrator: `bedrock:InvokeModel` restrito ao ARN do modelo aprovado
+(`CfnParameter`), `s3:GetObject`/`GetObjectVersion` restrito a
+`${orcamentosRawBucket.bucketArn}/*` (sem Put/Delete),
+`lambda:InvokeFunction` restrito ao ARN do Lambda MarkItDown deste BC
+(`CfnParameter`), `grantConsumeMessages` na `extrator-queue`. Réplica
+mecânica byte-a-byte de `ClassificadorLambdaRoleStack` (spec-001, já
+aprovado) — confirmado por diff lado a lado dos dois arquivos, apenas nomes
+trocados (Extrator↔Classificador). Wiring em `infra/bin/app.ts` é bloco
+contíguo, import em ordem alfabética, nenhuma outra stack do arquivo tocada
+(confirmado por leitura completa do diff do commit). `backend-reviewer` já
+aprovou (APPROVE WITH NITS).
+
+### Requisitos cobertos (T026, tasks.md)
+- `bedrock:InvokeModel` restrito a ARN via `CfnParameter`, nunca `Resource: "*"`.
+- `s3:GetObject`/`GetObjectVersion` restrito ao bucket raw, sem `PutObject`/`DeleteObject`.
+- `lambda:InvokeFunction` restrito ao ARN do Lambda MarkItDown via `CfnParameter`.
+- `grantConsumeMessages` na fila própria (`extrator-queue`), sem permissão além do necessário.
+- Nenhuma `PolicyStatement` com `Resource: "*"` — confirmado inspecionando o
+  template CDK sintetizado (`ExtratorLambdaRoleStack.template.json`), não
+  apenas por leitura do código-fonte.
+
+### Achado confirmado, não é regressão (NIT #2 do backend-reviewer)
+`s3:GetObject` é restrito ao bucket inteiro (`bucketArn/*`), não a um prefixo
+específico como o texto da task sugere ("restrito ao prefixo do bucket raw").
+Mesma lacuna já existe em `ClassificadorLambdaRoleStack` (spec-001, aprovado)
+— não é regressão introduzida por esta PR; registrado como risco residual,
+não bloqueante.
+
+### Suítes executadas e comandos
+```bash
+cd infra && npx tsc --noEmit -p tsconfig.json
+# sem erros, sem output
+
+npx vitest run
+# Test Files  86 passed | 8 skipped (94) / Tests  424 passed | 33 skipped (457)
+# sem regressão (spec 003/007 mergearam em paralelo — suíte completa confere)
+
+cd infra && npx cdk synth --app "node bin/app.ts"
+# Successfully synthesized to cdk.out — todas as 13 stacks do app, incluindo
+# ExtratorLambdaRoleStack, sem erro
+```
+Verificação adicional (não apenas leitura de código): template sintetizado
+inspecionado programaticamente —
+`ExtratorLambdaRoleStack.template.json` → `PolicyDocument.Statement`
+confirma 4 statements (`bedrock:InvokeModel`, `s3:GetObject`/`GetObjectVersion`,
+`lambda:InvokeFunction`, ações SQS de `grantConsumeMessages`), nenhum com
+`Resource: "*"`.
+
+Não há suíte de teste automatizado de CDK stack de IAM role neste repositório
+(mesmo gap pré-existente já registrado para `classificador-lambda-role-stack.ts`,
+spec-001) — verificação via `tsc --noEmit` + `cdk synth` + inspeção do
+template sintetizado é o padrão já aceito pelo projeto para este tipo de task.
+
+### Cobertura
+N/A — task de infraestrutura (IaC), sem lógica de aplicação; projeto não mede
+cobertura de stacks CDK (mesmo critério já registrado em `qa/coverage-baseline.md`).
+
+### Bugs
+Nenhum defeito de produção encontrado.
+
+### Riscos residuais
+- `s3:GetObject` restrito ao bucket inteiro, não a um prefixo — mesma lacuna
+  pré-existente do padrão já aprovado em spec-001; não bloqueante, não é
+  regressão desta PR.
+
+### Parecer final
+**APROVADO PELO QA.**
+
+Motivo: todos os critérios de aceite de T026 confirmados por inspeção do
+template CDK sintetizado (least privilege real, nenhum `Resource: "*"`);
+wiring correto e isolado (nenhuma outra stack alterada); `tsc --noEmit` e
+`cdk synth --app "node bin/app.ts"` limpos para as 13 stacks do app; suíte
+completa (`npx vitest run`) sem regressão após merges paralelos de spec
+003/007.
+
+---
+
 ## Validação — T022 (issue #87), primeira validação
 
 ### SPEC_ID e versão testada
