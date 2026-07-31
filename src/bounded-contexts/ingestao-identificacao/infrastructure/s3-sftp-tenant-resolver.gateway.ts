@@ -5,10 +5,17 @@ import type { SftpTenantMappingRepository } from '../domain/repositories/sftp-te
 import type { ReferenciaS3 } from '../domain/value-objects/referencia-s3.vo.js';
 
 /**
- * AWS Transfer Family tagueia automaticamente todo objeto S3 gravado via
- * SFTP com `aws:transfer:server-id`/`aws:transfer:user-name` (metadado do
- * objeto, nunca conteúdo do arquivo) — fonte legítima de usuário/servidor
- * para resolver `tenantId` via `sftp_tenant_mapping` (T006).
+ * Lê `aws:transfer:server-id`/`aws:transfer:user-name` como tags do objeto
+ * S3 (metadado, nunca conteúdo do arquivo) — fonte legítima de
+ * usuário/servidor para resolver `tenantId` via `sftp_tenant_mapping` (T006).
+ *
+ * PRÉ-REQUISITO DE INFRAESTRUTURA (achado MAJOR do backend-reviewer): estas
+ * tags só existem se o servidor AWS Transfer Family tiver um Managed
+ * Workflow com step `TAG` configurado — NÃO é automático por padrão. Ver
+ * `specs/007-isolamento-multitenant-dados/infra/aws-transfer-family-tagging-tenant.md`
+ * para o runbook de configuração/validação. Sem esse workflow, `TagSet`
+ * vem vazio e este gateway retorna `undefined` para todo arquivo
+ * (log-only no handler, não bloqueia — ver sftp-upload.handler.ts).
  */
 const TAG_SERVIDOR_ID = 'aws:transfer:server-id';
 const TAG_USUARIO = 'aws:transfer:user-name';
