@@ -1,4 +1,4 @@
-# Matriz de rastreabilidade — spec-009 (parcial, T004+T005+T006)
+# Matriz de rastreabilidade — spec-009 (parcial, T004+T005+T007)
 
 | Task | Requisito/Critério | Nível | Cenário | Teste | Resultado | Evidência Allure |
 |---|---|---|---|---|---|---|
@@ -12,10 +12,8 @@ Cobertura de linha das tasks: `assinatura-estrutural.ts` e `sinal-cache-identifi
 
 Nota de escopo: cálculo do hash (algoritmo, entradas) é T010 — fora do escopo de T004/T005 e desta rodada de QA. Validação de `assinatura` e `resultadoAnterior` já é responsabilidade dos VOs `AssinaturaEstrutural`/`ResultadoClassificacao` (não duplicada em `SinalCacheIdentificacao`, conforme a implementação).
 
-| T006 | tasks.md L31: interface `CacheIdentificacaoGateway` com `buscar(assinatura: AssinaturaEstrutural): Promise<SinalCacheIdentificacao \| null>` e `registrar(assinatura: AssinaturaEstrutural, resultado: ResultadoClassificacao): Promise<void>` — sem implementação, apenas contrato | Contrato (tipo, sem lógica executável) | Conformidade de assinatura verificada por leitura + `tsc --noEmit` (compilação estrita das assinaturas) | `src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.ts` (revisão de código + typecheck; interface não gera runtime, não há branch/statement a testar) | PASS | não aplicável (sem teste de execução; ver nota) |
+| T007 | tasks.md L?: `DomainEventEnvelope` ganha campo opcional `prioridade?: 'PADRAO' \| 'LOTE_BAIXA_PRIORIDADE'`, aditivo, sem novo evento | Unitário | Interface exposta em TypeScript, sem lógica executável própria | `npx tsc --noEmit` — compila sem erro; contrato validado estaticamente | PASS | allure indisponível (ver limitação de ambiente, mesma de T005) |
+| T007 | Critério: "payload sem o campo continua válido (default implícito PADRAO)" | Unitário | Para os 4 eventos concretos existentes (`OrcamentoRecebido`, `OrcamentoClassificado`, `OrcamentoEscalonadoParaRevisaoHumana`, `OrcamentoReclassificadoPorRevisaoHumana`), instancia sem `prioridade` e afirma `evento.prioridade` `undefined` | `domain-events.test.ts::payload sem "prioridade" continua válido (default implícito PADRAO) — $detailType` (4 casos via `describe.each`) | PASS (4/4) | idem |
+| T007 | Regressão: shape prévio do envelope (`detailType`, `schemaVersion`, `orcamentoId`, `ocorreuEm`) inalterado nos 4 eventos | Unitário | Mesma suíte, teste já existente reexecutado | `domain-events.test.ts::schemaVersion 1, orcamentoId e detailType "$detailType"` (4 casos) | PASS (4/4) | idem |
 
-Nota T006: interface pura (`type`-only, zero lógica) não produz bytecode instrumentável —
-`coverage-summary.json` não lista o arquivo (comportamento esperado do v8 coverage para
-declarações apenas de tipo). Verificação de conformidade feita por `tsc --noEmit` (zero erros)
-e conferência manual da assinatura contra tasks.md L31. Implementação real (T010) e seus testes
-de comportamento (T012–T015) ficam fora do escopo desta rodada.
+Cobertura de T007: `domain-event.ts` é interface pura (TypeScript type-only), 0 statements/branches/functions executáveis — 100% trivial via `coverage-summary.json`. Os 4 eventos concretos que implementam o envelope permanecem 100% statements/branches/functions/lines (ver coverage-final.md).

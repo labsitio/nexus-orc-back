@@ -116,64 +116,65 @@ APROVADO PELO QA
 
 ---
 
-# QA — T006 (spec-009)
+# QA — T007 (spec-009)
 
 ## 1. SPEC_ID e versão testada
 - SPEC_ID: 009-otimizacao-custo-operacional
-- Branch: feat/009-otimizacao-custo-t006
-- Commit: eec0db2
-- PR: https://github.com/labsitio/nexus-orc-back/pull/440 (draft)
+- Branch: feat/009-otimizacao-custo-t007
+- Commit: f1be263
+- PR: https://github.com/labsitio/nexus-orc-back/pull/442
 
 ## 2. Resumo executivo
-T006 entrega a interface `CacheIdentificacaoGateway` (contrato puro, sem implementação —
-implementação DynamoDB é T010, fora de escopo). Assinatura confere exatamente com
-tasks.md L31: `buscar(assinatura: AssinaturaEstrutural): Promise<SinalCacheIdentificacao | null>`
-e `registrar(assinatura: AssinaturaEstrutural, resultado: ResultadoClassificacao): Promise<void>`.
-`backend-reviewer` já aprovou (APPROVE, sem achados). Nenhum defeito de produção encontrado.
+T007 estende `DomainEventEnvelope` (BC Ingestão & Identificação) com o campo
+opcional `readonly prioridade?: 'PADRAO' | 'LOTE_BAIXA_PRIORIDADE'`. Mudança
+puramente aditiva em uma `interface` TypeScript: nenhum evento novo, nenhuma
+alteração nos 4 eventos concretos existentes (`OrcamentoRecebido`,
+`OrcamentoClassificado`, `OrcamentoEscalonadoParaRevisaoHumana`,
+`OrcamentoReclassificadoPorRevisaoHumana`). Teste novo (adicionado pelo
+dev-back-end) confirma, via `describe.each` sobre os 4 eventos, que
+`evento.prioridade` é `undefined` quando o campo não é informado — satisfaz
+literalmente o critério de aceite "payload sem o campo continua válido
+(default implícito PADRAO)". `tsc --noEmit` confirma que o campo opcional não
+quebra nenhum call-site existente (compatibilidade estrutural garantida pelo
+compilador). Nenhum defeito de produção encontrado.
 
 ## 3. Requisitos cobertos e não cobertos
-- Coberto: assinatura do contrato conforme tasks.md L31 (verificação por leitura + `tsc --noEmit`).
-- Fora de escopo de T006 (não avaliado aqui): implementação DynamoDB (T010), tratamento
-  de erro throttle/timeout (responsabilidade da implementação, não do contrato), injeção
-  de dependência (T018), testes de comportamento do caso de uso (T012–T015).
+- Coberto: campo `prioridade` aditivo e opcional na interface do envelope.
+- Coberto: "payload sem o campo continua válido (default implícito PADRAO)" — validado para os 4 eventos concretos existentes.
+- Coberto (regressão): shape prévio do envelope (`detailType`, `schemaVersion`, `orcamentoId`, `ocorreuEm`) inalterado.
+- Fora de escopo de T007 (não avaliado aqui): uso efetivo de `prioridade` para roteamento de fila de baixa prioridade — pertence a tasks posteriores (US3, ADR-009-003) ainda não implementadas.
+- Observação de rastreabilidade (não bloqueante): a descrição de T007 em `tasks.md` menciona "5 eventos já definidos em 001", mas o BC possui 4 classes de evento concretas (`OrcamentoRecebido`, `OrcamentoClassificado`, `OrcamentoEscalonadoParaRevisaoHumana`, `OrcamentoReclassificadoPorRevisaoHumana`). Todas as 4 foram exercitadas pelo teste. Divergência textual em `tasks.md`, não em código; fora da autoridade deste agente (não altera `tasks.md`) — registrado para quem mantém a spec (arquiteto/Tech Lead) avaliar se é apenas erro de redação.
 
 ## 4. Suítes executadas e comandos
-- `npx tsc --noEmit -p .`
-- `npx eslint src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.ts`
+- `npx tsc --noEmit`
+- `npx vitest run tests/bounded-contexts/ingestao-identificacao/domain/events --reporter=default`
+- `npx vitest run tests/bounded-contexts/ingestao-identificacao/domain/events/domain-events.test.ts --reporter=default --coverage --coverage.reporter=json-summary`
 - `npx vitest run --reporter=default` (regressão completa do repo)
 
 ## 5. Quantidade de testes por tipo
-- Nenhum teste novo. Interface pura sem lógica executável — nenhum comportamento a
-  exercitar nesta task (ver justificativa em qa/test-execution-report.md).
+- Unitário (domínio, contrato do envelope): 8 (4 eventos × [1 caso de shape existente + 1 caso de `prioridade` ausente])
 
 ## 6. Resultado
-- Typecheck: sem erros.
-- Lint: sem erros/warnings.
-- Regressão completa do repo: 285 testes (258 passed, 27 skipped pré-existentes),
-  0 falhas, 62 arquivos (56 passed, 6 skipped). Os dois testes citados pelo dev-back-end
-  como flaky por timeout (`upload-url.controller.test.ts`, `auth-cognito.middleware.test.ts`)
-  passaram nesta execução, sem instabilidade observada.
+- Suíte da task: 8/8 passed.
+- Regressão completa do repo: 262/289 testes passed, 0 failed, 27 skipped (skips pré-existentes de integração com banco/infra, não relacionados a este diff), 56 arquivos passed / 6 skipped. As 3 falhas de timeout reportadas pelo dev-back-end (contract/auth) não reproduziram nesta rodada — consistentes com flakiness sob paralelismo, não com regressão do diff.
 
 ## 7. Cobertura inicial e final
-- Não aplicável: interface `type`-only não gera bytecode instrumentável, não aparece
-  em `coverage/coverage-summary.json`. Verificação de conformidade feita por typecheck
-  e revisão de assinatura, não por cobertura de execução.
+- `domain-event.ts` (interface type-only): 0/0 em todas as métricas (100% trivial, sem statement executável).
+- Os 4 eventos concretos que implementam o envelope: 100% statements/branches/functions/lines cada, inalterado em relação ao estado anterior a T007 (ver qa/coverage-final.md).
 
 ## 8. Allure
-- Mesma limitação pré-existente do adaptador `allure-vitest` já registrada em T005
-  (`Vitest failed to find the runner` sem `--reporter=default`). Não bloqueia o gate.
+- Mesmo bug pré-existente do adaptador `allure-vitest` já registrado em T005 (`Error: Vitest failed to find the runner`), reproduzido nesta rodada independente do diff. Contornado com `--reporter=default`; `allure-results/` não gerado. Limitação de ambiente, não bloqueia o gate (T007 não tem requisito ligado a Allure).
 
 ## 9. Bugs por severidade e status
 Nenhum bug aberto nesta rodada.
 
 ## 10. Riscos residuais
-- Nenhum risco novo introduzido. Risco de contrato ficar desalinhado com a futura
-  implementação (T010) é mitigado por `tsc` ao compilar `DynamoCacheIdentificacaoGateway`
-  contra esta interface quando T010 for implementada.
+- Mesmo bug pré-existente do reporter `allure-vitest` já registrado em T004/T005 — risco de ferramenta de QA, não de produto.
+- Divergência textual em `tasks.md` ("5 eventos" vs. 4 eventos concretos existentes) — ver item 3; não é defeito de código, registrado apenas para rastreabilidade.
 
 ## 11. Limitações do ambiente
-- Bug pré-existente do reporter `allure-vitest` (ver item 8), já conhecido e sem
-  impacto no gate desta task.
+- `allure-results/` não gerado (ver item 8).
+- `node_modules` precisou ser reinstalado (`npm install`) neste worktree antes da execução — já resolvido pelo dev-back-end antes da entrega a este QA.
 
-## 12. Parecer final (T006)
+## 12. Parecer final (T007)
 APROVADO PELO QA

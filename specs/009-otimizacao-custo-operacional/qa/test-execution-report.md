@@ -109,53 +109,49 @@ não bloqueia o gate desta task (nenhum requisito de T005 depende de Allure).
 
 ---
 
-# T006 (spec-009)
+# T007 (spec-009)
 
-Commit testado: `eec0db2`
-Branch: `feat/009-otimizacao-custo-t006`
-PR: https://github.com/labsitio/nexus-orc-back/pull/440 (draft)
+Commit testado: `f1be263`
+Branch: `feat/009-otimizacao-custo-t007`
+PR: https://github.com/labsitio/nexus-orc-back/pull/442
 
-## Diff avaliado
-- `src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.ts` (novo, interface pura)
-- `specs/009-otimizacao-custo-operacional/tasks.md` (checkbox T006)
-
-## Conformidade de assinatura
-Comparação direta com tasks.md L31: `buscar(assinatura: AssinaturaEstrutural): Promise<SinalCacheIdentificacao | null>`
-e `registrar(assinatura: AssinaturaEstrutural, resultado: ResultadoClassificacao): Promise<void>` —
-assinatura do arquivo confere exatamente. Sem lógica implementada (conforme escopo da task,
-implementação real é T010).
+## Suíte da task
+```
+npx vitest run tests/bounded-contexts/ingestao-identificacao/domain/events --reporter=default
+```
+Resultado: 1 arquivo, 8 testes, 8 passed, 0 failed.
 
 ## Typecheck
 ```
-npx tsc --noEmit -p .
+npx tsc --noEmit
 ```
 Resultado: sem erros.
 
-## Lint
+## Cobertura da task
 ```
-npx eslint src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.ts
+npx vitest run tests/bounded-contexts/ingestao-identificacao/domain/events/domain-events.test.ts --reporter=default --coverage --coverage.reporter=json-summary
 ```
-Resultado: sem erros/warnings.
+`domain-event.ts` (interface, sem código executável): 0/0 em todas as métricas
+(100% trivial). Os 4 eventos concretos que implementam o envelope
+(`orcamento-recebido.event.ts`, `orcamento-classificado.event.ts`,
+`orcamento-escalonado-revisao-humana.event.ts`,
+`orcamento-reclassificado-revisao-humana.event.ts`): 100%
+statements/branches/functions/lines cada (ver coverage-final.md).
 
 ## Regressão — suíte completa do repositório
 ```
 npx vitest run --reporter=default
 ```
-Resultado: 62 arquivos (56 passed, 6 skipped — skips pré-existentes de integração
-com banco/infra, não relacionados a este diff), 285 testes (258 passed, 27 skipped),
-0 falhas. `upload-url.controller.test.ts` e `auth-cognito.middleware.test.ts` (relatados
-pelo dev-back-end como flaky por timeout) passaram nesta execução, sem instabilidade
-observada. Diff de T006 não introduziu nenhuma regressão.
-
-## Testes de comportamento
-Nenhum criado. Interface sem lógica executável (zero statements/branches em runtime);
-teste de contrato/comportamento cabe às tasks que consomem a interface: T012–T015
-(caso de uso `ClassificarOrcamento` com fake/mock do gateway) e à implementação real
-em T010 — ambas fora do escopo desta task e desta rodada de QA. Criar teste de
-compilação isolado para uma interface vazia adicionaria manutenção sem reduzir risco
-(o próprio `tsc --noEmit` já garante a conformidade estrutural).
+Resultado: 62 arquivos (56 passed, 6 skipped — skips pré-existentes de
+integração com banco/infra, não relacionados a este diff), 289 testes (262
+passed, 27 skipped), 0 falhas. As 3 falhas de timeout relatadas pelo
+dev-back-end na sua execução local (contract/auth) não reproduziram nesta
+rodada — consistente com flakiness sob paralelismo, não com regressão
+introduzida pelo diff de T007 (que toca apenas uma interface TypeScript sem
+lógica de execução).
 
 ## Allure
-Mesma limitação pré-existente do adaptador `allure-vitest` já registrada em T005;
-`--reporter=default` usado como workaround, sem geração de `allure-results/` nesta
-rodada. Não bloqueia o gate (task não tem requisito de evidência Allure).
+Mesmo bug pré-existente do adaptador `allure-vitest` já registrado em T005
+(`Error: Vitest failed to find the runner`) — contornado com `--reporter=default`,
+que desativa `allure-results/` nesta rodada. Limitação de ambiente, não bloqueia
+o gate (T007 não tem requisito ligado a Allure).

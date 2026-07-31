@@ -41,11 +41,24 @@ arquivo na visão em árvore quando há muitos arquivos na mesma pasta — confi
 em ambas as tasks. Cobertura agregada do repo não é aplicável a este gate (fora do diff
 destas tasks).
 
-## T006 — cache-identificacao.gateway.ts
+## T007 — domain-event.ts (envelope) + 4 eventos concretos
 
-Arquivo é `interface` TypeScript pura (contrato, zero lógica executável) — não gera
-bytecode e não aparece em `coverage/coverage-summary.json` (comportamento esperado
-para declarações apenas de tipo, sem statements/branches/functions em runtime).
-Métrica de cobertura não se aplica; conformidade verificada por `tsc --noEmit`
-(0 erros) e revisão da assinatura contra tasks.md L31. Sem teste de comportamento
-criado — não há comportamento a exercitar (evitando teste vazio/sem valor de risco).
+Comando:
+```
+npx vitest run tests/bounded-contexts/ingestao-identificacao/domain/events/domain-events.test.ts --reporter=default --coverage --coverage.reporter=json-summary
+```
+
+Resultado (`coverage/coverage-summary.json`):
+
+| Arquivo | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|
+| `domain-event.ts` (interface, 0 statements executáveis) | 100% (0/0) | 100% (0/0) | 100% (0/0) | 100% (0/0) |
+| `orcamento-recebido.event.ts` | 100% (8/8) | 100% (1/1) | 100% (1/1) | 100% (8/8) |
+| `orcamento-classificado.event.ts` | 100% (6/6) | 100% (1/1) | 100% (1/1) | 100% (6/6) |
+| `orcamento-escalonado-revisao-humana.event.ts` | 100% (6/6) | 100% (1/1) | 100% (1/1) | 100% (6/6) |
+| `orcamento-reclassificado-revisao-humana.event.ts` | 100% (6/6) | 100% (1/1) | 100% (1/1) | 100% (6/6) |
+
+`domain-event.ts` é um `interface` TypeScript type-only — não gera código em
+runtime, por isso 0/0 (não há statement a cobrir; instrumentado, sem lacuna).
+Os 4 eventos concretos que consomem o envelope permanecem 100% cobertos após
+a extensão aditiva do campo `prioridade`.

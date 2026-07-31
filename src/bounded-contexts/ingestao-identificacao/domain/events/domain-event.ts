@@ -7,4 +7,9 @@ export interface DomainEventEnvelope {
   readonly schemaVersion: 1;
   readonly orcamentoId: string;
   readonly ocorreuEm: string;
+  /**
+   * Prioridade de roteamento do evento (spec-009, ADR-009-003).
+   * Ausente = comportamento padrão atual (retrocompatível): tratado como `PADRAO`.
+   */
+  readonly prioridade?: 'PADRAO' | 'LOTE_BAIXA_PRIORIDADE';
 }
