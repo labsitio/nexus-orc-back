@@ -17,3 +17,15 @@ incluindo os 9 resultados de `PoliticaRetencao`, identificados via
 sensível nos payloads (VO opera sobre valores sintéticos de teste, sem PII).
 Relatório HTML não gerado nesta validação (não solicitado; `allure-results`
 brutos são suficientes como evidência).
+
+## T007 — gerado (commit `47c19bc`)
+
+`npx vitest run tests/platform/conformidade` (config completa, reporter
+`allure-vitest` ativo) executa sem erro e produz resultados em
+`allure-results/` na raiz do repositório, identificados via
+`grep -rl "ReferenciaTitular" allure-results`. Suite: `ReferenciaTitular`
+(feature/story derivados do `describe`/`it` do arquivo de teste). Nenhum
+dado sensivel nos payloads — VO opera sobre valores sinteticos de teste
+(e-mails ficticios `@exemplo.com`), sem PII real. Relatorio HTML nao gerado
+nesta validacao (nao solicitado; `allure-results` brutos sao suficientes
+como evidencia, mesmo padrao de T005).
