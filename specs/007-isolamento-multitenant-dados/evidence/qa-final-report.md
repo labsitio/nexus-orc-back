@@ -186,3 +186,99 @@ adversariais adicionais desta task.
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# Validação adicional — T004 (SPEC_ID: 007-isolamento-multitenant-dados)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: 007-isolamento-multitenant-dados
+- Issue: #267
+- PR: #472 (draft, aprovado pelo backend-reviewer com veredito APPROVE)
+- Branch: feat/007-isolamento-multitenant
+- Worktree: `.claude/worktrees/agent-007-multitenant`
+- Commit testado: 2bc4ae9 (conteúdo relevante; HEAD atual após merge de reconciliação 15dfe1e)
+- Tipo de validação: primeira validação (sem reteste anterior)
+
+## 2. Resumo executivo
+T004 entrega um runbook operacional (não código de produção, não stack CDK/Terraform) para
+adicionar o custom attribute `custom:tenant_id` a um User Pool Cognito já existente e gerenciado
+fora deste monorepo. Nenhuma spec 001-006 provisiona o pool via IaC neste repositório — decisão
+correta e já validada pelo backend-reviewer. A execução real por ambiente (dev/staging/prod) não
+foi feita nem afirmada como feita; está rastreada na issue #469, fora do board de tasks técnicas
+de spec 007.
+
+## 3. Requisitos cobertos e não cobertos
+Cobertos (T004, 4 pontos do pedido de validação):
+1. Runbook tecnicamente correto e executável — comando `add-custom-attributes` usa sintaxe
+   shorthand válida da AWS CLI (`Name=tenant_id,AttributeDataType=String,Mutable=false,
+   Required=false,StringAttributeConstraints={MinLength=36,MaxLength=36}`); `Name` sem prefixo
+   `custom:` na criação (correto — a API adiciona o prefixo automaticamente), com prefixo
+   `custom:` apenas ao consultar `SchemaAttributes` via `describe-user-pool` (correto — o schema
+   já retorna o atributo prefixado). `MinLength=MaxLength=36` é consistente com formato UUID
+   (mesmo formato de `TenantId`).
+2. IAM policy cobre exatamente `cognito-idp:AddCustomAttributes` e `cognito-idp:DescribeUserPool`
+   — as únicas duas ações usadas no runbook (criação + idempotência/validação) — restrita ao ARN
+   do User Pool alvo. Nenhuma ação além dessas (`AdminUpdateUserAttributes`, por exemplo, usada
+   apenas no onboarding operacional de usuário, explicitamente fora de escopo desta task e não
+   incluída na policy — correto, menor privilégio).
+3. Nem `tasks.md` nem o runbook afirmam execução real ocorrida — ambos hedgeiam explicitamente
+   ("Execução real em cada ambiente ... não foi feita por este agente").
+4. Rastreabilidade: linha de T004 em `tasks.md` referencia a seção "Status" do runbook, que por
+   sua vez referencia a issue #469 (aberta, label `spec-007`, corpo declara "Pré-requisito para
+   T005 ... funcionar em produção — sem o atributo no schema, não há claim `custom:tenant_id`
+   para extrair"). As três referências ficam imediatamente acima da linha de T005 em `tasks.md`,
+   reduzindo o risco de quem pegar T005 assumir que o atributo já existe em produção.
+
+Não cobertos (fora de escopo de T004, por natureza do entregável):
+- Execução real do comando contra um User Pool (requer acesso operacional AWS que este agente
+  não possui) — rastreada na issue #469, não nesta task.
+- Teste automatizado do comando (não é possível sem um User Pool real ou mock de API Cognito;
+  não há LocalStack/emulador configurado neste repositório para Cognito).
+
+## 4. Suítes executadas e comandos
+Não aplicável — T004 é documentação/runbook puro, sem código de produção nem teste automatizado
+associado. Validação feita por:
+- inspeção técnica do comando AWS CLI contra a sintaxe documentada de
+  `cognito-idp add-custom-attributes` (shorthand de `SchemaAttributeType`);
+- comparação ação-a-ação entre IAM policy e comandos usados no runbook;
+- leitura de `tasks.md`, do runbook e da issue #469 via `gh issue view 469`;
+- confirmação via `gh pr view 472 --json files` de que o diff do PR contém apenas os 2 arquivos
+  de documentação declarados (nenhum código de produção alterado).
+
+## 5. Quantidade de testes por tipo
+- Não aplicável (sem runtime a exercitar). Verificação por inspeção estática/técnica, 6 pontos
+  (ver matriz de rastreabilidade).
+
+## 6. Resultado
+- Aprovados: 6 (todos os pontos de inspeção da matriz de rastreabilidade)
+- Falhos: 0
+- Ignorados: 0
+- Instáveis: 0
+
+## 7. Cobertura
+Não aplicável — nenhum código de produção, nenhum arquivo elegível a cobertura de
+statements/branches/functions/lines.
+
+## 8. Allure
+Não gerado — sem testes automatizados no runner (Vitest) para esta task; natureza puramente
+documental sem runtime a exercitar.
+
+## 9. Bugs por severidade e status
+Nenhum bug encontrado.
+
+## 10. Riscos residuais
+- Execução real do runbook em dev/staging/prod ainda pendente (issue #469) — T005
+  (`TenantContextMiddleware`) não deve ser considerada "pronta para produção" sem essa execução
+  confirmada, ainda que o código de T005 possa ser implementado e testado com claim simulada.
+- Onboarding operacional (atribuição do valor por usuário via `AdminUpdateUserAttributes`) segue
+  fora do escopo de qualquer task de spec 007, dependente de processo manual — risco de erro
+  humano na primeira atribuição (irreversível) já documentado no próprio runbook.
+
+## 11. Limitações do ambiente
+Sem acesso operacional a AWS/Cognito real neste agente e neste QA — inerente à natureza da task
+(User Pool gerenciado fora do monorepo). Não bloqueia o gate desta task, pois o entregável
+esperado é o runbook, não a execução.
+
+## 12. Parecer final
+APROVADO PELO QA
