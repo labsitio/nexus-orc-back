@@ -106,3 +106,56 @@ Confirma o bug pré-existente do adaptador `allure-vitest` neste repositório
 (já relatado por outros agentes). Contornado ao rodar com `--reporter=default`,
 que desativa a geração de `allure-results/` nesta rodada — limitação de ambiente,
 não bloqueia o gate desta task (nenhum requisito de T005 depende de Allure).
+
+---
+
+# T006 (spec-009)
+
+Commit testado: `eec0db2`
+Branch: `feat/009-otimizacao-custo-t006`
+PR: https://github.com/labsitio/nexus-orc-back/pull/440 (draft)
+
+## Diff avaliado
+- `src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.ts` (novo, interface pura)
+- `specs/009-otimizacao-custo-operacional/tasks.md` (checkbox T006)
+
+## Conformidade de assinatura
+Comparação direta com tasks.md L31: `buscar(assinatura: AssinaturaEstrutural): Promise<SinalCacheIdentificacao | null>`
+e `registrar(assinatura: AssinaturaEstrutural, resultado: ResultadoClassificacao): Promise<void>` —
+assinatura do arquivo confere exatamente. Sem lógica implementada (conforme escopo da task,
+implementação real é T010).
+
+## Typecheck
+```
+npx tsc --noEmit -p .
+```
+Resultado: sem erros.
+
+## Lint
+```
+npx eslint src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.ts
+```
+Resultado: sem erros/warnings.
+
+## Regressão — suíte completa do repositório
+```
+npx vitest run --reporter=default
+```
+Resultado: 62 arquivos (56 passed, 6 skipped — skips pré-existentes de integração
+com banco/infra, não relacionados a este diff), 285 testes (258 passed, 27 skipped),
+0 falhas. `upload-url.controller.test.ts` e `auth-cognito.middleware.test.ts` (relatados
+pelo dev-back-end como flaky por timeout) passaram nesta execução, sem instabilidade
+observada. Diff de T006 não introduziu nenhuma regressão.
+
+## Testes de comportamento
+Nenhum criado. Interface sem lógica executável (zero statements/branches em runtime);
+teste de contrato/comportamento cabe às tasks que consomem a interface: T012–T015
+(caso de uso `ClassificarOrcamento` com fake/mock do gateway) e à implementação real
+em T010 — ambas fora do escopo desta task e desta rodada de QA. Criar teste de
+compilação isolado para uma interface vazia adicionaria manutenção sem reduzir risco
+(o próprio `tsc --noEmit` já garante a conformidade estrutural).
+
+## Allure
+Mesma limitação pré-existente do adaptador `allure-vitest` já registrada em T005;
+`--reporter=default` usado como workaround, sem geração de `allure-results/` nesta
+rodada. Não bloqueia o gate (task não tem requisito de evidência Allure).
