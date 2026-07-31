@@ -42,6 +42,14 @@ export class TransicaoInvalidaDecisaoWorkflowError extends ErroDominio {
   }
 }
 
+export class JustificativaHumanaAusenteError extends ErroDominio {
+  constructor() {
+    super(
+      'Decisão humana exige criterio/justificativa não vazia, para auditoria — DecisaoRoteamento.criar não valida isso quando agenteOrigem é HUMANO',
+    );
+  }
+}
+
 /** Resultado reportado pelo `AgenteOrquestradorGateway` — ainda não é uma `DecisaoRoteamento` válida (depende do limiar de confiança ser atingido). */
 export interface ResultadoOrquestrador {
   readonly acao: AcaoRoteamento;
@@ -173,8 +181,17 @@ export class DecisaoWorkflow {
    * Só transita para `CONTEXTO_CONSOLIDADO` quando os 3 contextos estão
    * presentes; caso contrário permanece `AGUARDANDO_CONTEXTO` e lança
    * `ContextoIncompletoError` — nunca uma decisão parcial (ADR-001).
+   * Idempotente a partir de `CONTEXTO_CONSOLIDADO`/`DECIDIDO`/
+   * `PENDENTE_REVISAO_HUMANA` — reentrega do evento que dispara este método
+   * (`ConsolidarEDecidirWorkflow`, plan.md) nunca reverte o status para
+   * `CONTEXTO_CONSOLIDADO`, o que reabriria a porta para invocar o
+   * Orquestrador em duplicidade sobre uma decisão já tomada/escalonada.
    */
   consolidarContexto(): void {
+    if (this._status !== 'AGUARDANDO_CONTEXTO') {
+      return;
+    }
+
     const camposAusentes: string[] = [];
     if (!this._contextoClassificacao) camposAusentes.push('contextoClassificacao');
     if (!this._contextoExtracao) camposAusentes.push('contextoExtracao');
@@ -248,6 +265,10 @@ export class DecisaoWorkflow {
   registrarDecisaoHumana(decisao: DecisaoHumanaInput): void {
     if (this._status !== 'PENDENTE_REVISAO_HUMANA') {
       throw new TransicaoInvalidaDecisaoWorkflowError(this._status, 'registrarDecisaoHumana');
+    }
+
+    if (!decisao.criterio?.trim()) {
+      throw new JustificativaHumanaAusenteError();
     }
 
     const decisaoRoteamento = DecisaoRoteamento.criar({

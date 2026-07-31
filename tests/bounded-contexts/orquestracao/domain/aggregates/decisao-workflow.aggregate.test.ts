@@ -3,6 +3,7 @@ import {
   ContextoImutavelError,
   ContextoIncompletoError,
   DecisaoWorkflow,
+  JustificativaHumanaAusenteError,
   TransicaoInvalidaDecisaoWorkflowError,
 } from '../../../../../src/bounded-contexts/orquestracao/domain/aggregates/decisao-workflow.aggregate.js';
 import { ContextoClassificacao } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/contexto-classificacao.vo.js';
@@ -108,6 +109,37 @@ describe('DecisaoWorkflow', () => {
 
       expect(() => decisao.consolidarContexto()).toThrow(ContextoIncompletoError);
       expect(decisao.status).toBe('AGUARDANDO_CONTEXTO');
+    });
+
+    it('é no-op quando reaplicado após DECIDIDO — nunca reverte status já avançado (reentrega de evento)', () => {
+      const decisao = criarComContextoConsolidado();
+      decisao.registrarTentativaOrquestrador({
+        acao: 'ENCAMINHAR_COMPRADOR',
+        nivelConfianca: NivelConfianca.de(90),
+        criterio: 'confiança suficiente',
+        requerIntegracaoExterna: false,
+      });
+      expect(decisao.status).toBe('DECIDIDO');
+
+      decisao.consolidarContexto();
+
+      expect(decisao.status).toBe('DECIDIDO');
+      expect(decisao.historico).toHaveLength(1);
+    });
+
+    it('é no-op quando reaplicado após PENDENTE_REVISAO_HUMANA — nunca reverte para CONTEXTO_CONSOLIDADO', () => {
+      const decisao = criarComContextoConsolidado();
+      decisao.registrarTentativaOrquestrador({
+        acao: 'ENCAMINHAR_COMPRADOR',
+        nivelConfianca: NivelConfianca.de(40),
+        criterio: 'confiança baixa',
+        requerIntegracaoExterna: false,
+      });
+      expect(decisao.status).toBe('PENDENTE_REVISAO_HUMANA');
+
+      decisao.consolidarContexto();
+
+      expect(decisao.status).toBe('PENDENTE_REVISAO_HUMANA');
     });
   });
 
@@ -260,6 +292,26 @@ describe('DecisaoWorkflow', () => {
           requerIntegracaoExterna: false,
         }),
       ).toThrow(ReenvioSemFundamentoError);
+      expect(decisao.status).toBe('PENDENTE_REVISAO_HUMANA');
+      expect(decisao.decisaoAtual).toBeUndefined();
+    });
+
+    it('rejeita criterio/justificativa vazia mesmo em decisão humana — JustificativaHumanaAusenteError', () => {
+      const decisao = criarComContextoConsolidado();
+      decisao.registrarTentativaOrquestrador({
+        acao: 'ENCAMINHAR_COMPRADOR',
+        nivelConfianca: NivelConfianca.de(40),
+        criterio: 'confiança baixa',
+        requerIntegracaoExterna: false,
+      });
+
+      expect(() =>
+        decisao.registrarDecisaoHumana({
+          acao: 'ENCAMINHAR_COMPRADOR',
+          criterio: '   ',
+          requerIntegracaoExterna: false,
+        }),
+      ).toThrow(JustificativaHumanaAusenteError);
       expect(decisao.status).toBe('PENDENTE_REVISAO_HUMANA');
       expect(decisao.decisaoAtual).toBeUndefined();
     });
