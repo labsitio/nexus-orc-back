@@ -18,6 +18,10 @@ describe('CNPJ', () => {
     expect(() => CNPJ.de('1122233300018')).toThrow(CnpjInvalidoError);
   });
 
+  it('rejeita sequência de dígitos repetidos mesmo com dígito verificador calculável', () => {
+    expect(() => CNPJ.de('00000000000000')).toThrow(CnpjInvalidoError);
+  });
+
   it('equals compara pelo valor normalizado', () => {
     expect(CNPJ.de('11.222.333/0001-81').equals(CNPJ.de('11222333000181'))).toBe(true);
   });

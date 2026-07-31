@@ -31,6 +31,12 @@ export class CNPJ {
       throw new CnpjInvalidoError(`deve ter 14 dígitos, recebido "${valorBruto}"`);
     }
 
+    if (/^(\d)\1{13}$/.test(digitos)) {
+      throw new CnpjInvalidoError(
+        `sequência de dígitos repetidos não é um CNPJ válido "${valorBruto}"`,
+      );
+    }
+
     const primeiroDigito = calcularDigitoVerificador(digitos, PESOS_PRIMEIRO_DIGITO);
     const segundoDigito = calcularDigitoVerificador(digitos, PESOS_SEGUNDO_DIGITO);
     const digitoVerificadorEsperado = `${primeiroDigito}${segundoDigito}`;
