@@ -11,6 +11,12 @@ export class OrigemValidacaoImutavelError extends ErroDominio {
   }
 }
 
+export class IndiceOrcamentoInconsistenteError extends ErroDominio {
+  constructor(mensagem: string) {
+    super(`IndiceOrcamento inconsistente: ${mensagem}`);
+  }
+}
+
 export type EstadoIndexacao = 'PENDENTE' | 'INDEXADO' | 'FALHA_INDEXACAO';
 
 export interface IndiceOrcamentoProps {
@@ -59,8 +65,12 @@ export class IndiceOrcamento {
     return new IndiceOrcamento(props.orcamentoId, props.conteudoIndexavel, props.origemValidacao);
   }
 
-  /** Reidrata o agregado a partir de estado já persistido (Infrastructure) — confia no invariante garantido na escrita original. */
+  /** Reidrata o agregado a partir de estado já persistido (Infrastructure) — revalida a invariante crítica antes de aceitar a reidratação. */
   static reconstituir(props: IndiceOrcamentoReconstituirProps): IndiceOrcamento {
+    if (props.estado === 'INDEXADO' && !props.embedding) {
+      throw new IndiceOrcamentoInconsistenteError('estado INDEXADO reidratado sem embedding');
+    }
+
     const indice = new IndiceOrcamento(
       props.orcamentoId,
       props.conteudoIndexavel,
@@ -110,23 +120,25 @@ export class IndiceOrcamento {
    * domínio antes de qualquer mutação de estado.
    */
   registrarTentativaIndexacao(params: RegistrarTentativaIndexacaoParams): void {
-    const embedding = (params as { embedding?: Embedding }).embedding;
-    const motivoFalha = (params as { motivoFalha?: string }).motivoFalha;
+    if (params.resultado === 'INDEXADO') {
+      const embeddingRecebido = params.embedding as Embedding | undefined;
+      const tentativa = TentativaIndexacao.de({
+        resultado: 'INDEXADO',
+        timestamp: params.timestamp,
+        modeloEmbedding: embeddingRecebido?.modeloId,
+      });
+      this._historico.push(tentativa);
+      this._embedding = embeddingRecebido;
+      this._estado = 'INDEXADO';
+      return;
+    }
 
     const tentativa = TentativaIndexacao.de({
-      resultado: params.resultado,
+      resultado: 'FALHA_TECNICA',
       timestamp: params.timestamp,
-      modeloEmbedding: embedding?.modeloId,
-      motivoFalha,
+      motivoFalha: params.motivoFalha as string | undefined,
     });
-
     this._historico.push(tentativa);
-
-    if (params.resultado === 'INDEXADO') {
-      this._embedding = embedding;
-      this._estado = 'INDEXADO';
-    } else {
-      this._estado = 'FALHA_INDEXACAO';
-    }
+    this._estado = 'FALHA_INDEXACAO';
   }
 }

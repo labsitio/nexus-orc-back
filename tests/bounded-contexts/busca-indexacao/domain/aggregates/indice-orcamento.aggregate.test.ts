@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   IndiceOrcamento,
+  IndiceOrcamentoInconsistenteError,
   OrigemValidacaoImutavelError,
 } from '../../../../../src/bounded-contexts/busca-indexacao/domain/aggregates/indice-orcamento.aggregate.js';
 import { TentativaIndexacaoInvalidaError } from '../../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/tentativa-indexacao.vo.js';
@@ -143,6 +144,19 @@ describe('IndiceOrcamento', () => {
 
     expect(indice.estado).toBe('INDEXADO');
     expect(indice.embedding).toBe(embedding);
+  });
+
+  it('rejeita reidratar estado INDEXADO sem embedding — dado persistido inconsistente', () => {
+    expect(() =>
+      IndiceOrcamento.reconstituir({
+        orcamentoId,
+        conteudoIndexavel,
+        origemValidacao,
+        estado: 'INDEXADO',
+        embedding: undefined,
+        historico: [],
+      }),
+    ).toThrow(IndiceOrcamentoInconsistenteError);
   });
 });
 
