@@ -1,5 +1,60 @@
 # Test Execution Report — SPEC 002
 
+## Leva T018 (issue #83, PR #451, commit `a8ff244`)
+
+### Escopo
+`sanitizarConteudoExtracao` (Infrastructure, novo) + `MarkItDownConversaoExtracaoACL`
+(Infrastructure, novo, implementa contrato de T011) do BC Extração — réplica
+mecânica do padrão já aprovado em spec-001 (`sanitizar-conteudo-documento.ts` /
+`markitdown-conversao.acl.ts`), instância própria deste BC (ADR-002).
+
+### Comando e resultado
+```bash
+npx vitest run
+```
+- 67 arquivos passaram, 6 skipped (integração Postgres, mesma limitação
+  pré-existente sem `DATABASE_URL`) — **322 testes passaram, 27 skipped, 0 falhas.**
+- `sanitizar-conteudo-extracao.test.ts`: 7/7 PASS.
+- `markitdown-conversao-extracao.acl.test.ts`: 6/6 PASS.
+- Sem regressão nas demais suítes.
+
+```bash
+npx vitest run --coverage
+```
+- Mesmo resultado, exceto **1 falha isolada**: `sanitizar-conteudo-documento.test.ts`
+  (par de **spec-001**, não tocado por esta PR) — teste de mitigação de DoS com
+  limite de 200ms falhou sob `--coverage` no full-suite run, e passou quando
+  executado isoladamente. Achado pré-existente já relatado pelo dev-back-end/
+  backend-reviewer; nenhum arquivo de spec-001 alterado nesta PR, portanto sem
+  BUG novo aberto por esta leva — registrado apenas como risco residual.
+
+### Verificação empírica do limite de 500ms (DoS) do par novo (spec-002)
+Medido via probe descartável (removido após a medição, não versionado):
+- Implementação atual (com limite de varredura de entrada) sob `--coverage`:
+  ~102ms para documento adversarial de 10M caracteres de controle.
+- Regressão simulada (mesma lógica, sem o limite de varredura de entrada) sob
+  `--coverage`: ~1676ms para o mesmo documento.
+- Conclusão: teste com 500ms tem margem (~5x acima do normal, ~3x abaixo da
+  regressão) — não está frouxo a ponto de nunca falhar por engano, continua
+  detectando regressão real de complexidade.
+
+### Estático
+- `npx tsc --noEmit` — sem erros.
+- `npx eslint` nos arquivos alterados/novos (produção + teste) — sem erros.
+
+### Cobertura dos arquivos novos
+- `sanitizar-conteudo-extracao.ts`: 100% stmts/functions/lines, 96.29% branches
+  (1 branch não coberto, mesmo padrão residual do par de spec-001).
+- `markitdown-conversao-extracao.acl.ts`: 100% stmts/branches/functions/lines.
+
+### Resultado
+**PASS.** Nenhum defeito de produção encontrado. Critérios de aceite de T018
+(`tasks.md`) satisfeitos: unit test do ACL mockando saída do MarkItDown, com
+sanitização de conteúdo antes de compor prompt (mitigação de prompt injection),
+mesmo padrão de spec-001.
+
+---
+
 ## Leva T015 (issue #80, PR #429, commit `3580e09`)
 
 ### Escopo
