@@ -71,5 +71,7 @@ new ContextoExtracaoQueueStack(app, 'ContextoExtracaoQueueStack', {
 });
 
 new DecisaoWorkflowQueueStack(app, 'DecisaoWorkflowQueueStack', {
-  description: 'Fila decisao-workflow-queue + DLQ + alarme (BC Orquestração) — spec 005, T003.',
+  description:
+    'Fila decisao-workflow-queue + DLQ + alarme, roteada por regra EventBridge — spec 005, T003/T006.',
+  dominioBus: dominioEventBusStack.dominioBus,
 });
