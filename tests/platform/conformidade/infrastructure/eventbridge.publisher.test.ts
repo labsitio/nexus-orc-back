@@ -28,6 +28,10 @@ describe('EventBridgePublisher (conformidade)', () => {
     expect(entrada.EventBusName).toBe('nexo-dominio-bus');
     expect(entrada.Source).toBe('nexo.conformidade');
     expect(entrada.DetailType).toBe('SolicitacaoEsquecimentoRegistrada');
+    expect(JSON.parse(entrada.Detail as string)).toMatchObject({
+      detailType: 'SolicitacaoEsquecimentoRegistrada',
+      schemaVersion: 1,
+    });
   });
 
   it('lança erro descritivo se o EventBridge reportar falha na entrada', async () => {
