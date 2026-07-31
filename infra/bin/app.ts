@@ -78,5 +78,7 @@ new DecisaoWorkflowQueueStack(app, 'DecisaoWorkflowQueueStack', {
 });
 
 new IndexadorQueueStack(app, 'IndexadorQueueStack', {
-  description: 'Fila indexador-queue + DLQ + alarme (BC Busca & Indexação) — spec 004, T004.',
+  description:
+    'Fila indexador-queue + DLQ + alarme, roteada por regra EventBridge — spec 004, T004/T005.',
+  dominioBus: dominioEventBusStack.dominioBus,
 });
