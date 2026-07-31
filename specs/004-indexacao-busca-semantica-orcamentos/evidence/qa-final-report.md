@@ -1,76 +1,90 @@
-# QA Final Report — T001 (BC busca-indexacao scaffolding)
+# QA Final Report — T002 (PR #446)
 
 ## SPEC_ID / versão testada
-SPEC_ID: 004-indexacao-busca-semantica-orcamentos
-PR: #434 (labsitio/nexus-orc-back)
-Branch: feat/004-busca-indexacao
-Commits: 7bcdf7a (estrutura de pastas), 107271f (tasks.md T001 marcada [x])
-Base: main
+- SPEC_ID: 004-indexacao-busca-semantica-orcamentos
+- PR: #446, branch feat/004-busca-indexacao-t002
+- Commit: 2c14dda (base main)
+- Task: T002 — migração Drizzle Kit `CREATE EXTENSION IF NOT EXISTS vector;`
 
 ## Resumo executivo
-Task T001 é scaffolding puro: criação de diretórios vazios (`.gitkeep`) do BC
-`busca-indexacao`, sem entidades, VOs, use cases, gateways, controllers ou
-config de teste/lint/Allure novos. Não há comportamento de produção a
-verificar. Validação consistiu em conferência estrutural contra `plan.md` e
-`tasks.md`, não execução de suíte de testes específica (não há código a
-exercitar).
+Task de infraestrutura pura (SQL de migração, sem código de aplicação). Escopo
+de mudança: `drizzle/0008_enable_pgvector_extension.sql`, `drizzle/meta/_journal.json`,
+`drizzle/meta/0008_snapshot.json`, `tasks.md` (marca T002 concluída). Validação
+estática executada: SQL correto e idempotente, journal sequencial consistente,
+snapshot sem alteração indevida de schema, suíte de testes/lint/typecheck verdes.
+Sem Aurora/Postgres real disponível neste ambiente para aplicar a migração
+fisicamente — tratado como limitação de ambiente conhecida e documentada, não
+como bloqueio, dado que não há lógica de aplicação nesta task para exercitar.
 
-## Requisitos cobertos / não cobertos
-- T001 (`tasks.md` linha 15): "Criar estrutura de pastas
-  `src/bounded-contexts/busca-indexacao/{domain,application,infrastructure,interface}`
-  e `tests/bounded-contexts/busca-indexacao/{domain,application,contract}`
-  conforme `plan.md`" — COBERTO. Todos os 7 diretórios existem, cada um com
-  `.gitkeep` (git não versiona diretório vazio).
-- Comparação com `plan.md` linhas 167-194 (Source Code layout do BC
-  busca-indexacao): estrutura de pastas do PR bate 1:1 com o desenhado.
-- Comparação com convenção dos BCs já existentes (`extracao`,
-  `ingestao-identificacao`, `validacao`, `orquestracao`): mesmo padrão de 4
-  pastas em `src` e as pastas de teste correspondentes (T001 lista apenas
-  `domain/application/contract` em `tests`, sem `infrastructure`/`interface`
-  — coerente, pois BCs anteriores só criaram essas pastas quando código
-  correspondente passou a existir).
-- Diff do PR (`gh pr view 434 --json files`): 8 arquivos — 7 `.gitkeep` +
-  `tasks.md`. Nenhum arquivo de produção com lógica alterado.
-- Não há critério de aceite de negócio (spec.md RF/RN) associado a T001 —
-  é tarefa de infraestrutura de repositório, não de comportamento de domínio.
+## Requisitos cobertos
+- T002 (tasks.md): migração cria extensão `vector` de forma idempotente
+  (`IF NOT EXISTS`) — coberto por leitura do SQL.
+- Journal sequencial do Drizzle Kit (idx 8, tag `0008_enable_pgvector_extension`,
+  `when` posterior ao registro anterior) — consistente.
+- Snapshot 0008: `prevId` == `id` do snapshot 0007 (`bf5dc1e8-...`); nenhuma
+  tabela alterada (esperado, pois a migração não toca em schema de tabela,
+  apenas habilita extensão) — consistente.
+- Comentário do SQL documenta responsabilidade de infra (Ricardo/DevOps) para
+  habilitar a extensão no cluster antes da migração rodar em cada ambiente —
+  alinhado ao ADR-001 do plan.md e à nota do backend-reviewer.
 
-## Suítes executadas
-- `npm run test` (vitest) rodado como baseline: 58 arquivos de teste,
-  **todos falham na etapa de setup** com
-  `Error: Vitest failed to find the runner` em
-  `allure-vitest/src/setup.ts`. Falha ocorre em specs de outros BCs
-  (extracao, ingestao-identificacao, validacao) e é **anterior a este PR** —
-  não há nenhum arquivo de teste novo para `busca-indexacao` (pastas
-  contêm somente `.gitkeep`), logo o PR não pode ter causado ou agravado
-  essa falha. Classificação: problema de ambiente/config global de
-  Allure+Vitest, pré-existente, fora do escopo de T001.
-- Nenhuma suíte unitária, de integração, contrato ou E2E aplicável a
-  T001, pois não há código com comportamento.
+## Não coberto / não aplicável
+- Aplicação real da migração contra Aurora Serverless v2 ou Postgres local com
+  pgvector: não há banco disponível nesta sessão de execução (nem Aurora real,
+  nem LocalStack/Postgres provisionado). Sem lógica de aplicação nesta task
+  (SQL puro de 1 statement), o risco residual é operacional (permissão
+  `rds_superuser`/`CREATE EXTENSION`, versão mínima do pgvector no cluster),
+  já registrado como nit não-bloqueante pelo backend-reviewer — não é passível
+  de teste automatizado de unidade/integração da suíte atual, e sim de
+  verificação em deploy real (T046 e Fase 5 já preveem confirmação em ambiente
+  real de infra/DevOps).
+
+## Suítes executadas e comandos
+- `npx tsc --noEmit` — sem erros.
+- `npx eslint . --max-warnings=0` — sem erros/warnings.
+- `npx vitest run --reporter=default` — 59 arquivos passaram, 6 skipped
+  (testes de integração com Postgres real, já skipados antes desta task —
+  não é regressão introduzida por T002); 290 testes passaram, 27 skipped,
+  0 falhas.
 
 ## Cobertura
-Não aplicável — nenhum statement/branch/function/line novo introduzido.
+Não aplicável a este PR: nenhum arquivo de código de aplicação (TS) foi
+alterado. SQL de migração e metadados JSON do Drizzle Kit não são instrumentados
+por istanbul/v8. Cobertura da suíte segue igual à baseline do repositório
+(sem alteração de statements/branches/functions/lines exercitáveis).
 
 ## Allure
-Não aplicável — nenhum teste automatizado é exigido ou possível para
-diretórios vazios.
+Reporter allure-vitest não pôde ser usado (bug conhecido no ambiente, contornado
+com `--reporter=default`, conforme instrução). Nenhuma evidência Allure nova
+gerada para este PR — não há cenário de teste novo para instrumentar, dado que
+a mudança é puramente de infraestrutura de banco sem lógica testável via
+suíte automatizada.
 
 ## Bugs
-Nenhum defeito de produção encontrado. A falha pré-existente do runner
-Vitest/Allure não é atribuível a este PR (nenhum arquivo dela foi tocado)
-e não bloqueia a aprovação de uma task de scaffonding sem comportamento.
-Fica registrada como risco residual de ambiente para acompanhamento
-separado (fora do escopo desta task).
+Nenhum defeito de produção encontrado.
 
 ## Riscos residuais
-- Falha de setup global do Vitest/Allure (`allure-vitest` não encontra o
-  runner) afeta toda a suíte do repositório, incluindo BCs já
-  implementados (`extracao`, `ingestao-identificacao`, `validacao`).
-  Recomenda-se abertura de item de manutenção de ambiente, não bloqueante
-  para este PR.
+- Extensão pgvector não validada fisicamente contra o cluster Aurora (depende
+  de DevOps/Ricardo executar a migração em ambiente real e confirmar versão
+  mínima do pgvector, permissão `CREATE EXTENSION` e, opcionalmente, `SCHEMA`
+  explícito — nits já levantados pelo backend-reviewer, não bloqueantes para
+  esta task isolada).
+- Task T003 (schema real da tabela `indices_orcamento` com coluna `vector`)
+  é o próximo ponto em que a extensão será de fato exercitada por schema/dados;
+  QA reavaliará risco de pgvector com mais profundidade nesse momento.
 
 ## Limitações do ambiente
-Suíte de testes do repositório (vitest+allure) não executa localmente
-por problema de configuração pré-existente, não relacionado a este PR.
+- Sem Aurora Serverless v2 real nem LocalStack/Postgres com pgvector
+  provisionado nesta sessão — impede execução física da migração. Não impede
+  o gate desta task, pois não há lógica de aplicação testável e a validação
+  estática (SQL, journal, snapshot, testes/lint/typecheck) é suficiente para
+  o escopo de T002.
 
 ## Parecer final
-APROVADO PELO QA
+APROVADO COM RESSALVAS
+
+Ressalva: aplicação física da migração contra Aurora real não verificada
+nesta sessão (ambiente indisponível); DevOps deve confirmar em ambiente real
+antes de produção, conforme já registrado como risco em tasks.md (T046) e nits
+do backend-reviewer. Não há defeito de produção nem lacuna de teste automatizável
+para esta task específica.
