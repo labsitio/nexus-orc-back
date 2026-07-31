@@ -22,11 +22,11 @@
 # Env:
 #   CLAUDE_5H_COST_LIMIT      teto USD do bloco de 5h (default: maior bloco histórico)
 #   CLAUDE_5H_THRESHOLD_PCT   limiar de bloqueio (default 80)
-#   CLAUDE_USAGE_GUARD_CACHE  caminho do cache (default /tmp/claude-usage-guard-$UID.json)
+#   CLAUDE_USAGE_GUARD_CACHE  caminho do cache (default $TMPDIR|$TMP|$TEMP|/tmp/claude-usage-guard-$UID.json)
 set -uo pipefail
 
 THRESHOLD_PCT=${CLAUDE_5H_THRESHOLD_PCT:-80}
-CACHE=${CLAUDE_USAGE_GUARD_CACHE:-${TMPDIR:-/tmp}/claude-usage-guard-$(id -u).json}
+CACHE=${CLAUDE_USAGE_GUARD_CACHE:-${TMPDIR:-${TMP:-${TEMP:-/tmp}}}/claude-usage-guard-$(id -u 2>/dev/null || echo user).json}
 
 allow() { exit 0; }
 
