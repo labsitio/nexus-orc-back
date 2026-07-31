@@ -1,4 +1,4 @@
-# QA Final Report — T004 (spec-009-otimizacao-custo-operacional)
+# QA Final Report — T004/T005 (spec-009-otimizacao-custo-operacional)
 
 ## 1. SPEC_ID e versão testada
 - SPEC_ID: 009-otimizacao-custo-operacional
@@ -51,5 +51,65 @@ Nenhum bug aberto nesta rodada.
 - `npm run typecheck` completo falha por dependências não instaladas (pré-existente, não introduzido por este diff).
 - Geração do HTML do Allure depende de CLI externa não presente no worktree local.
 
-## 12. Parecer final
+## 12. Parecer final (T004)
+APROVADO PELO QA
+
+---
+
+# QA — T005 (spec-009)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: 009-otimizacao-custo-operacional
+- Branch: feat/009-otimizacao-custo-t005
+- Commit: d9185d5
+- PR: https://github.com/labsitio/nexus-orc-back/pull/438 (draft)
+
+## 2. Resumo executivo
+T005 entrega o VO `SinalCacheIdentificacao` (`{ assinatura: AssinaturaEstrutural,
+resultadoAnterior: ResultadoClassificacao, ultimaConfirmacaoEm: Date }`), construído
+via factory estático `criar`, seguindo o mesmo padrão de `AssinaturaEstrutural`
+(construtor privado + factory). Rejeita `ultimaConfirmacaoEm` inválida com
+`SinalCacheIdentificacaoInvalidoError` (subclasse de `ErroDominio`), conforme
+critério de aceite. Teste já escrito pelo dev-back-end cobre caso feliz e o único
+caminho de rejeição especificado. Nenhum defeito de produção encontrado.
+backend-reviewer já aprovou (APPROVE) sem achados bloqueantes.
+
+## 3. Requisitos cobertos e não cobertos
+- Coberto: shape do VO (`assinatura`, `resultadoAnterior`, `ultimaConfirmacaoEm`) exposto e imutável (campos `readonly`).
+- Coberto: construção via factory estático (`SinalCacheIdentificacao.criar`), sem construtor público, alinhado ao padrão dos demais VOs do BC.
+- Coberto: "rejeitando data inválida com erro de domínio próprio" — `SinalCacheIdentificacaoInvalidoError`.
+- Fora de escopo de T005 (não avaliado aqui): validação interna de `assinatura`/`resultadoAnterior` — já é responsabilidade dos VOs correspondentes, não duplicada aqui (decisão de design correta, evita validação redundante).
+- Fora de escopo de T005: consumo do VO pelo `CacheIdentificacaoGateway` (T006) e pelo caso de uso `ClassificarOrcamento` (Phase 3/US1).
+
+## 4. Suítes executadas e comandos
+- `npx vitest run --reporter=default tests/bounded-contexts/ingestao-identificacao/domain/value-objects/sinal-cache-identificacao.test.ts`
+- `npx vitest run --coverage --coverage.reporter=json-summary tests/bounded-contexts/ingestao-identificacao/domain/value-objects/sinal-cache-identificacao.test.ts`
+- `npx vitest run --reporter=default` (regressão completa do repo)
+- `npx eslint <arquivo novo> <teste novo>`
+- `npx tsc --noEmit`
+
+## 5. Quantidade de testes por tipo
+- Unitário (domínio): 2 (1 positivo, 1 negativo)
+
+## 6. Resultado
+- Suíte da task: 2/2 passed.
+- Regressão completa do repo: 249/276 testes passed, 0 failed, 27 skipped (skips pré-existentes de integração com banco/infra, não relacionados a este diff), 55 arquivos passed / 6 skipped.
+
+## 7. Cobertura inicial e final
+- Não há coverage-baseline.md prévio isolando T005 (task nova, arquivo novo).
+- Final (arquivo da task): statements 100%, branches 100%, functions 100%, lines 100% (`coverage/coverage-summary.json`, chave `sinal-cache-identificacao.ts`).
+
+## 8. Allure
+- Reporter `allure-vitest` falha ao rodar sem `--reporter=default` (bug pré-existente do adaptador neste repo, já confirmado por outros agentes) — `allure-results/` não gerado nesta rodada. Limitação de ambiente, não bloqueia o gate (T005 não tem requisito ligado a Allure).
+
+## 9. Bugs por severidade e status
+Nenhum bug aberto nesta rodada.
+
+## 10. Riscos residuais
+- Bug pré-existente no reporter `allure-vitest` (`Vitest failed to find the runner`) impede evidência Allure automatizada em qualquer task deste repo até ser corrigido — risco de ferramenta de QA, não de produto; fora da autoridade deste agente (ajuste de config de teste seria aceitável, mas está fora do escopo desta validação pontual).
+
+## 11. Limitações do ambiente
+- `allure-results/` não gerado (ver item 8).
+
+## 12. Parecer final (T005)
 APROVADO PELO QA
