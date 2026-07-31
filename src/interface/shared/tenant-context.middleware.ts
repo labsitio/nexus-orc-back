@@ -1,7 +1,7 @@
-import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import type { preHandlerHookHandler } from 'fastify';
 import { criarTenantContext, type TenantContext } from '../../shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../shared-kernel/tenant/tenant-id.vo.js';
+import { criarVerificadorJwtCognito, extrairBearerToken } from './cognito-jwt-verifier.js';
 import type { ProblemDetails } from './problem-details.schema.js';
 
 declare module 'fastify' {
@@ -29,15 +29,10 @@ export interface TenantContextMiddlewareConfig {
 export function criarTenantContextMiddleware(
   config: TenantContextMiddlewareConfig,
 ): preHandlerHookHandler {
-  const verifier = CognitoJwtVerifier.create({
-    userPoolId: config.userPoolId,
-    tokenUse: 'access',
-    clientId: config.clientId,
-  });
+  const verifier = criarVerificadorJwtCognito(config);
 
   return async (request, reply) => {
-    const cabecalho = request.headers.authorization;
-    const token = cabecalho?.startsWith('Bearer ') ? cabecalho.slice('Bearer '.length) : undefined;
+    const token = extrairBearerToken(request.headers.authorization);
     if (!token) {
       request.log.warn({ motivo: 'sem_token' }, 'TenantContextMiddleware: requisição rejeitada');
       await responderNaoAutenticado(reply, 'Header Authorization: Bearer <token> ausente');

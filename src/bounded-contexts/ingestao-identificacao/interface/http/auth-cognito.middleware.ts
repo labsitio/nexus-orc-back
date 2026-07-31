@@ -1,5 +1,8 @@
-import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import type { preHandlerHookHandler } from 'fastify';
+import {
+  criarVerificadorJwtCognito,
+  extrairBearerToken,
+} from '../../../../interface/shared/cognito-jwt-verifier.js';
 import type { ProblemDetails } from './status.schema.js';
 
 export interface AutenticacaoCognitoConfig {
@@ -15,15 +18,10 @@ export interface AutenticacaoCognitoConfig {
  * passa por este middleware (plan.md).
  */
 export function criarAutenticacaoCognito(config: AutenticacaoCognitoConfig): preHandlerHookHandler {
-  const verifier = CognitoJwtVerifier.create({
-    userPoolId: config.userPoolId,
-    tokenUse: 'access',
-    clientId: config.clientId,
-  });
+  const verifier = criarVerificadorJwtCognito(config);
 
   return async (request, reply) => {
-    const cabecalho = request.headers.authorization;
-    const token = cabecalho?.startsWith('Bearer ') ? cabecalho.slice('Bearer '.length) : undefined;
+    const token = extrairBearerToken(request.headers.authorization);
     if (!token) {
       const problema: ProblemDetails = {
         type: 'https://nexo.internal/problems/nao-autenticado',

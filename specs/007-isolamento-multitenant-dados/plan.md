@@ -270,3 +270,21 @@ tests/
 **Trade-offs**: menor esforço de implementação agora, com possível necessidade de revisão (ADR novo) se o volume real por tenant tornar paginação impraticável para o caso de uso de auditoria.
 
 **Impactos futuros**: se um consumidor externo pedir explicitamente exportação em arquivo único (CSV/PDF assíncrono), é uma nova decisão de arquitetura, não uma extensão implícita deste endpoint.
+
+### ADR-007 — Verificação de assinatura JWT Cognito centralizada em helper único, consumida por múltiplos middlewares independentes
+
+**Contexto**: T005 (`TenantContextMiddleware`) duplicou 100% da lógica de verificação de assinatura JWT já existente em `auth-cognito.middleware.ts` (spec 001) — mesma config (`userPoolId`/`clientId`/`tokenUse`), instâncias separadas de `CognitoJwtVerifier`.
+
+**Problema**: duas fontes de verdade para lógica de segurança crítica (verificação de assinatura JWT) divergem com o tempo — fix de CVE/bug em `aws-jwt-verify` ou mudança de config aplicada em só um dos dois pontos.
+
+**Alternativas consideradas**: (a) aceitar a duplicação, cada middleware standalone; (b) extrair helper único de verificação reaproveitado pelos dois middlewares; (c) `TenantContextMiddleware` assume que `auth-cognito.middleware.ts` já rodou antes na cadeia de preHandlers e só lê o payload já verificado de `request.jwtPayload`.
+
+**Vantagens (b)**: elimina a fonte única de drift de config/lógica de verificação; nenhum acoplamento de ordem de registro de preHandler entre BCs/camadas (diferente de (c)); cada middleware continua chamável e testável isoladamente, sem mock de outro middleware ter rodado antes.
+
+**Desvantagens**: verificação de assinatura ainda ocorre duas vezes em runtime se ambos os middlewares estiverem na mesma rota (custo CPU-bound leve, JWKS cacheado pelo verifier); exige tocar `auth-cognito.middleware.ts` (spec 001) a partir de T005 (spec 007) — mitigado por ser refactor mecânico, sem mudança de contrato/comportamento externo.
+
+**Decisão**: helper único `src/interface/shared/cognito-jwt-verifier.ts` (`criarVerificadorJwtCognito`, `extrairBearerToken`), consumido por `tenant-context.middleware.ts` e `auth-cognito.middleware.ts`. Opção (c) rejeitada por introduzir acoplamento de ordem de plugin entre camadas sem ganho de segurança correspondente.
+
+**Trade-offs**: dupla execução de `verify()` em runtime quando ambos os middlewares coexistem na mesma rota — aceito; é CPU-bound leve, não I/O externo repetido (JWKS já cacheado pelo verifier).
+
+**Impactos futuros**: qualquer novo middleware de autenticação (002–006) MUST consumir este helper, nunca instanciar `CognitoJwtVerifier.create` diretamente. Se no futuro `TenantContextMiddleware` passar a ser o único preHandler de autenticação de toda rota (linha 131 — "todos os endpoints de 001 e futuros passam a rodar atrás do mesmo `TenantContextMiddleware`"), `auth-cognito.middleware.ts` pode ser aposentado — decisão fora do escopo de T005, requer ADR próprio quando essa migração for planejada.
