@@ -341,3 +341,110 @@ relacionada a este diff).
 
 ## Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T009 (EventPublisher/EventBridgePublisher do componente Conformidade)
+
+## SPEC_ID e versão testada
+008-hardening-seguranca-lgpd. Issue #310, PR draft #447, branch
+`feat/008-hardening-conformidade-t009`, commit `37ada19`. Primeira
+validação (não é reteste; sem BUG anterior nesta task).
+
+## Resumo executivo
+T009 implementa `EventPublisher` (interface, Domain) e `EventBridgePublisher`
+(implementação, Infrastructure) para o componente de plataforma Conformidade,
+publicando no bus único `nexo-dominio-bus` com `source = nexo.conformidade` e
+`detail-type` = nome do evento — mesmo shape e mesmo padrão já usado em 001
+(`ingestao-identificacao`) e 002 (`extracao`). Arquivos de produção alterados:
+`domain/gateways/event-publisher.ts` (novo) e
+`infrastructure/eventbridge.publisher.ts` (novo). 3 testes unitários já
+entregues pelo dev-back-end (publicação bem-sucedida, erro descritivo, fallback
+de mensagem) validados sem necessidade de extensão.
+
+## Requisitos cobertos e não cobertos
+- Mesma interface `EventPublisher` da convenção de 001: coberto, PASS.
+- Mesma instância de bus (`nexo-dominio-bus`, injetado via construtor): coberto, PASS.
+- `source` fixo `nexo.conformidade`: coberto, PASS.
+- `detail-type` = nome do evento: coberto, PASS.
+- Sem mecanismo de publicação alternativo: coberto, PASS (leitura de código).
+- Sem SDK AWS vazando para Domain: coberto, PASS (leitura de código — import
+  de `@aws-sdk/client-eventbridge` confinado a Infrastructure).
+- Nenhum outro RF/RN/RNF de `spec.md` (US1-US4) é exigível por esta task
+  isolada (Foundational, ainda sem uso por caso de uso/agregado — entra em
+  T022+).
+
+**Observação registrada, não bloqueante**: a redação de `tasks.md` T009 pede
+"reaproveitar (**import**, não reimplementar)" o padrão de 001. O código
+entregue declara sua própria cópia local de interface+classe em
+`platform/conformidade/`, sem import cross-contexto — mesmo padrão que 002
+(`extracao`) já usa em relação a 001, e consistente com ADR-004 desta spec
+("a convenção de 001, item 5, proíbe código compartilhado por import direto
+entre contextos"). Todos os critérios de aceite tecnicamente verificáveis
+(interface, bus, source, ausência de mecanismo alternativo, isolamento
+Domain/SDK) estão satisfeitos — a divergência é entre a redação literal da
+task e a convenção real e já estabelecida do repositório (reafirmada em
+002, que precede esta task), não um defeito de implementação. Ver detalhe em
+`qa/traceability-matrix.md` e `qa/test-execution-report.md`.
+
+## Suítes executadas e comandos
+- `pnpm vitest run --reporter=default tests/platform/conformidade/infrastructure/eventbridge.publisher.test.ts`
+- `pnpm vitest run --reporter=default` (suíte completa, para regressão)
+- `pnpm exec tsc --noEmit`
+- `pnpm exec eslint src/platform/conformidade tests/platform/conformidade`
+- `pnpm vitest run --reporter=default --coverage --coverage.reporter=json tests/platform/conformidade/infrastructure/eventbridge.publisher.test.ts`
+
+Detalhe completo em `qa/test-execution-report.md`.
+
+## Quantidade de testes por tipo
+3 testes unitários (já entregues pelo dev-back-end junto com T009; QA validou
+sem necessidade de estender — cobrem publicação bem-sucedida, erro descritivo
+do EventBridge e mensagem de fallback).
+
+## Resultado: aprovados, falhos, ignorados e instáveis
+- `eventbridge.publisher.test.ts`: 3/3 aprovados.
+- Suíte completa (`--reporter=default`): 293 aprovados, 27 ignorados (skipped
+  pré-existentes — suítes de integração Drizzle/schema que exigem Aurora
+  local), **0 arquivos falhos** (60 arquivos passaram) — inclusive os 3
+  testes que o dev-back-end reportou como falha pré-existente por timeout
+  (`confirmar-upload.controller`, `upload-url.controller`,
+  `auth-cognito.middleware`) passaram nesta execução.
+- `tsc --noEmit`/`eslint`: sem erro.
+
+## Cobertura inicial e final
+Repositório não possui threshold de cobertura configurado. Para os arquivos
+em diff: `eventbridge.publisher.ts` — Statements 7/7 (100%) | Branches 4/4
+(100%) | Functions 2/2 (100%), confirmado via `coverage-final.json` (v8 json
+reporter, filtrado por caminho). `event-publisher.ts` é apenas uma interface
+TS (sem código executável em runtime, sem entrada em cobertura). Nenhuma
+lacuna de cobertura conhecida para este PR.
+
+## Allure
+Não gerado nesta rodada — bug intermitente do adaptador `allure-vitest`
+(`Vitest failed to find o runner`) se reproduziu nesta validação (já
+registrado desde a Fase 1/T001). Contornado com `--reporter=default`
+(mesmo workaround de T006), que não produz `allure-results`. Evidência de
+execução registrada via saída de `vitest run` (ver `qa/test-execution-report.md`
+e `qa/allure-report.md`).
+
+## Bugs por severidade e status
+Nenhum bug de produção encontrado nesta validação.
+
+## Riscos residuais
+- Adaptador `allure-vitest` segue não confiável neste ambiente (bug
+  intermitente já registrado desde T001) — recomendação de investigar/corrigir
+  `vitest.config.ts`/versão do `allure-vitest` permanece em aberto, fora do
+  escopo de código de produção de T009.
+- Divergência de redação entre `tasks.md` T009 ("import, não reimplementar")
+  e a convenção real do repositório (cópia local por isolamento de contexto,
+  já praticada em 002) — não bloqueante para este gate, mas recomenda-se ao
+  Tech Lead/Arquiteto ajustar a redação de tasks futuras equivalentes para
+  "reaproveitar o padrão" em vez de "import", evitando ambiguidade percebida
+  em revisões futuras.
+
+## Limitações do ambiente
+Nenhuma limitação bloqueante identificada além da já registrada (reporter
+Allure intermitente, contornável, sem impacto na validação funcional).
+
+## Parecer final
+APROVADO PELO QA

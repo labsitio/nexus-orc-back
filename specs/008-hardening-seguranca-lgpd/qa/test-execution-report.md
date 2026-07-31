@@ -250,3 +250,88 @@ com 9/9 statements cobertos (100%). A tabela texto do reporter v8 (`--coverage`
 sem `--coverage.reporter=json`) nao lista o arquivo individualmente — mesma
 limitacao de ferramental ja registrada em T005/T006, contornada lendo o JSON
 bruto em vez da tabela agregada.
+
+## T009 — `EventPublisher`/`EventBridgePublisher` do componente Conformidade (PR #447, commit `37ada19`)
+
+Ambiente: Node 24.14.0, worktree `.claude/worktrees/agent-a77c638eab34392f5`,
+gerenciador `pnpm` (repositório é monorepo pnpm — `package-lock.json` npm
+untracked no worktree é resíduo local, não do commit; ignorado).
+
+**Nota sobre o reporter `allure-vitest`**: reproduzido novamente o
+`Vitest failed to find the runner` ao rodar `pnpm exec vitest run <arquivo>`
+ou `pnpm vitest run` (config completa com `reporters: ["default", ["allure-vitest/reporter", ...]]`).
+Mesmo workaround já registrado em T006/T007: `--reporter=default` sobrepõe o
+reporter da config e a suíte roda normalmente. Comportamento intermitente
+entre commits já documentado — não investigado a fundo (fora da autoridade
+de correção do QA sobre `vitest.config.ts`), reafirmado como limitação de
+ambiente preexistente, não introduzida por T009.
+
+```
+$ pnpm vitest run --reporter=default tests/platform/conformidade/infrastructure/eventbridge.publisher.test.ts
+ ✓ tests/platform/conformidade/infrastructure/eventbridge.publisher.test.ts (3 tests) 9ms
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+```
+
+Casos cobertos pelo teste já entregue pelo dev-back-end (não estendido pelo
+QA — cobre integralmente o critério de aceite da task): (1) publicação
+bem-sucedida asserta `EventBusName`, `Source = 'nexo.conformidade'`,
+`DetailType` = nome do evento e `Detail` serializado corretamente (JSON
+válido, contém `detailType`/`schemaVersion`); (2) erro descritivo quando
+`FailedEntryCount > 0` com `ErrorMessage` presente; (3) mensagem de fallback
+`"motivo desconhecido"` quando o EventBridge não informa `ErrorMessage`.
+
+`pnpm exec tsc --noEmit` (raiz do monorepo): sem erro.
+`pnpm exec eslint src/platform/conformidade tests/platform/conformidade`: sem
+erro/warning.
+
+### Regressão completa (HEAD `37ada19`)
+
+```
+$ pnpm vitest run --reporter=default
+ Test Files  60 passed | 6 skipped (66)
+      Tests  293 passed | 27 skipped (320)
+```
+
+Nenhuma falha em toda a suíte — inclusive os 3 arquivos de teste
+(`confirmar-upload.controller`, `upload-url.controller`,
+`auth-cognito.middleware`) que o dev-back-end reportou como falha
+pré-existente por timeout: passaram nesta execução (607ms e demais dentro do
+esperado). Os 6 arquivos `skipped` são suítes de integração de persistência
+(Drizzle/schema) que exigem Aurora local, marcadas `describe.skip`
+deliberadamente — não são falhas. Nenhuma regressão introduzida por T009.
+
+### Cobertura
+
+```
+$ pnpm vitest run --reporter=default --coverage --coverage.reporter=json tests/platform/conformidade/infrastructure/eventbridge.publisher.test.ts
+```
+
+`coverage/coverage-final.json` filtrado por caminho —
+`src/platform/conformidade/infrastructure/eventbridge.publisher.ts`:
+Statements 7/7 (100%) | Branches 4/4 (100%) | Functions 2/2 (100%). Os 4
+branches cobertos correspondem aos 2 `if`/`??` de tratamento de erro
+(`FailedEntryCount` truthy/falsy × `ErrorMessage` presente/ausente).
+Nenhuma lacuna de cobertura para este arquivo.
+
+### Observação sobre a redação da task (não é defeito)
+
+`tasks.md` T009 pede "reaproveitar (import, não reimplementar)" o padrão de
+001. O código entregue declara interface (`EventPublisher`) e classe
+(`EventBridgePublisher`) locais em `platform/conformidade/`, sem import de
+`bounded-contexts/ingestao-identificacao` nem de `bounded-contexts/extracao`.
+Comparação com o já implementado em 002 (`extracao`) confirma que este é o
+padrão real e consistente do repositório: cada Bounded Context/componente
+declara sua própria cópia local do par interface+classe (mesmo shape, `source`
+e mensagem de erro contextualizados) — nunca import cross-contexto de código
+de Domain/Infrastructure, conforme a própria convenção #5 de 001 (reafirmada
+no ADR-004 desta spec: "a convenção de 001, item 5, proíbe código
+compartilhado por import direto entre contextos"). `plan.md` desta spec tem
+uma frase na Project Structure (linha 190, "reaproveita implementação de
+001") que sugere import, mas a seção Application (linha 135) descreve apenas
+"mesma interface... nenhum caso de uso novo introduz mecanismo de publicação
+alternativo" — sem exigir import literal. Todos os critérios de aceite
+técnicos e verificáveis (mesma interface, mesmo bus, `source` correto,
+sem mecanismo alternativo, sem SDK vazando para Domain) estão satisfeitos.
+Registrado como ambiguidade de redação entre `tasks.md` e `plan.md`, não como
+defeito de implementação — sem impacto no gate desta task.
