@@ -1,0 +1,55 @@
+import { ErroDominio } from '../errors/erro-dominio.js';
+
+export class TentativaIndexacaoInvalidaError extends ErroDominio {
+  constructor(mensagem: string) {
+    super(`TentativaIndexacao inválida: ${mensagem}`);
+  }
+}
+
+export type ResultadoTentativaIndexacao = 'INDEXADO' | 'FALHA_TECNICA';
+
+export interface TentativaIndexacaoProps {
+  readonly resultado: ResultadoTentativaIndexacao;
+  readonly timestamp: Date;
+  readonly modeloEmbedding?: string;
+  readonly motivoFalha?: string;
+}
+
+/**
+ * Entrada imutável do histórico append-only de `IndiceOrcamento.historico`
+ * (plan.md) — cada chamada a `registrarTentativaIndexacao` anexa uma nova
+ * `TentativaIndexacao`, nunca sobrescreve ou apaga uma anterior. Não há
+ * limite estrutural de tentativas no Domain (retry sem limite — ADR-002);
+ * o limite de tentativas é responsabilidade de infraestrutura (SQS
+ * `maxReceiveCount` + DLQ).
+ */
+export class TentativaIndexacao {
+  private constructor(
+    readonly resultado: ResultadoTentativaIndexacao,
+    readonly timestamp: Date,
+    readonly modeloEmbedding: string | undefined,
+    readonly motivoFalha: string | undefined,
+  ) {}
+
+  static de(props: TentativaIndexacaoProps): TentativaIndexacao {
+    if (Number.isNaN(props.timestamp.getTime())) {
+      throw new TentativaIndexacaoInvalidaError('timestamp inválido');
+    }
+
+    if (props.resultado === 'INDEXADO') {
+      if (!props.modeloEmbedding?.trim()) {
+        throw new TentativaIndexacaoInvalidaError(
+          'resultado INDEXADO exige modeloEmbedding não vazio',
+        );
+      }
+      return new TentativaIndexacao('INDEXADO', props.timestamp, props.modeloEmbedding, undefined);
+    }
+
+    if (!props.motivoFalha?.trim()) {
+      throw new TentativaIndexacaoInvalidaError(
+        'resultado FALHA_TECNICA exige motivoFalha não vazio — nunca "falhou" genérico',
+      );
+    }
+    return new TentativaIndexacao('FALHA_TECNICA', props.timestamp, undefined, props.motivoFalha);
+  }
+}
