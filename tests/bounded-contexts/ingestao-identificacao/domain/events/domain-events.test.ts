@@ -12,6 +12,11 @@ const resultadoPayload = {
   nivelConfianca: 90,
   agenteOrigem: 'CLASSIFICADOR' as const,
 };
+const referenciaBrutaPayload = {
+  bucket: 'nexo-orcamentos-raw',
+  key: 'k',
+  versionId: 'v1',
+};
 
 describe.each([
   {
@@ -27,7 +32,7 @@ describe.each([
   {
     nome: 'OrcamentoClassificado',
     detailType: 'OrcamentoClassificado',
-    criar: () => new OrcamentoClassificado(orcamentoId, resultadoPayload),
+    criar: () => new OrcamentoClassificado(orcamentoId, resultadoPayload, referenciaBrutaPayload),
   },
   {
     nome: 'OrcamentoEscalonadoParaRevisaoHumana',

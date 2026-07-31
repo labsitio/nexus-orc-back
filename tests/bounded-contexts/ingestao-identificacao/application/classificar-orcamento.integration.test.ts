@@ -81,7 +81,11 @@ async function processarMensagemClassificadorQueue(
 
   const evento =
     orcamento.status === 'CLASSIFICADO'
-      ? new OrcamentoClassificado(orcamento.id.toString(), resultado.paraPayload())
+      ? new OrcamentoClassificado(orcamento.id.toString(), resultado.paraPayload(), {
+          bucket: orcamento.referenciaBruta.bucket,
+          key: orcamento.referenciaBruta.key,
+          versionId: orcamento.referenciaBruta.versionId,
+        })
       : new OrcamentoEscalonadoParaRevisaoHumana(orcamento.id.toString(), resultado.paraPayload());
   await publisher.publicar(evento);
 }

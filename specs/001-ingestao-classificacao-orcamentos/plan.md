@@ -53,6 +53,8 @@ Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API 
 
 **Re-check pós Phase 1 (desenho detalhado)**: nenhuma violação introduzida pelo desenho de agregado/eventos abaixo — gate permanece PASS.
 
+**Re-check pós T023/spec 002 (2026-07-31)**: ADR-003 (abaixo) enriquece o payload de `OrcamentoClassificado` com `referenciaBruta`, resolvendo dependência de contrato sinalizada como risco remanescente no `plan.md` da spec 002. Mudança aditiva sobre Value Object de evento já existente, sem alterar invariante do agregado `Orcamento` — gate permanece PASS, nenhuma violação nova.
+
 ## Convenções estabelecidas nesta spec (vinculantes para specs 002–009)
 
 1. **Nomenclatura de Bounded Context**: nome estratégico do contexto vem do Context Map macro (candidatos: Ingestão & Identificação, Extração, Validação, Busca & Indexação, Orquestração, Acompanhamento). O nome da pasta `specs/00N-slug-tatico` é o nome tático da feature, não o nome do Bounded Context — uma spec pode ser um recorte parcial de um BC maior. Esta spec pertence ao BC **Ingestão & Identificação**.
@@ -61,6 +63,7 @@ Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API 
 4. **Bus de eventos**: um único EventBridge custom bus `nexo-dominio-bus` compartilhado por todos os Bounded Contexts do produto (não um bus por contexto) — roteamento por regra/`detail-type`, não por bus separado, para manter um único ponto de auditoria de todos os eventos de domínio (reforça Princípio I).
 5. **Layout de código por Bounded Context** (monorepo único): `src/bounded-contexts/<slug-do-bc>/{domain,application,infrastructure,interface}`. Código nunca compartilhado por import direto entre contextos — comunicação sempre via evento ou, quando síncrona e inevitável, via um cliente HTTP/SDK explícito tratado como Anti-Corruption Layer.
 6. **Identificador canônico**: `OrcamentoId` é UUID v7 (ordenável por tempo, facilita índice/paginação em Aurora), gerado exclusivamente no Gateway de Ingestão deste contexto. Qualquer referência externa (ex.: número de cotação do ERP do fornecedor) é armazenada como metadado (`referenciaExterna`), nunca como identidade.
+7. **Evolução de payload de evento já publicado**: adicionar um campo a um evento existente é mudança aditiva/compatível (nenhum consumidor existente quebra ao ignorar campo novo) e NÃO exige incrementar `schemaVersion` — reservar o incremento de `schemaVersion` para mudança que remova, renomeie ou altere semântica de campo existente (ver ADR-003).
 
 ## Bounded Context e Context Map (recorte desta spec)
 
@@ -81,7 +84,7 @@ Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API 
                                                        OrcamentoReclassificadoPorRevisaoHumana
 
 Consumidores externos (fora deste BC, apenas via evento/API — nunca chamada direta):
-  - BC Extração (spec 002): assina OrcamentoClassificado para iniciar extração de itens.
+  - BC Extração (spec 002): assina OrcamentoClassificado para iniciar extração de itens (payload inclui `referenciaBruta`, ver ADR-003 — Extração nunca chama a Ingestão para obter esse ponteiro).
   - BC Acompanhamento / consumidor de frontend externo: assina todos os eventos + consulta GET /orcamentos/{id}/status.
 ```
 
@@ -114,7 +117,7 @@ Relação entre contextos: **Customer/Supplier** — Ingestão & Identificação
 ### Domain Events (payload sempre com `schemaVersion: 1`, `orcamentoId`, `ocorreuEm`)
 
 1. `OrcamentoRecebido` — publicado pelo caso de uso `ReceberOrcamento`. Payload: canal, referenciaBruta (ponteiro, não o arquivo), referenciaExterna opcional.
-2. `OrcamentoClassificado` — publicado quando o Classificador atinge confiança ≥ 80% (`agenteOrigem: 'CLASSIFICADOR'`). Consumido pelo futuro BC Extração.
+2. `OrcamentoClassificado` — publicado quando o Classificador atinge confiança ≥ 80% (`agenteOrigem: 'CLASSIFICADOR'`). Payload: `resultado` (VO `ResultadoClassificacao`) + `referenciaBruta` (VO `ReferenciaS3`, cópia do ponteiro do agregado — ADR-003). Consumido pelo BC Extração (spec 002), que lê o arquivo bruto usando esse ponteiro sem chamada síncrona de volta à Ingestão.
 3. `OrcamentoEscalonadoParaRevisaoHumana` — publicado quando o Classificador fica < 80%. Consumido pelo Acompanhamento/consumidor externo para exibir "pendente" e alimentar a fila de escalonamento humano.
 4. `OrcamentoReclassificadoPorRevisaoHumana` — publicado após confirmação humana explícita via API; reaproveita o mesmo shape de `OrcamentoClassificado` com `agenteOrigem: 'HUMANO'` mais um evento próprio para auditoria da correção manual.
 
@@ -123,7 +126,7 @@ Nota: `OrcamentoClassificado` é o único evento que a Extração (002) precisa 
 ## Application — Casos de uso
 
 - `ReceberOrcamento(canal, arquivo, referenciaExternaOpcional)` — grava bruto no S3 (via `ArmazenamentoBrutoGateway`), cria agregado, persiste, publica `OrcamentoRecebido`. Idempotência: aceita `Idempotency-Key` opcional na borda REST; se repetida dentro de 24h, retorna o `OrcamentoId` já existente sem duplicar o registro (tabela `idempotency_keys` com TTL).
-- `ClassificarOrcamento(orcamentoId)` — consumidor do evento `OrcamentoRecebido` (via SQS). Busca arquivo bruto, converte via `MarkItDownConversaoACL`, invoca `AgenteClassificadorGateway`, aplica `Orcamento.registrarTentativaClassificador`, persiste, publica `OrcamentoClassificado` (≥80%) ou `OrcamentoEscalonadoParaRevisaoHumana` (<80%).
+- `ClassificarOrcamento(orcamentoId)` — consumidor do evento `OrcamentoRecebido` (via SQS). Busca arquivo bruto, converte via `MarkItDownConversaoACL`, invoca `AgenteClassificadorGateway`, aplica `Orcamento.registrarTentativaClassificador`, persiste, publica `OrcamentoClassificado` (≥80%, payload inclui `orcamento.referenciaBruta` — ADR-003) ou `OrcamentoEscalonadoParaRevisaoHumana` (<80%).
 - `ConfirmarRevisaoHumana(orcamentoId, resultadoConfirmado)` — caso de uso síncrono acionado pelo endpoint REST de confirmação. Valida que o agregado está em `PENDENTE_REVISAO_HUMANA`, aplica `registrarConfirmacaoHumana`, publica `OrcamentoReclassificadoPorRevisaoHumana`.
 - `ConsultarStatusOrcamento(orcamentoId)` — query, retorna status atual + histórico completo (nunca escreve).
 
@@ -238,3 +241,30 @@ tests/
 **Trade-offs**: latência adicional de uma chamada extra, aceitável frente à meta de 5 minutos p95 (dominada pela classificação via Bedrock, não pelo upload).
 
 **Impactos futuros**: qualquer canal novo de upload (Additional Constraint da constituição) MUST seguir o mesmo padrão de duas etapas, nunca introduzir upload multipart direto como exceção.
+
+### ADR-003 — `OrcamentoClassificado` passa a incluir `referenciaBruta` no payload (correção retroativa aditiva)
+
+**Contexto**: durante a implementação de T023 (spec 002, handler consumidor de `extrator-queue`), o dev back-end identificou contradição real entre `specs/002-extracao-dados-orcamento/plan.md` (que já assumia, desde a Constitution Check re-check da própria spec 002, a necessidade de `referenciaBruta` no payload de `OrcamentoClassificado`) e o evento efetivamente implementado/mergeado nesta spec (T0xx, PR já fechado), cujo `OrcamentoClassificadoPayload` carrega apenas `resultado` (fornecedor/formato/confiança), sem nenhum ponteiro S3. O caso de uso `ExtrairDadosOrcamento` (spec 002, já mergeado) exige `referenciaBrutaS3` como parâmetro explícito de entrada — sem esse campo no evento, o handler T023 não tem de onde obter o dado sem violar Princípio II (Desacoplamento por eventos).
+
+**Problema**: como o BC Extração obtém a referência S3 do documento bruto (propriedade da Ingestão) para poder lê-lo, dado que o evento upstream já publicado não carrega esse campo.
+
+**Alternativas consideradas**:
+(a) Enriquecer o payload de `OrcamentoClassificado` com `referenciaBruta` (VO `ReferenciaS3`, já existente no agregado `Orcamento` — `orcamento.referenciaBruta` — e já copiado para o payload de `OrcamentoRecebido`), mudança aditiva ao Value Object de evento e ao caso de uso `ClassificarOrcamento` que o publica.
+(b) Extração consulta o schema/tabela `orcamentos` da Ingestão diretamente (leitura cross-schema no mesmo Aurora).
+(c) Versionar o evento para `schemaVersion: 2`, com migração de consumidor.
+
+**Vantagens (a)**: dado já existe no agregado `Orcamento` no momento da publicação do evento (`orcamento.referenciaBruta`, populado desde `ReceberOrcamento`) — nenhuma nova fonte de dado, nenhuma nova invariante, nenhuma nova dependência; preserva Princípio II (nenhuma leitura direta de outro BC); mudança estritamente aditiva de um campo a mais no payload — nenhum consumidor existente quebra ao ignorá-lo (nenhum consumidor real de `OrcamentoClassificado` está em produção hoje além do handler T023 sendo construído); menor diff possível (2 arquivos: o evento e a linha que o instancia em `classificar-orcamento.ts`).
+
+**Desvantagens (a)**: exige tocar código já mergeado de uma spec com todas as issues fechadas — mitigado por ser mudança aditiva/compatível, sem alterar nenhuma invariante do agregado `Orcamento` nem o shape de nenhum campo existente.
+
+**Por que (b) foi descartada**: violaria diretamente o Princípio II ("nunca chama diretamente componente interno da Ingestão") e a convenção 5 desta spec (código nunca compartilhado por import/consulta direta entre contextos) — schema de outro BC não é contrato público, é detalhe de implementação; qualquer mudança de coluna/tabela na Ingestão quebraria silenciosamente a Extração sem nenhum contrato versionado entre as duas.
+
+**Por que (c) foi descartada**: bump de `schemaVersion` é justificado para mudança que remove/renomeia campo ou altera semântica existente; aqui é adição pura, sem consumidor real de produção rodando contra o schema anterior — versionar geraria complexidade de migração de consumidor sem benefício real nesta fase pré-lançamento (YAGNI). Ver convenção 7 (acima) para o critério geral de quando `schemaVersion` deve subir.
+
+**Decisão**: alternativa (a). `OrcamentoClassificadoPayload` passa a incluir `readonly referenciaBruta: ReferenciaS3Params` (mesmo shape de `{ bucket, key, versionId }` já usado em `OrcamentoRecebido`); `ClassificarOrcamento.executar` passa a construir o evento com `orcamento.referenciaBruta` (o dado já está carregado no agregado buscado no início do método, nenhuma leitura adicional). `schemaVersion` permanece `1` (mudança aditiva, não-quebra — ver convenção 7).
+
+Escopo de execução: mudança cirúrgica de 2 arquivos (`orcamento-classificado.event.ts`, `classificar-orcamento.ts`), sem ambiguidade de requisito e sem alterar invariante de agregado — dispensa fluxo Spec Kit completo (exceção prevista no system prompt do arquiteto). Autorizado o próprio dev back-end da trilha de Extração (autor de T023) a implementá-la, mesmo fora do diretório padrão de sua trilha (`ingestao-identificacao/**`), justamente por ser aditiva/compatível e por ser o bloqueador direto de T023 — abrir PR separado, referenciando este ADR-003, escopo limitado exatamente a esses 2 arquivos (nenhuma outra mudança em `ingestao-identificacao/**`). Testes de contrato/unit do evento e do caso de uso desta spec MUST ser atualizados no mesmo PR para cobrir o novo campo.
+
+**Trade-offs**: pequeno retrabalho em uma spec com issues já fechadas, em troca de manter o desacoplamento por eventos como único mecanismo de contrato entre BCs (Princípio II, NON-NEGOTIABLE) — trade-off aceitável, e menor que as alternativas descartadas.
+
+**Impactos futuros**: qualquer spec futura (Validação, 003; Orquestração, 005) que precise de um ponteiro/atributo hoje ausente de um evento já publicado por outra spec MUST seguir o mesmo padrão: mudança aditiva ao payload do evento existente, nunca leitura cross-schema, nunca chamada síncrona cross-BC. `plan.md` da spec consumidora MUST registrar a dependência de contrato explicitamente na Constitution Check (como a spec 002 já fazia) para que a lacuna seja detectada antes da implementação, não durante.

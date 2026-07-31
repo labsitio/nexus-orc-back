@@ -52,6 +52,8 @@ Abordagem técnica: novo Bounded Context **Extração**, com agregado raiz próp
 
 **Re-check pós Phase 1 (desenho detalhado)**: nenhuma violação introduzida pelo desenho de agregado/eventos abaixo — gate permanece PASS. Ponto de atenção não-bloqueante: dependência de contrato entre specs — `OrcamentoClassificado` (evento publicado pela spec 001) precisa incluir a `referenciaBruta` (ponteiro S3) no payload para a Extração poder ler o arquivo sem chamada síncrona cross-BC; a spec 001/plan.md atual não detalha explicitamente esse campo no payload de `OrcamentoClassificado` — registrado como risco remanescente e dependência de coordenação com o plano da spec 001 (ver "Riscos remanescentes" no relatório final), não uma violação de princípio.
 
+**Resolução do risco acima (2026-07-31, durante T023)**: ADR-003 em `specs/001-ingestao-classificacao-orcamentos/plan.md` enriquece `OrcamentoClassificadoPayload` com `referenciaBruta: ReferenciaS3Params`, mudança aditiva/compatível ao evento já mergeado, sem chamada síncrona cross-BC e sem leitura cross-schema (alternativas descartadas no próprio ADR-003). Risco encerrado; T023 (handler consumidor `extrator-queue`) MUST ler `evento.detail.referenciaBruta` do payload de `OrcamentoClassificado` e repassá-lo como `referenciaBrutaS3` ao caso de uso `ExtrairDadosOrcamento` (T022, já mergeado) — nenhuma consulta ao schema/tabela `orcamentos` da Ingestão, nunca.
+
 ## Bounded Context e Context Map (recorte desta spec)
 
 ```text
@@ -124,13 +126,15 @@ Nota: `OrcamentoExtraido` e `OrcamentoExtraidoComPendenciaConfirmada` são os do
 
 Todos os casos de uso publicam evento via a mesma interface `EventPublisher` (implementada na Infra sobre EventBridge, instância própria deste BC apontando para o mesmo bus `nexo-dominio-bus`) — nunca chamam SDK AWS diretamente.
 
+**Interface (T023)**: o handler Lambda consumidor de `extrator-queue` extrai `orcamentoId`, `resultado` (→ `referenciaClassificacao`) e `referenciaBruta` (→ `referenciaBrutaS3`) diretamente do `detail` do evento `OrcamentoClassificado` (payload enriquecido por ADR-003 em `specs/001-ingestao-classificacao-orcamentos/plan.md`) e invoca `ExtrairDadosOrcamento.executar({ orcamentoId, referenciaClassificacao, referenciaBrutaS3 })` — nenhuma consulta síncrona a outro BC.
+
 ## Infrastructure
 
 - `LeituraBrutaGateway` — implementação read-only de leitura do bucket `nexo-orcamentos-raw` (propriedade da Ingestão); IAM restrito a `s3:GetObject`, nunca `PutObject`/`DeleteObject`.
 - `BedrockExtratorGateway` — implementa o gateway do agente Extrator, com seu `ACL` de parsing de resposta (structured output/tool-use do Bedrock, nunca parsing de texto livre por regex).
 - `MarkItDownConversaoExtracaoACL` — invoca MarkItDown (processo isolado/Lambda Layer, CPU-bound, timeout e memória dimensionados para conversão completa, não a versão leve da spec 001) para gerar texto/markdown estruturável; sanitiza o texto antes de compor o prompt do Extrator (ver Segurança).
 - `EventBridgePublisher` — implementa `EventPublisher`, publica no bus `nexo-dominio-bus` (mesma instância física, wiring próprio deste BC).
-- `DrizzleExtracaoOrcamentoRepository` — traduz linha↔agregado sobre Aurora Serverless v2 Postgres; tabelas `extracoes_orcamento` (estado atual, `itens`/`condicoes_comerciais` em coluna JSONB — ADR-003) e `extracoes_orcamento_historico` (append-only, nunca UPDATE/DELETE, apenas INSERT).
+- `DrizzleExtracaoOrcamentoRepository` — traduz linha↔agregado sobre Aurora Serverless v2 Postgres; tabelas `extracoes_orcamento` (estado atual, `itens`/`condicoes_comerciais` em coluna JSONB — ADR-004) e `extracoes_orcamento_historico` (append-only, nunca UPDATE/DELETE, apenas INSERT).
 - Filas SQS por consumidor: `extrator-queue`, com DLQ própria + alarme CloudWatch em mensagem na DLQ (Princípio IV — exceção de infraestrutura também nunca silenciosa).
 - IAM: uma role por Lambda (`ExtratorLambdaRole`, `ConfirmarRevisaoHumanaExtracaoLambdaRole`, `ConsultaStatusExtracaoLambdaRole`), least privilege — ex.: `ExtratorLambdaRole` tem `bedrock:InvokeModel` restrito ao ARN do modelo aprovado e `s3:GetObject` restrito ao prefixo do bucket raw da Ingestão, sem nenhuma permissão de escrita nesse bucket.
 
@@ -247,3 +251,11 @@ tests/
 **Trade-offs**: simplicidade imediata em troca de possível migração futura — trade-off aceitável (menor complexidade agora, sem otimização prematura, conforme prioridade de Simplicidade sobre Performance/Escalabilidade não medida no system prompt do arquiteto).
 
 **Impactos futuros**: se a spec de Busca & Indexação (004) precisar de índice relacional sobre itens, essa decisão MUST ser revisitada com ADR próprio naquela spec, nunca silenciosamente contornada por query JSONB complexa.
+
+### ADR-005 — `referenciaBrutaS3` de T023 vem do payload de `OrcamentoClassificado`, nunca de consulta cross-BC (referência a ADR-003 de spec 001)
+
+**Contexto**: T023 (handler Lambda consumidor de `extrator-queue`) precisa de `referenciaBrutaS3` para invocar `ExtrairDadosOrcamento`, mas o evento `OrcamentoClassificado` publicado pela spec 001 (já mergeado) originalmente não carregava esse campo — ver ADR-003 em `specs/001-ingestao-classificacao-orcamentos/plan.md` para a decisão completa (contexto, alternativas descartadas, trade-offs).
+
+**Decisão** (referenciada aqui para rastreabilidade do lado consumidor): T023 lê `referenciaBruta` diretamente de `evento.detail` de `OrcamentoClassificado` (campo agora presente por ADR-003 da spec 001) e a repassa como `referenciaBrutaS3` a `ExtrairDadosOrcamento.executar`. Nenhuma consulta ao schema/tabela `orcamentos` da Ingestão, nunca chamada síncrona cross-BC — preserva Princípio II e a Anti-Corruption Layer desta spec (o handler nunca decide sozinho o shape do payload; usa o `DomainEventEnvelope`/tipo do evento como contrato).
+
+**Impactos futuros**: se a spec 001 evoluir novamente o payload de `OrcamentoClassificado`, qualquer novo campo relevante à Extração MUST ser propagado por evento aditivo, nunca por leitura cross-schema — mesma regra da convenção 7 do `plan.md` da spec 001.
