@@ -12,7 +12,7 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Criar estrutura de pastas `src/bounded-contexts/busca-indexacao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/busca-indexacao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pelas specs 001–003 — não repetir setup daquelas specs).
+- [x] T001 Criar estrutura de pastas `src/bounded-contexts/busca-indexacao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/busca-indexacao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pelas specs 001–003 — não repetir setup daquelas specs).
 - [ ] T002 [P] Migração Drizzle Kit: `CREATE EXTENSION IF NOT EXISTS vector;` no Aurora Serverless v2 Postgres — primeira spec do projeto a exigir extensão Postgres além do padrão (ADR-001 do `plan.md`); coordenar com Ricardo/DevOps a habilitação da extensão no cluster antes desta migração rodar.
 - [ ] T003 [P] Migração Drizzle Kit: schema inicial do BC Busca & Indexação (tabelas `indices_orcamento` com coluna `embedding vector(1024)` + índice HNSW distância cosseno, `indices_orcamento_historico`, ambas vazias, baseline).
 - [ ] T004 [P] Provisionar fila SQS `indexador-queue` com DLQ própria, `maxReceiveCount` configurado para retentativas automáticas com backoff, e alarme CloudWatch em mensagem na DLQ (IaC — Ricardo/DevOps). Sem fila de revisão humana de negócio, por decisão de ADR-002 desta spec.
