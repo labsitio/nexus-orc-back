@@ -1,5 +1,14 @@
 # T004 — Custom attribute `custom:tenant_id` no Cognito User Pool
 
+## Status
+
+Documentação/runbook concluído nesta task (T004, #267). **Execução real em cada ambiente
+(dev/staging/prod) não foi feita por este agente** — requer acesso operacional a um User Pool
+existente que este repositório não provisiona nem gerencia (ver "Contexto"). Rastrear a execução
+por ambiente em issue operacional própria — #469 — fora do board de tasks técnicas de spec 007
+(T005 em diante consome `custom:tenant_id` assumindo que a execução deste runbook já ocorreu antes
+do deploy do `TenantContextMiddleware`).
+
 ## Contexto
 
 O User Pool Cognito usado pelos endpoints REST (`auth-cognito.middleware.ts`, spec 001 T025) não é
@@ -18,6 +27,20 @@ tem acesso operacional ao pool — não por deploy automático de uma stack de a
 - IAM principal executando o comando precisa da permissão `cognito-idp:AddCustomAttributes`,
   restrita ao ARN do User Pool alvo (ver política abaixo).
 - Confirmar o `user-pool-id` correto (ambiente de destino) antes de rodar — não há como desfazer.
+- **Risco operacional**: tanto a criação do atributo (`Mutable=false`) quanto a primeira atribuição
+  de valor por usuário no onboarding são irreversíveis — não existe API de correção. Um erro na
+  primeira atribuição de `custom:tenant_id` de um usuário só se corrige recriando o usuário no
+  Cognito. Validar o valor antes de confirmar o onboarding de cada tenant.
+
+## Passo 0 — checar se o atributo já existe (idempotência)
+
+```bash
+aws cognito-idp describe-user-pool --user-pool-id <USER_POOL_ID> \
+  --query "UserPool.SchemaAttributes[?Name=='custom:tenant_id']"
+```
+
+Saída não vazia → atributo já provisionado, **não** rodar o comando da seção seguinte (evita erro
+`InvalidParameterException` de tentar recriar um atributo existente).
 
 ## Comando (executar uma vez, por ambiente)
 
@@ -42,7 +65,7 @@ aws cognito-idp add-custom-attributes \
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": "cognito-idp:AddCustomAttributes",
+      "Action": ["cognito-idp:AddCustomAttributes", "cognito-idp:DescribeUserPool"],
       "Resource": "arn:aws:cognito-idp:<REGION>:<ACCOUNT_ID>:userpool/<USER_POOL_ID>"
     }
   ]
