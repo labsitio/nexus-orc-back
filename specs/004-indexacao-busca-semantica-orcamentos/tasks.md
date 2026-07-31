@@ -30,7 +30,7 @@
 - [x] T007 Domain: implementar VOs `OrcamentoId`, `Dinheiro` (redefinidos localmente neste BC, mesma validação das specs 001–003, sem import cruzado) em `src/bounded-contexts/busca-indexacao/domain/value-objects/`.
 - [x] T008 [P] Domain: implementar VO `ConteudoIndexavel` — construtor valida não-vazio (erro de domínio se vazio, nunca "indexação válida" de conteúdo nulo); estrutura `{ resumoFornecedor, itensDescricao: string[], condicoesResumo, categorias }`.
 - [x] T009 [P] Domain: implementar VO `Embedding` — construtor valida `vetor.length === dimensao`; sem lógica de similaridade (isso é query, não Domain).
-- [ ] T010 [P] Domain: implementar VO `OrigemValidacao` (enum fechado `VALIDADO | VALIDADO_COM_RESSALVA`) e VO `TentativaIndexacao` (histórico imutável).
+- [x] T010 [P] Domain: implementar VO `OrigemValidacao` (enum fechado `VALIDADO | VALIDADO_COM_RESSALVA`) e VO `TentativaIndexacao` (histórico imutável).
 - [ ] T011 [P] Domain: implementar VOs `CriterioBusca` e `ResultadoBusca` (usados pelo caso de uso de busca, US2).
 - [ ] T012 Domain: implementar agregado `IndiceOrcamento` (`indice-orcamento.aggregate.ts`) com método `registrarTentativaIndexacao`, invariante "só transita para INDEXADO com embedding gerado e persistido na mesma tentativa", retry sem limite estrutural no Domain (limite é infraestrutura, ver T004), histórico append-only, `OrigemValidacaoImutavelError` se houver tentativa de sobrescrever `origemValidacao`/`conteudoIndexavel` fora do construtor. Critério: unit test que tenta forçar `INDEXADO` sem embedding e espera erro de domínio.
 - [ ] T013 [P] Domain: definir os 2 Domain Events (`orcamento-indexado`, `falha-indexacao-detectada`) com `schemaVersion: 1`, `source: nexo.busca-indexacao`, conforme convenção do `plan.md`.
