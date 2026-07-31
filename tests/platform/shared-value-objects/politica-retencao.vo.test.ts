@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { CategoriaDocumento } from '../../../src/platform/shared-value-objects/domain/categoria-documento.vo.js';
 import {
+  AtualizadaEmInvalidaError,
+  BaseLegalInvalidaError,
   PoliticaRetencao,
   PrazoEmDiasInvalidoError,
 } from '../../../src/platform/shared-value-objects/domain/politica-retencao.vo.js';
@@ -33,6 +35,23 @@ describe('PoliticaRetencao', () => {
     expect(() =>
       PoliticaRetencao.de({ categoria, prazoEmDias: 1.5, baseLegal: 'LGPD art. 16', atualizadaEm }),
     ).toThrow(PrazoEmDiasInvalidoError);
+  });
+
+  it.each(['', '   '])('rejeita baseLegal vazia ou só espaços ("%s")', (baseLegal) => {
+    expect(() =>
+      PoliticaRetencao.de({ categoria, prazoEmDias: 365, baseLegal, atualizadaEm }),
+    ).toThrow(BaseLegalInvalidaError);
+  });
+
+  it('rejeita atualizadaEm inválida', () => {
+    expect(() =>
+      PoliticaRetencao.de({
+        categoria,
+        prazoEmDias: 365,
+        baseLegal: 'LGPD art. 16',
+        atualizadaEm: new Date('data-invalida'),
+      }),
+    ).toThrow(AtualizadaEmInvalidaError);
   });
 
   it('equals compara por categoria, prazoEmDias, baseLegal e atualizadaEm', () => {

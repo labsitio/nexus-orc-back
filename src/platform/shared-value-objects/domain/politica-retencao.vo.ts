@@ -7,6 +7,18 @@ export class PrazoEmDiasInvalidoError extends ErroDominio {
   }
 }
 
+export class BaseLegalInvalidaError extends ErroDominio {
+  constructor() {
+    super('PoliticaRetencao.baseLegal inválida: esperado texto não vazio');
+  }
+}
+
+export class AtualizadaEmInvalidaError extends ErroDominio {
+  constructor() {
+    super('PoliticaRetencao.atualizadaEm inválida: esperado uma data válida');
+  }
+}
+
 export interface PoliticaRetencaoProps {
   categoria: CategoriaDocumento;
   prazoEmDias: number;
@@ -30,6 +42,12 @@ export class PoliticaRetencao {
   static de(props: PoliticaRetencaoProps): PoliticaRetencao {
     if (!Number.isInteger(props.prazoEmDias) || props.prazoEmDias <= 0) {
       throw new PrazoEmDiasInvalidoError(props.prazoEmDias);
+    }
+    if (props.baseLegal.trim().length === 0) {
+      throw new BaseLegalInvalidaError();
+    }
+    if (Number.isNaN(props.atualizadaEm.getTime())) {
+      throw new AtualizadaEmInvalidaError();
     }
     return new PoliticaRetencao(
       props.categoria,
