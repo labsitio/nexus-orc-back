@@ -106,3 +106,52 @@ Confirma o bug pré-existente do adaptador `allure-vitest` neste repositório
 (já relatado por outros agentes). Contornado ao rodar com `--reporter=default`,
 que desativa a geração de `allure-results/` nesta rodada — limitação de ambiente,
 não bloqueia o gate desta task (nenhum requisito de T005 depende de Allure).
+
+---
+
+# T007 (spec-009)
+
+Commit testado: `f1be263`
+Branch: `feat/009-otimizacao-custo-t007`
+PR: https://github.com/labsitio/nexus-orc-back/pull/442
+
+## Suíte da task
+```
+npx vitest run tests/bounded-contexts/ingestao-identificacao/domain/events --reporter=default
+```
+Resultado: 1 arquivo, 8 testes, 8 passed, 0 failed.
+
+## Typecheck
+```
+npx tsc --noEmit
+```
+Resultado: sem erros.
+
+## Cobertura da task
+```
+npx vitest run tests/bounded-contexts/ingestao-identificacao/domain/events/domain-events.test.ts --reporter=default --coverage --coverage.reporter=json-summary
+```
+`domain-event.ts` (interface, sem código executável): 0/0 em todas as métricas
+(100% trivial). Os 4 eventos concretos que implementam o envelope
+(`orcamento-recebido.event.ts`, `orcamento-classificado.event.ts`,
+`orcamento-escalonado-revisao-humana.event.ts`,
+`orcamento-reclassificado-revisao-humana.event.ts`): 100%
+statements/branches/functions/lines cada (ver coverage-final.md).
+
+## Regressão — suíte completa do repositório
+```
+npx vitest run --reporter=default
+```
+Resultado: 62 arquivos (56 passed, 6 skipped — skips pré-existentes de
+integração com banco/infra, não relacionados a este diff), 289 testes (262
+passed, 27 skipped), 0 falhas. As 3 falhas de timeout relatadas pelo
+dev-back-end na sua execução local (contract/auth) não reproduziram nesta
+rodada — consistente com flakiness sob paralelismo, não com regressão
+introduzida pelo diff de T007 (que toca apenas uma interface TypeScript sem
+lógica de execução).
+
+## Allure
+Mesmo bug pré-existente do adaptador `allure-vitest` já registrado em T005
+(`Error: Vitest failed to find the runner`) — contornado com `--reporter=default`,
+que desativa `allure-results/` nesta rodada. Limitação de ambiente, não bloqueia
+o gate (T007 não tem requisito ligado a Allure).

@@ -40,3 +40,25 @@ arquivo na visão em árvore quando há muitos arquivos na mesma pasta — confi
 `coverage/coverage-summary.json` que o arquivo está de fato instrumentado e 100% coberto
 em ambas as tasks. Cobertura agregada do repo não é aplicável a este gate (fora do diff
 destas tasks).
+
+## T007 — domain-event.ts (envelope) + 4 eventos concretos
+
+Comando:
+```
+npx vitest run tests/bounded-contexts/ingestao-identificacao/domain/events/domain-events.test.ts --reporter=default --coverage --coverage.reporter=json-summary
+```
+
+Resultado (`coverage/coverage-summary.json`):
+
+| Arquivo | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|
+| `domain-event.ts` (interface, 0 statements executáveis) | 100% (0/0) | 100% (0/0) | 100% (0/0) | 100% (0/0) |
+| `orcamento-recebido.event.ts` | 100% (8/8) | 100% (1/1) | 100% (1/1) | 100% (8/8) |
+| `orcamento-classificado.event.ts` | 100% (6/6) | 100% (1/1) | 100% (1/1) | 100% (6/6) |
+| `orcamento-escalonado-revisao-humana.event.ts` | 100% (6/6) | 100% (1/1) | 100% (1/1) | 100% (6/6) |
+| `orcamento-reclassificado-revisao-humana.event.ts` | 100% (6/6) | 100% (1/1) | 100% (1/1) | 100% (6/6) |
+
+`domain-event.ts` é um `interface` TypeScript type-only — não gera código em
+runtime, por isso 0/0 (não há statement a cobrir; instrumentado, sem lacuna).
+Os 4 eventos concretos que consomem o envelope permanecem 100% cobertos após
+a extensão aditiva do campo `prioridade`.
