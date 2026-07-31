@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigserial,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -54,9 +55,7 @@ export const validacoesOrcamentoHistorico = validacaoSchema.table(
   'validacoes_orcamento_historico',
   {
     id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-    orcamentoValidacaoId: uuid('orcamento_validacao_id')
-      .notNull()
-      .references(() => validacoesOrcamento.id),
+    orcamentoValidacaoId: uuid('orcamento_validacao_id').notNull(),
     resultado: text('resultado').notNull(),
     inconsistencias: jsonb('inconsistencias').notNull().default([]),
     ocorreuEm: timestamp('ocorreu_em', { withTimezone: true }).notNull(),
@@ -69,6 +68,16 @@ export const validacoesOrcamentoHistorico = validacaoSchema.table(
       'validacoes_orcamento_historico_resultado_valido',
       emValoresValidos('resultado', RESULTADOS_TENTATIVA_VALIDACAO),
     ),
+    // Nome explícito e curto: o nome padrão gerado pelo Drizzle
+    // (`<tabela>_<coluna>_<tabela-ref>_<coluna-ref>_fk`) passa de 63 bytes
+    // (limite NAMEDATALEN do Postgres) e é truncado silenciosamente,
+    // quebrando qualquer verificação por nome exato (ex.: teste de
+    // integração que espera essa constraint no erro de violação).
+    foreignKey({
+      name: 'validacoes_orcamento_historico_orcamento_validacao_id_fk',
+      columns: [table.orcamentoValidacaoId],
+      foreignColumns: [validacoesOrcamento.id],
+    }),
   ],
 );
 

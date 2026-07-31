@@ -22,7 +22,13 @@ CREATE TABLE "validacao"."validacoes_orcamento_historico" (
 	"ocorreu_em" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "validacao"."validacoes_orcamento_historico" ADD CONSTRAINT "validacoes_orcamento_historico_orcamento_validacao_id_validacoes_orcamento_id_fk" FOREIGN KEY ("orcamento_validacao_id") REFERENCES "validacao"."validacoes_orcamento"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+-- Nome explícito e curto: o nome padrão que o Drizzle geraria aqui
+-- (`validacoes_orcamento_historico_orcamento_validacao_id_validacoes_orcamento_id_fk`,
+-- 80 bytes) excede o limite NAMEDATALEN (63 bytes) do Postgres e seria
+-- truncado silenciosamente na criação, quebrando qualquer verificação por
+-- nome exato dessa constraint (ex.: teste de integração que espera esse
+-- nome no erro de violação de FK).
+ALTER TABLE "validacao"."validacoes_orcamento_historico" ADD CONSTRAINT "validacoes_orcamento_historico_orcamento_validacao_id_fk" FOREIGN KEY ("orcamento_validacao_id") REFERENCES "validacao"."validacoes_orcamento"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "validacoes_orcamento_historico_orcamento_validacao_id_idx" ON "validacao"."validacoes_orcamento_historico" USING btree ("orcamento_validacao_id");--> statement-breakpoint
 ALTER TABLE "validacao"."validacoes_orcamento" ADD CONSTRAINT "validacoes_orcamento_status_valido" CHECK (status in ('PENDENTE', 'VALIDADO', 'PENDENTE_REVISAO_HUMANA', 'VALIDADO_COM_RESSALVA'));--> statement-breakpoint
 ALTER TABLE "validacao"."validacoes_orcamento_historico" ADD CONSTRAINT "validacoes_orcamento_historico_resultado_valido" CHECK (resultado in ('VALIDADO', 'INCONSISTENTE', 'ACEITE_COM_RESSALVA'));--> statement-breakpoint

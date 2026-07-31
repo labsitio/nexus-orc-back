@@ -145,7 +145,7 @@ describe.skipIf(!DATABASE_URL)('schema validacao.validacoes_orcamento* (Postgres
         inconsistencias: [],
         ocorreuEm: new Date(),
       }),
-      /validacoes_orcamento_historico_orcamento_validacao_id_validacoes_orcamento_id_fk/,
+      /validacoes_orcamento_historico_orcamento_validacao_id_fk/,
     );
   });
 

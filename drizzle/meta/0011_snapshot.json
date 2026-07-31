@@ -1,5 +1,5 @@
 {
-  "id": "af03899f-c5a0-470d-a85a-b4d76f8b191f",
+  "id": "ae0f6e80-5091-43a2-9bf1-482292b30e4e",
   "prevId": "533afb03-9277-42d7-ad2f-bf8bfc5bb6a8",
   "version": "7",
   "dialect": "postgresql",
@@ -820,8 +820,8 @@
         }
       },
       "foreignKeys": {
-        "validacoes_orcamento_historico_orcamento_validacao_id_validacoes_orcamento_id_fk": {
-          "name": "validacoes_orcamento_historico_orcamento_validacao_id_validacoes_orcamento_id_fk",
+        "validacoes_orcamento_historico_orcamento_validacao_id_fk": {
+          "name": "validacoes_orcamento_historico_orcamento_validacao_id_fk",
           "tableFrom": "validacoes_orcamento_historico",
           "tableTo": "validacoes_orcamento",
           "schemaTo": "validacao",
