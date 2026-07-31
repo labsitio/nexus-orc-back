@@ -4,9 +4,9 @@ import {
   CriterioAusenteError,
   DecisaoRoteamento,
   ReenvioSemFundamentoError,
-  type ContextoValidacaoParaDecisao,
 } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/decisao-roteamento.vo.js';
 import { NivelConfianca } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/nivel-confianca.vo.js';
+import { ContextoValidacao } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/contexto-validacao.vo.js';
 
 describe('DecisaoRoteamento', () => {
   it('rejeita APROVAR sem contextoValidacao', () => {
@@ -24,7 +24,7 @@ describe('DecisaoRoteamento', () => {
   it('rejeita APROVAR com contextoValidacao em resultado inesperado (defesa contra dado upstream malformado)', () => {
     const contextoValidacaoMalformado = {
       resultado: 'REPROVADO',
-    } as unknown as ContextoValidacaoParaDecisao;
+    } as unknown as ContextoValidacao;
     expect(() =>
       DecisaoRoteamento.criar({
         acao: 'APROVAR',
@@ -40,13 +40,20 @@ describe('DecisaoRoteamento', () => {
   it.each(['VALIDADO', 'VALIDADO_COM_RESSALVA'] as const)(
     'aceita APROVAR quando contextoValidacao.resultado é %s',
     (resultado) => {
+      const contextoValidacao = ContextoValidacao.de({
+        resultado,
+        inconsistenciasAceitas:
+          resultado === 'VALIDADO_COM_RESSALVA'
+            ? [{ regra: 'CNPJ_DIVERGENTE', detalhe: 'CNPJ do fornecedor diverge do cadastro' }]
+            : undefined,
+      });
       const decisao = DecisaoRoteamento.criar({
         acao: 'APROVAR',
         nivelConfianca: NivelConfianca.de(90),
         criterio: 'confiança suficiente',
         agenteOrigem: 'ORQUESTRADOR',
         requerIntegracaoExterna: false,
-        contextoValidacao: { resultado },
+        contextoValidacao,
       });
       expect(decisao.acao).toBe('APROVAR');
     },
