@@ -57,7 +57,7 @@
 
 ### Implementation (US1)
 
-- [ ] T021 [US1] Infrastructure: `BedrockExtratorGateway` + `BedrockExtracaoACL` (structured output/tool-use, nunca parsing de texto livre por regex).
+- [x] T021 [US1] Infrastructure: `BedrockExtratorGateway` + `BedrockExtracaoACL` (structured output/tool-use, nunca parsing de texto livre por regex). #86
 - [ ] T022 [US1] Application: caso de uso `ExtrairDadosOrcamento` (consome `OrcamentoClassificado`, converte via MarkItDown, invoca Extrator, aplica `registrarTentativaExtrator`, persiste, publica `OrcamentoExtraido` se todos os campos obrigatórios OK ou `ExtracaoEscalonadaParaRevisaoHumana` se 1+ campo sem confiança).
 - [ ] T023 [US1] Interface: handler Lambda consumidor SQS de `extrator-queue`, invocando `ExtrairDadosOrcamento`.
 - [ ] T024 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/extracao/status` (query, Zod schema de response, Problem Details para erro).
