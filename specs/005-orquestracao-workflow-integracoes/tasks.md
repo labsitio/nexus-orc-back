@@ -31,7 +31,7 @@
 
 **⚠️ CRITICAL**: nenhuma user story começa antes desta fase.
 
-- [ ] T008 Domain: implementar VOs `OrcamentoId`, `NivelConfianca` (redefinidos localmente neste BC, mesma validação das specs 001–003, sem import cruzado) em `src/bounded-contexts/orquestracao/domain/value-objects/`.
+- [x] T008 Domain: implementar VOs `OrcamentoId`, `NivelConfianca` (redefinidos localmente neste BC, mesma validação das specs 001–003, sem import cruzado) em `src/bounded-contexts/orquestracao/domain/value-objects/`.
 - [ ] T009 [P] Domain: implementar VOs `ContextoClassificacao`, `ContextoExtracao`, `ContextoValidacao` (cópias imutáveis traduzidas dos payloads upstream, ver `plan.md` seção Domain).
 - [ ] T010 Domain: implementar VO `DecisaoRoteamento` com as invariantes estruturais críticas — construtor rejeita: `acao === 'APROVAR'` sem `contextoValidacao.resultado` em `VALIDADO`/`VALIDADO_COM_RESSALVA`; `acao === 'SOLICITAR_REENVIO'` sem `motivoDadoAusente` não vazio referenciando inconsistência/pendência concreta; qualquer decisão automática (`agenteOrigem !== 'HUMANO'`) sem `criterio` não vazio. Critério de aceite: unit test para cada uma das 3 rejeições, mapeando diretamente as "Ações proibidas" e critérios de aceite do `spec.md`.
 - [ ] T011 [P] Domain: implementar VO `TentativaDecisaoWorkflow` (histórico imutável).
