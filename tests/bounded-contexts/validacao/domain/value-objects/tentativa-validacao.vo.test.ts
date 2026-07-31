@@ -36,6 +36,16 @@ describe('TentativaValidacao', () => {
     );
   });
 
+  it('aceita ACEITE_COM_RESSALVA preservando a(s) inconsistência(s) aceita(s) apesar delas', () => {
+    const inconsistencia = InconsistenciaDetectada.de(
+      'CNPJ_INVALIDO',
+      'dígito verificador incorreto',
+    );
+    const tentativa = TentativaValidacao.de('ACEITE_COM_RESSALVA', [inconsistencia], new Date());
+    expect(tentativa.resultado).toBe('ACEITE_COM_RESSALVA');
+    expect(tentativa.inconsistencias).toHaveLength(1);
+  });
+
   it('rejeita timestamp inválido', () => {
     expect(() => TentativaValidacao.de('VALIDADO', [], new Date('data-invalida'))).toThrow(
       TentativaValidacaoInvalidaError,

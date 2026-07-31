@@ -7,7 +7,7 @@ export class TentativaValidacaoInvalidaError extends ErroDominio {
   }
 }
 
-export type ResultadoTentativaValidacao = 'VALIDADO' | 'INCONSISTENTE';
+export type ResultadoTentativaValidacao = 'VALIDADO' | 'INCONSISTENTE' | 'ACEITE_COM_RESSALVA';
 
 /**
  * Entrada de histórico imutável (append-only) de uma avaliação de regras de

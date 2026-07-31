@@ -141,11 +141,7 @@ export class OrcamentoValidacao {
     }
 
     this._historico.push(
-      TentativaValidacao.de(
-        this._inconsistencias.length === 0 ? 'VALIDADO' : 'INCONSISTENTE',
-        this._inconsistencias,
-        new Date(),
-      ),
+      TentativaValidacao.de('ACEITE_COM_RESSALVA', this._inconsistencias, new Date()),
     );
     this._status = 'VALIDADO_COM_RESSALVA';
   }

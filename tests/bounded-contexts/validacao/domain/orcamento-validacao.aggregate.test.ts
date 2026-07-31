@@ -91,6 +91,7 @@ describe('OrcamentoValidacao', () => {
     agregado.registrarDecisaoHumana({ tipo: 'ACEITE_COM_RESSALVA' });
     expect(agregado.status).toBe('VALIDADO_COM_RESSALVA');
     expect(agregado.historico).toHaveLength(2);
+    expect(agregado.historico[1]?.resultado).toBe('ACEITE_COM_RESSALVA');
     expect(agregado.inconsistencias).toHaveLength(1);
   });
 
