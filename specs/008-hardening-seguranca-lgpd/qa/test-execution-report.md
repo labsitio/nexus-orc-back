@@ -140,3 +140,61 @@ pasta `.../shared-value-objects/domain` e o arquivo `categoria-documento.vo.ts`
 cobertura funcional de todos os ramos foi confirmada por leitura de código +
 execução dos 9 casos, não por essa tabela. Registrado como limitação de
 ferramental de relatório, não como lacuna de teste.
+
+## T006 — VO `DadoAnonimizado` (PR #439, commit `dcb1190`)
+
+Ambiente: Node 24, worktree `.claude/worktrees/agent-aa3475b21e7b08a8a`.
+
+```
+$ npx vitest run --reporter=default tests/platform/shared-value-objects/dado-anonimizado.vo.test.ts
+ ✓ tests/platform/shared-value-objects/dado-anonimizado.vo.test.ts (10 tests) 11ms
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+```
+
+Casos cobertos: props válidas com `MASCARAMENTO` e `REMOCAO`; **irreversibilidade**
+(`Object.keys(dado)` restrito a `[campoOriginal, metodo, aplicadoEm,
+solicitacaoId]`, ausência de `valor`/`valorOriginal`, `(dado as any).valorOriginal`
+`undefined`); `campoOriginal`/`solicitacaoId` vazios ou whitespace-only
+rejeitados (`it.each`); `metodo` fora de `MASCARAMENTO|REMOCAO` rejeitado;
+`aplicadoEm` inválida (`Invalid Date`) rejeitada; `equals` por valor (positivo
+e negativo). Critério de aceite da task ("teste unit garantindo que a API do
+VO não expõe getter de valor original") satisfeito — reforçado pela leitura de
+código: `private constructor`, sem método/setter que aceite o dado original de
+volta, `campoOriginal` guarda apenas o nome do campo, nunca o valor.
+
+`npx tsc --noEmit` e `npx eslint` no arquivo de produção e no teste: sem erro
+nos arquivos do PR (ver ressalva de ambiente abaixo).
+
+### Regressão completa (HEAD `dcb1190`)
+
+```
+$ npx vitest run --reporter=default
+ Test Files  7 failed | 50 passed | 6 skipped (63)
+      Tests  242 passed | 27 skipped (269)
+```
+
+Os 7 arquivos falhos são pré-existentes e não relacionados a este diff —
+`Cannot find module` para `@aws-sdk/client-eventbridge`,
+`@aws-sdk/client-bedrock-runtime`, `@aws-sdk/client-lambda`, `pino`,
+`@opentelemetry/instrumentation-aws-lambda` em módulos de outros BCs
+(`extracao`, `ingestao-identificacao/infrastructure`). Confirmado via
+`git show --stat dcb1190`: o diff deste PR contém apenas `tasks.md` (checkbox)
++ `dado-anonimizado.vo.ts` + `dado-anonimizado.vo.test.ts`. `node_modules` do
+worktree está incompleto para essas dependências (declaradas em `package.json`,
+ausentes em disco) — mesmo sintoma reproduzido por `npx tsc --noEmit`. Nenhuma
+regressão introduzida por T006.
+
+### Cobertura
+
+```
+$ npx vitest run --coverage --reporter=default tests/platform/shared-value-objects
+```
+
+Diretório `src/platform/shared-value-objects/domain` (3 VOs): Statements
+97.61% | Branch 100% | Functions 94.44% | Lines 97.61%. Assim como em T005, a
+tabela text do reporter v8 não lista `dado-anonimizado.vo.ts`/
+`politica-retencao.vo.ts` individualmente (mostra apenas a agregação do
+diretório e o arquivo `categoria-documento.vo.ts`) — mesma limitação de
+ferramental já registrada. Cobertura funcional confirmada por leitura de
+código + execução dos 10 casos.

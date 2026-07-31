@@ -16,3 +16,16 @@ tabela text do reporter v8 omite a linha individual do arquivo — ver
 `test-execution-report.md`). Nenhuma lacuna de cobertura conhecida para este
 VO. Sem regressão na cobertura de `categoria-documento.vo.ts` (T004,
 inalterado neste PR).
+
+## T006 — final (commit `dcb1190`)
+
+`dado-anonimizado.vo.ts`: 10 testes exercitam caminho válido (2 métodos),
+irreversibilidade (chaves públicas restritas), os 4 ramos de erro
+(`campoOriginal`, `metodo`, `aplicadoEm`, `solicitacaoId`) e `equals`. Todo
+statement/branch do arquivo é alcançado por pelo menos um teste (confirmado
+por leitura de código — a tabela text do reporter v8 segue omitindo a linha
+individual do arquivo, mesma limitação já registrada em T005). Diretório
+`shared-value-objects/domain` agregado: 97.61% stmts / 100% branch / 94.44%
+funcs. Nenhuma lacuna de cobertura conhecida para este VO. Sem regressão na
+cobertura de `categoria-documento.vo.ts`/`politica-retencao.vo.ts` (inalterados
+neste PR).
