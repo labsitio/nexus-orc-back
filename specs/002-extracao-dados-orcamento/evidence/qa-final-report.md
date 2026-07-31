@@ -1,5 +1,87 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
+## Validação — T019 (issue #84), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #457 (draft), branch `feat/002-t019-contract-test-status-extracao-v2`, commit `61c4670`
+
+### Resumo executivo
+Contract test (Zod) de `GET /v1/orcamentos/{orcamentoId}/extracao/status` em
+`tests/bounded-contexts/extracao/contract/status.contract.test.ts`, contra o
+schema novo `src/bounded-contexts/extracao/interface/http/status.schema.ts`.
+Controller real (T024) ainda não existe — task define apenas o contrato de
+borda, a ser reusado quando T024 for implementada. `backend-reviewer` já
+aprovou (APPROVE WITH NITS).
+
+### Verificação independente do contrato contra o domínio real
+Confirmado por leitura de cada VO (não apenas do relato do dev-back-end):
+- `STATUS_EXTRACAO` (`extracao-orcamento.aggregate.ts`) ≡ `z.enum(STATUS_EXTRACAO)`.
+- `AGENTES_ORIGEM_CAMPO` (`campo-extraido.vo.ts`, `['EXTRATOR','HUMANO']`) ≡
+  `agenteOrigem`/`agente` no schema.
+- `NivelConfianca.valor` (inteiro 0–100) ≡ `confianca: z.number().int().min(0).max(100)`.
+- `Dinheiro.paraPayload()` (`valorCentavos`/`moeda`) ≡ `dinheiroResponseSchema`.
+- `DescricaoProduto.paraPayload()` (`descricao`/`sku?`) ≡ `descricaoProdutoResponseSchema`.
+- `ItemOrcamento.paraPayload()` (descricao/quantidade/precoUnitario, cada um
+  `CampoExtraidoPayload<T>`) ≡ `itemOrcamentoResponseSchema`.
+- `CondicoesComerciais.paraPayload()` (condicoesPagamento/prazoValidade/
+  condicoesEntrega) ≡ `condicoesComerciaisResponseSchema`; `PeriodoValidade.paraPayload()`
+  devolve ISO 8601 ≡ `z.string().datetime()`.
+- `TentativaExtracao` (agente/timestamp/resultado?/motivoInsucesso?) ≡
+  `tentativaExtracaoResponseSchema` — nota: o VO não tem `paraPayload()` e usa
+  `undefined` (não `null`) no campo ausente; mapear `undefined → null` fica a
+  cargo do controller real (T024, fora do escopo desta task), não é defeito
+  desta PR.
+
+### Verificação de "falha pelo motivo certo" (Karpathy checklist)
+Alterado temporariamente `confianca: min(0)` → `min(1)` no schema, reexecutado
+o teste — 2/9 falharam exatamente nos cenários com `confianca: 0`
+(`PENDENTE_REVISAO_HUMANA`), erro Zod "Too small: expected number to be >=1".
+Revertido via `git checkout --`, working tree confirmado limpo. Teste é
+sensível ao contrato real, não um teste que passa por acidente.
+
+### Suítes executadas e comandos
+```bash
+PATH="<nvm 24.14.1>/bin:$PATH" ./node_modules/.bin/vitest run \
+  tests/bounded-contexts/extracao/contract/status.contract.test.ts --reporter=default
+# Test Files  1 passed (1) / Tests  9 passed (9)
+
+PATH="<nvm 24.14.1>/bin:$PATH" ./node_modules/.bin/vitest run \
+  tests/bounded-contexts/extracao/ --reporter=default
+# Test Files  21 passed | 2 skipped (23) / Tests  88 passed | 12 skipped (100)
+# (2 skipped = testes de integração Postgres pré-existentes sem DATABASE_URL,
+# não relacionados a esta task)
+
+PATH="<nvm 24.14.1>/bin:$PATH" ./node_modules/.bin/tsc --noEmit
+# sem erros
+
+PATH="<nvm 24.14.1>/bin:$PATH" ./node_modules/.bin/eslint \
+  src/bounded-contexts/extracao/interface/http/status.schema.ts \
+  tests/bounded-contexts/extracao/contract/status.contract.test.ts
+# sem erros
+```
+Reporter Allure indisponível neste ambiente ("Vitest failed to find the
+runner") — falha de infraestrutura pré-existente, não desta task (mesma
+limitação já registrada em `qa/coverage-baseline.md`); execução feita com
+`--reporter=default`.
+
+### Cobertura
+Não medida isoladamente com precisão — `--coverage` no repo completo com
+apenas este arquivo de teste em execução produz números de statements/lines
+não confiáveis para `status.schema.ts` (artefato conhecido do instrumentador
+v8 quando poucos arquivos são exercitados contra uma base instrumentada
+inteira). Branches/functions do arquivo novo: 100%. Sem lógica de negócio no
+schema (apenas definição declarativa Zod) — risco de cobertura não medida é
+baixo.
+
+### Bugs
+Nenhum defeito de produção encontrado.
+
+### Parecer
+**APROVADO PELO QA.**
+
+---
+
 ## Validação — T018 (issue #83), primeira validação
 
 ### SPEC_ID e versão testada

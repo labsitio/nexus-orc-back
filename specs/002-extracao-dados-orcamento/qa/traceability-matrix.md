@@ -1,3 +1,16 @@
+## Leva T019 (issue #84, PR #457, commit `61c4670`)
+
+| Critério de aceite (spec.md / plan.md) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| Contrato de resposta de `GET /extracao/status` reflete exatamente os `paraPayload()` reais dos VOs (`ItemOrcamento`, `CondicoesComerciais`, `CampoExtraido<T>`, `Dinheiro`, `DescricaoProduto`) | Drift contrato/domínio | Contrato (Zod) | 4 status possíveis do agregado (`PENDENTE`, `EXTRAIDO`, `PENDENTE_REVISAO_HUMANA`, `EXTRAIDO_COM_PENDENCIA_CONFIRMADA`) + `orcamentoId` inválido + `status`/`agenteOrigem` fora do enum + 404 Problem Details | `status.contract.test.ts` (9 testes) | PASS |
+| Campo obrigatório sem confiança nunca aparece com valor inventado na resposta de status | Financeiro (crítico) | Contrato (Zod) | cenário `PENDENTE_REVISAO_HUMANA` com `CampoExtraido` `valor: null`/`extraido: false` | `status.contract.test.ts` (1 dos 9 testes) | PASS |
+
+### Fora desta leva
+- Endpoint real (T024, controller) não existe ainda — este contrato só é
+  exercitado end-to-end quando T024 for implementada e reusar estes schemas.
+
+---
+
 # Matriz de Rastreabilidade — SPEC 002 (leva T001, T005-T011)
 
 | Critério de aceite (spec.md) | Risco | Nível | Cenário | Teste | Resultado |
