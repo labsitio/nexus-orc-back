@@ -83,3 +83,106 @@ Nenhum bug encontrado.
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# Validação adicional — T003 (SPEC_ID: 007-isolamento-multitenant-dados)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: 007-isolamento-multitenant-dados
+- Issue: #266
+- PR: #467 (draft, aprovado pelo backend-reviewer com veredito APPROVE)
+- Branch: feat/007-isolamento-multitenant
+- Worktree: `.claude/worktrees/agent-007-multitenant`
+- Commit testado: a468ad7
+- Tipo de validação: primeira validação (sem reteste anterior)
+
+## 2. Resumo executivo
+T003 configura uma regra ESLint custom (`nexo-boundaries/no-cross-bounded-context-import`) que
+bloqueia import direto entre Bounded Contexts (ADR-004), resolvendo o caminho real do import
+(relativo via `path.resolve` ou literal) em vez de comparar apenas o texto do specifier. A
+exceção `src/shared-kernel/tenant/` é satisfeita implicitamente: esse caminho nunca cai sob
+`bounded-contexts/`, então a regra nunca a bloqueia. Um checklist de PR
+(`.github/pull_request_template.md`) documenta a regra e a exceção para revisão humana.
+
+## 3. Requisitos cobertos e não cobertos
+Cobertos (T003, 4 critérios de aceite do pedido de validação):
+1. `npx eslint .` no repo atual passa limpo — verificado, exit 0, saída vazia.
+2. Import relativo cross-BC entre BCs irmãos é detectado — verificado com fixture adversarial.
+3. Import same-BC passa limpo — verificado com fixture.
+4. Import de `src/shared-kernel/tenant/` passa limpo (exceção ADR-004) — verificado com fixture.
+
+Cobertos adicionalmente (adversarial, não pedido explicitamente mas relevante ao risco da task):
+- `export ... from` cross-BC é bloqueado (`ExportNamedDeclaration`/`ExportAllDeclaration`).
+- `require()` cross-BC é bloqueado (`CallExpression`).
+- `import()` dinâmico cross-BC é bloqueado (`ImportExpression`).
+
+Não cobertos (fora de escopo de T003, riscos residuais documentados no código-fonte da regra):
+- Resolução de `tsconfig` `paths`/aliases: hoje o projeto não configura `paths`, então specifiers
+  não-relativos são comparados por texto literal. Se `paths` apontar para dentro de
+  `bounded-contexts/` sem o literal "bounded-contexts" no specifier, a regra não detectaria —
+  risco documentado em comentário no próprio arquivo da regra, não bloqueante hoje.
+- Não há teste automatizado (unit test do runner ESLint, ex. `RuleTester`) cobrindo a regra em
+  `tests/`; a verificação desta validação foi feita via fixtures manuais descartáveis + execução
+  direta do `eslint`, não uma suíte que rode em CI a cada alteração da regra. Não é exigência
+  explícita do critério de aceite da task, mas é uma lacuna de regressão: uma alteração futura na
+  regra não tem teste próprio que falhe automaticamente. Registrado como risco residual (não
+  bloqueia o gate — o comportamento atual foi comprovado correto).
+
+## 4. Suítes executadas e comandos
+```
+cd .claude/worktrees/agent-007-multitenant
+npx eslint .
+# fixtures adversariais criadas e removidas nesta sessão em
+# src/bounded-contexts/ingestao-identificacao/domain/__qa_tmp_*.ts:
+npx eslint src/bounded-contexts/ingestao-identificacao/domain/__qa_tmp_cross_bc_relative.ts \
+  src/bounded-contexts/ingestao-identificacao/domain/__qa_tmp_same_bc.ts \
+  src/bounded-contexts/ingestao-identificacao/domain/__qa_tmp_shared_kernel.ts \
+  src/bounded-contexts/ingestao-identificacao/domain/__qa_tmp_cross_bc_require.ts \
+  src/bounded-contexts/ingestao-identificacao/domain/__qa_tmp_cross_bc_export_from.ts \
+  src/bounded-contexts/ingestao-identificacao/domain/__qa_tmp_cross_bc_dynamic_import.ts \
+  --no-ignore
+git status --short   # confirma fixtures removidas, working tree limpo
+```
+Limitação de ambiente conhecida (relatada pelo dev-back-end e confirmada nesta validação):
+`npm run typecheck` falha por módulos ausentes (pino, @aws-sdk/*, aws-jwt-verify) no worktree —
+pré-existente, não relacionado ao diff de T003 (que não toca nenhum desses módulos). Não bloqueia
+este gate, pois o critério de aceite da task é sobre lint, não typecheck.
+
+## 5. Quantidade de testes por tipo
+- Estático/lint (repositório completo): 1 execução (`npx eslint .`).
+- Adversarial/lint (fixtures descartáveis, não persistidas no repositório): 6 cenários
+  (cross-BC relativo, same-BC, shared-kernel/tenant, export-from, require, import dinâmico).
+- Inspeção estática/manual: 1 (checklist do PR template vs. nome real da regra/arquivo).
+
+## 6. Resultado
+- Aprovados: 8 (1 lint global + 6 fixtures adversariais + 1 inspeção de checklist)
+- Falhos: 0
+- Ignorados: 0
+- Instáveis: 0
+
+## 7. Cobertura
+Não aplicável a esta task — regra de lint e template de PR não são código de produção coberto por
+cobertura de statements/branches/functions/lines do Vitest. Cobertura funcional foi obtida via
+verificação adversarial direta do comportamento da regra (seção 4), não via `coverage-summary.json`.
+
+## 8. Allure
+Não gerado para esta task — não há testes automatizados no runner (Vitest) exercitando a regra
+ESLint; a verificação foi feita fora do runner de testes, diretamente via `eslint`. Nenhum dado
+sensível envolvido (fixtures continham apenas nomes de classes já públicas no repositório).
+
+## 9. Bugs por severidade e status
+Nenhum bug encontrado.
+
+## 10. Riscos residuais
+- Ausência de `RuleTester` unitário para a regra ESLint (ver seção 3) — mudança futura na regra
+  não tem rede de segurança automatizada em CI, apenas a validação manual desta sessão.
+- Resolução de `tsconfig paths` não coberta (documentado no próprio código da regra como risco
+  conhecido e aceito, condicional a mudança futura de configuração).
+
+## 11. Limitações do ambiente
+Nenhuma limitação de ambiente impediu a validação dos 4 critérios de aceite e dos 3 cenários
+adversariais adicionais desta task.
+
+## 12. Parecer final
+APROVADO PELO QA
