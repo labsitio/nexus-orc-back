@@ -1,6 +1,14 @@
-import { ItemParaValidacao } from './item-para-validacao.vo.js';
+import { ItemParaValidacao, type ItemParaValidacaoPayload } from './item-para-validacao.vo.js';
 import { PeriodoValidade } from './periodo-validade.vo.js';
 import { ErroDominio } from '../errors/erro-dominio.js';
+
+export interface DadosExtraidosParaValidacaoPayload {
+  readonly cnpjFornecedor: string;
+  readonly itens: readonly ItemParaValidacaoPayload[];
+  readonly condicoesComerciais: string;
+  readonly dataEmissaoProposta: string;
+  readonly periodoValidade: string;
+}
 
 export class DadosExtraidosParaValidacaoInvalidosError extends ErroDominio {
   constructor(mensagem: string) {
@@ -52,5 +60,15 @@ export class DadosExtraidosParaValidacao {
       props.dataEmissaoProposta,
       props.periodoValidade,
     );
+  }
+
+  paraPayload(): DadosExtraidosParaValidacaoPayload {
+    return {
+      cnpjFornecedor: this.cnpjFornecedor,
+      itens: this.itens.map((item) => item.paraPayload()),
+      condicoesComerciais: this.condicoesComerciais,
+      dataEmissaoProposta: this.dataEmissaoProposta.toISOString(),
+      periodoValidade: this.periodoValidade.paraPayload(),
+    };
   }
 }

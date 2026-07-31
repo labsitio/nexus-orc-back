@@ -50,6 +50,36 @@ describe('ItemParaValidacao', () => {
     expect(item.extraido).toBe(false);
   });
 
+  it('paraPayload serializa categoria/descricao ausentes sem chaves undefined', () => {
+    const item = ItemParaValidacao.de({
+      quantidade: 1,
+      precoUnitario: Dinheiro.de(1000, 'BRL'),
+      extraido: false,
+    });
+    expect(item.paraPayload()).toEqual({
+      quantidade: 1,
+      precoUnitario: { valorCentavos: 1000, moeda: 'BRL' },
+      extraido: false,
+    });
+  });
+
+  it('paraPayload serializa categoria/descricao presentes', () => {
+    const item = ItemParaValidacao.de({
+      descricao: 'Notebook 14"',
+      quantidade: 2,
+      precoUnitario: Dinheiro.de(500000, 'BRL'),
+      categoria: CategoriaItem.de('Informática'),
+      extraido: true,
+    });
+    expect(item.paraPayload()).toEqual({
+      descricao: 'Notebook 14"',
+      quantidade: 2,
+      precoUnitario: { valorCentavos: 500000, moeda: 'BRL' },
+      categoria: 'Informática',
+      extraido: true,
+    });
+  });
+
   it('rejeita quantidade <= 0', () => {
     expect(() =>
       ItemParaValidacao.de({
