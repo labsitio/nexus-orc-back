@@ -1,5 +1,37 @@
 # Test Execution Report — SPEC 002
 
+## Leva T015 (issue #80, PR #429, commit `3580e09`)
+
+### Escopo
+`EventPublisher` (Domain, novo, réplica do contrato de spec-001) +
+`EventBridgePublisher` (Infrastructure) do BC Extração — instância própria
+deste BC, mesmo bus `nexo-dominio-bus`.
+
+### Comando e resultado
+```bash
+npx vitest run
+```
+- 49 arquivos passaram, 6 skipped (integração Postgres/schema sem `DATABASE_URL`
+  — pré-existente, não relacionado a esta PR) — **224 testes passaram, 0 falhas**.
+- `eventbridge.publisher.test.ts` (extração): 3/3 PASS.
+- Sem regressão nas demais suítes (BC Ingestão & Identificação, BC Validação,
+  BC Extração).
+
+### Estático
+- `npx tsc --noEmit` — sem erros.
+- `npx eslint` nos 3 arquivos alterados/novos — sem erros.
+
+### Ambiente
+Sem LocalStack neste worktree. Teste é unitário com `EventBridgeClient` mockado
+(`send` fake) — sem chamada real a `PutEventsCommand`. Suficiente para validar
+o contrato do publisher (mapeamento de campos e tratamento de erro), não
+substitui um teste de integração contra EventBridge real/LocalStack.
+
+### Resultado
+**PASS.** Nenhum defeito de produção encontrado.
+
+---
+
 ## Leva T012 (issue #77, PR #423, commit `27409c6`)
 
 ### Escopo
