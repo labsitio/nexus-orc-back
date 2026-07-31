@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { CategoriaItem } from '../../../../src/bounded-contexts/validacao/domain/value-objects/categoria-item.vo.js';
 import { DadosExtraidosParaValidacao } from '../../../../src/bounded-contexts/validacao/domain/value-objects/dados-extraidos-para-validacao.vo.js';
 import { Dinheiro } from '../../../../src/bounded-contexts/validacao/domain/value-objects/dinheiro.vo.js';
+import { FaixaPreco } from '../../../../src/bounded-contexts/validacao/domain/value-objects/faixa-preco.vo.js';
 import { InconsistenciaDetectada } from '../../../../src/bounded-contexts/validacao/domain/value-objects/inconsistencia-detectada.vo.js';
 import { ItemParaValidacao } from '../../../../src/bounded-contexts/validacao/domain/value-objects/item-para-validacao.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/validacao/domain/value-objects/orcamento-id.vo.js';
@@ -10,6 +12,12 @@ import {
   OrcamentoValidacao,
   TransicaoInvalidaValidacaoError,
 } from '../../../../src/bounded-contexts/validacao/domain/orcamento-validacao.aggregate.js';
+import {
+  validarCamposObrigatorios,
+  validarCnpjValido,
+  validarPrazoCoerente,
+  validarPrecoDentroDaFaixa,
+} from '../../../../src/bounded-contexts/validacao/domain/regras-consistencia.js';
 
 const orcamentoId = () => OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a1');
 
@@ -46,6 +54,40 @@ describe('OrcamentoValidacao', () => {
     expect(agregado.status).toBe('VALIDADO');
     expect(agregado.historico).toHaveLength(1);
     expect(agregado.historico[0]?.resultado).toBe('VALIDADO');
+  });
+
+  it('criar() + avaliarRegrasDeConsistencia com as 4 regras determinísticas (T010) passando transita para VALIDADO', () => {
+    const categoria = CategoriaItem.de('Informática');
+    const faixasPreco = [
+      FaixaPreco.de(categoria, Dinheiro.de(500, 'BRL'), Dinheiro.de(5000, 'BRL')),
+    ];
+    const dados = DadosExtraidosParaValidacao.de({
+      cnpjFornecedor: '11222333000181',
+      itens: [
+        ItemParaValidacao.de({
+          descricao: 'Notebook',
+          quantidade: 1,
+          precoUnitario: Dinheiro.de(1000, 'BRL'),
+          categoria,
+          extraido: true,
+        }),
+      ],
+      condicoesComerciais: 'à vista',
+      dataEmissaoProposta: new Date('2026-01-10T00:00:00.000Z'),
+      periodoValidade: PeriodoValidade.de(new Date('2026-02-10T00:00:00.000Z')),
+    });
+
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dados);
+    const inconsistencias = [
+      ...validarCnpjValido(dados),
+      ...validarCamposObrigatorios(dados),
+      ...validarPrecoDentroDaFaixa(dados, faixasPreco),
+      ...validarPrazoCoerente(dados),
+    ];
+
+    expect(inconsistencias).toHaveLength(0);
+    agregado.avaliarRegrasDeConsistencia(inconsistencias);
+    expect(agregado.status).toBe('VALIDADO');
   });
 
   it('avaliarRegrasDeConsistencia com 1+ inconsistência transita direto para PENDENTE_REVISAO_HUMANA', () => {
