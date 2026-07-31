@@ -44,3 +44,15 @@ Novo arquivo `conformidade/domain/errors/erro-dominio.ts`: classe abstrata
 sem logica alem do construtor, exercitada indiretamente via subclasse
 `ReferenciaTitularInvalidaError` nos testes de rejeicao. Sem regressao em
 VOs de outros modulos (inalterados neste PR).
+
+## T009 — final (commit `37ada19`)
+
+`eventbridge.publisher.ts`: Statements 7/7 (100%) | Branches 4/4 (100%) |
+Functions 2/2 (100%), confirmado via `coverage-final.json` (v8 json
+reporter, filtrado por caminho). Os 3 testes já entregues pelo dev-back-end
+exercitam publicação bem-sucedida e os 2 ramos de erro (`ErrorMessage`
+presente/ausente), cobrindo os 4 branches do arquivo (o `if (resultado.FailedEntryCount)`
+e o `??` de fallback da mensagem). `domain/gateways/event-publisher.ts` é
+apenas uma interface TS (sem código executável em runtime, sem entrada em
+`coverage-final.json`). Nenhuma lacuna de cobertura conhecida para este
+arquivo.
