@@ -26,7 +26,7 @@
 
 **⚠️ CRITICAL**: nenhuma user story começa antes desta fase.
 
-- [ ] T004 Domain: implementar VO `AssinaturaEstrutural` em `src/bounded-contexts/ingestao-identificacao/domain/value-objects/assinatura-estrutural.ts` — string opaca, construtor valida formato de hash, sem lógica de cálculo (cálculo é Application, ver T010). Critério: rejeita string vazia/malformada com erro de domínio.
+- [x] T004 Domain: implementar VO `AssinaturaEstrutural` em `src/bounded-contexts/ingestao-identificacao/domain/value-objects/assinatura-estrutural.ts` — string opaca, construtor valida formato de hash, sem lógica de cálculo (cálculo é Application, ver T010). Critério: rejeita string vazia/malformada com erro de domínio.
 - [ ] T005 [P] Domain: implementar VO `SinalCacheIdentificacao` em `src/bounded-contexts/ingestao-identificacao/domain/value-objects/sinal-cache-identificacao.ts` — `{ assinatura: AssinaturaEstrutural, resultadoAnterior: ResultadoClassificacao, ultimaConfirmacaoEm: Date }`.
 - [ ] T006 [P] Domain: definir interface `CacheIdentificacaoGateway` em `src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.ts` — métodos `buscar(assinatura: AssinaturaEstrutural): Promise<SinalCacheIdentificacao | null>` e `registrar(assinatura: AssinaturaEstrutural, resultado: ResultadoClassificacao): Promise<void>`. Sem implementação, apenas contrato.
 - [ ] T007 Domain: estender o tipo de envelope de Domain Event (usado pelos 5 eventos já definidos em 001) com campo opcional `prioridade?: 'PADRAO' | 'LOTE_BAIXA_PRIORIDADE'` — mudança aditiva, retrocompatível, sem novo evento. Critério: payload sem o campo continua válido (default implícito `PADRAO`).
