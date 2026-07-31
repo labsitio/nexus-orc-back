@@ -60,7 +60,8 @@ new ValidadorQueueStack(app, 'ValidadorQueueStack', {
 
 new ContextoClassificacaoQueueStack(app, 'ContextoClassificacaoQueueStack', {
   description:
-    'Fila contexto-classificacao-queue + DLQ + alarme (BC Orquestração) — spec 005, T003.',
+    'Fila contexto-classificacao-queue + DLQ + alarme, roteada por regra EventBridge — spec 005, T003/T004.',
+  dominioBus: dominioEventBusStack.dominioBus,
 });
 
 new ContextoExtracaoQueueStack(app, 'ContextoExtracaoQueueStack', {
