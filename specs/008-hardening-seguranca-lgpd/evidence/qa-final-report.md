@@ -250,3 +250,94 @@ ambiente local — nao relacionado a este PR.
 
 ## Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T007 (VO ReferenciaTitular)
+
+## SPEC_ID e versao testada
+008-hardening-seguranca-lgpd. PR #441, branch feat/008-hardening-conformidade-t007,
+commit 47c19bc. Primeira validacao (nao e reteste; sem BUG anterior nesta task).
+
+## Resumo executivo
+T007 implementa o VO ReferenciaTitular (src/platform/conformidade/domain/value-objects/referencia-titular.vo.ts)
+— identifica o titular de dado pessoal de forma estavel entre BCs (ex.: e-mail
+normalizado ou CNPJ+contato) sem expor a modelagem interna de nenhum BC
+(plan.md L106). Opaco por design: normaliza (lowercase + trim) mas nao
+interpreta formato. Arquivos de producao alterados: referencia-titular.vo.ts
+(novo) e conformidade/domain/errors/erro-dominio.ts (novo — base de erro de
+dominio local do modulo conformidade, primeira vez que esse modulo precisa de
+um; mesmo padrao ja usado em shared-value-objects/ingestao-identificacao/extracao/validacao,
+cada um com sua propria classe local, conforme ADR-004: "cada BC os declara
+localmente — nunca import cross-BC").
+
+## Requisitos cobertos e nao cobertos
+- Criterio de aceite da task (identificar titular de forma estavel entre BCs
+  sem expor modelagem interna, plan.md L106): coberto, PASS.
+- Opacidade: VO nao valida/interpreta formato do valor (aceita qualquer texto
+  nao vazio ate 320 chars) — confirmado por leitura de codigo.
+- Normalizacao (lowercase + trim) garantindo que a mesma referencia logica com
+  capitalizacao diferente resulte no mesmo VO: coberto, teste dedicado.
+- Validacao de limite (vazio/whitespace rejeitado, >320 chars rejeitado, 320
+  chars exato aceito): coberto.
+- equals por valor normalizado: coberto.
+- Nenhum outro RF/RN/RNF de spec.md (US1-US4) e exigivel por esta task isolada
+  (VO puro, ainda sem uso por agregado/caso de uso — entra em T022+).
+
+## Suites executadas e comandos
+- npx vitest run --reporter=default tests/platform/conformidade
+- npx vitest run --reporter=default (suite completa, para regressao)
+- npx vitest run --coverage --coverage.reporter=json tests/platform/conformidade
+- npx tsc --noEmit -p .
+- npx eslint . --ext .ts
+
+Detalhe completo em qa/test-execution-report.md.
+
+## Quantidade de testes por tipo
+7 testes unitarios (ja entregues pelo dev-back-end junto com T007; QA validou
+sem necessidade de estender — cobrem o criterio de aceite, opacidade,
+normalizacao, limites de tamanho e equals).
+
+## Resultado: aprovados, falhos, ignorados e instaveis
+- referencia-titular.vo.test.ts: 7/7 aprovados.
+- Suite completa (--reporter=default): 249 aprovados, 27 ignorados (skipped
+  pre-existentes), 7 arquivos falhos por Cannot find package (pino,
+  @opentelemetry/instrumentation-aws-lambda e outros pacotes AWS/observability)
+  em modulos de bounded-contexts/extracao e bounded-contexts/ingestao-identificacao —
+  mesmos 7 ja registrados em T005/T006, confirmado via git show 47c19bc --stat
+  que o diff deste PR nao toca esses modulos. Nao relacionado a este PR.
+- tsc --noEmit / eslint: sem erro nos arquivos do diff.
+
+## Cobertura inicial e final
+Repositorio nao possui threshold de cobertura configurado. Para o arquivo em
+diff, referencia-titular.vo.ts: 9/9 statements (100%), confirmado via
+coverage-final.json (v8 json reporter, filtrado por caminho — a tabela texto
+do reporter v8 nao lista o arquivo individualmente, mesma limitacao de
+ferramental ja registrada em T005/T006). Nenhuma lacuna de cobertura conhecida
+para este VO.
+
+## Allure
+Gerado com sucesso nesta validacao — allure-results/ contem os 7 resultados
+de ReferenciaTitular (grep -rl "ReferenciaTitular" allure-results). Ver
+qa/allure-report.md.
+
+## Bugs por severidade e status
+Nenhum bug de producao encontrado nesta validacao.
+
+## Riscos residuais
+- 7 arquivos de teste seguem falhando por dependencias de runtime ausentes no
+  node_modules do worktree (pino, @opentelemetry/*, @aws-sdk/*) em modulos de
+  outros BCs — pre-existente, fora do escopo deste PR, mesmo risco ja
+  registrado em T005/T006. Recomenda-se reinstalacao de dependencias (npm ci)
+  neste worktree antes do proximo ciclo.
+- Novo `ErroDominio` local do modulo conformidade/domain: apenas 2 subclasses
+  ate agora (ReferenciaTitularInvalidaError). Convencao correta segundo
+  ADR-004, sem acao necessaria.
+
+## Limitacoes do ambiente
+Nenhuma limitacao bloqueante identificada nesta validacao alem da ja
+registrada (pacotes AWS/observability ausentes, pre-existente e nao
+relacionada a este diff).
+
+## Parecer final
+APROVADO PELO QA

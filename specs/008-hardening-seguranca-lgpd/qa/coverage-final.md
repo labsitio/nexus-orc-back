@@ -29,3 +29,18 @@ individual do arquivo, mesma limitação já registrada em T005). Diretório
 funcs. Nenhuma lacuna de cobertura conhecida para este VO. Sem regressão na
 cobertura de `categoria-documento.vo.ts`/`politica-retencao.vo.ts` (inalterados
 neste PR).
+
+## T007 — final (commit `47c19bc`)
+
+`referencia-titular.vo.ts`: 9/9 statements cobertos (100%), confirmado via
+`coverage-final.json` (v8, `--coverage.reporter=json`) filtrado pelo caminho
+do arquivo — a tabela texto do reporter v8 continua omitindo a linha
+individual do arquivo (mesma limitacao de ferramental registrada em T005/T006).
+Os 7 testes exercitam: caminho valido, normalizacao (lowercase + trim), os 2
+ramos de erro (vazio/whitespace e acima de 320 chars) e o limite exato de 320
+chars, alem de `equals`. Nenhuma lacuna de cobertura conhecida para este VO.
+
+Novo arquivo `conformidade/domain/errors/erro-dominio.ts`: classe abstrata
+sem logica alem do construtor, exercitada indiretamente via subclasse
+`ReferenciaTitularInvalidaError` nos testes de rejeicao. Sem regressao em
+VOs de outros modulos (inalterados neste PR).
