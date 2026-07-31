@@ -84,3 +84,59 @@ array `reporters` parece incompatível com a versão instalada do runner
 entre baseline e HEAD do PR — mesmos 12 arquivos, mesmo erro, mesma
 stack — não é atribuível às mudanças de T001-T003. Registrado como
 limitação de ambiente preexistente, não como defeito deste PR.
+
+## T005 — VO `PoliticaRetencao` (PR #437, commit `4db548f`)
+
+Ambiente: Node 24, worktree `.claude/worktrees/agent-ae5e601a6ab865f53`.
+
+```
+$ npx vitest run tests/platform/shared-value-objects/politica-retencao.vo.test.ts
+ ✓ tests/platform/shared-value-objects/politica-retencao.vo.test.ts (9 tests) 7ms
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+```
+
+Casos cobertos: prazoEmDias positivo aceito; prazoEmDias 0/-1/-100 rejeitados
+(`PrazoEmDiasInvalidoError`); prazoEmDias não inteiro (1.5) rejeitado (mesmo
+erro); baseLegal vazia e whitespace-only rejeitadas (`BaseLegalInvalidaError`);
+atualizadaEm inválida (`new Date('data-invalida')`) rejeitada
+(`AtualizadaEmInvalidaError`); `equals` comparando os 4 campos. Todos os 3
+erros de domínio herdam de `ErroDominio`, conferido por leitura de código.
+Critério de aceite da task ("teste unit cobrindo rejeição de `prazoEmDias <=
+0`") satisfeito e ampliado.
+
+`npx tsc --noEmit` e `npx eslint` no arquivo de produção e no teste: sem erro.
+
+**Nota sobre o reporter `allure-vitest`**: ao contrário da limitação registrada
+na Fase 1 (`Vitest failed to find the runner`), a suíte completa roda hoje sem
+esse erro — `npm test`/`npx vitest run` (config completa, com reporter Allure
+ativo) executam normalmente e geram `allure-results/` (245 arquivos, incluindo
+os 9 resultados de `PoliticaRetencao`). O bug do reporter não se reproduziu
+nesta validação; não investigado a fundo por estar fora do escopo de T005.
+
+### Regressão completa (HEAD `4db548f`)
+
+```
+$ npx vitest run --reporter=default
+ Test Files  7 failed | 48 passed | 6 skipped (61)
+      Tests  230 passed | 27 skipped (257)
+```
+
+Os 7 arquivos falhos são pré-existentes e não relacionados a este diff —
+falham na importação de dependências ausentes em outros módulos:
+`@aws-sdk/client-eventbridge` (BC extracao), `pino` e
+`@opentelemetry/instrumentation-aws-lambda` (BC ingestao-identificacao).
+Nenhum deles importa ou depende de `politica-retencao.vo.ts`. Nenhuma
+regressão introduzida por T005.
+
+### Cobertura
+
+`npx vitest run --coverage` isolado no arquivo de teste do VO: os 9 testes
+exercitam os 3 `if` de validação (branch positivo e negativo de cada um) e o
+`equals`. A linha do arquivo `politica-retencao.vo.ts` não aparece
+individualmente na tabela text do relatório v8 (mostra apenas a agregação da
+pasta `.../shared-value-objects/domain` e o arquivo `categoria-documento.vo.ts`
+— possível comportamento do reporter ao omitir arquivo 100% coberto); a
+cobertura funcional de todos os ramos foi confirmada por leitura de código +
+execução dos 9 casos, não por essa tabela. Registrado como limitação de
+ferramental de relatório, não como lacuna de teste.

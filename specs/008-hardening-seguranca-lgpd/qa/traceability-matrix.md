@@ -11,3 +11,11 @@
 Nenhum RF/RN/RNF funcional de `spec.md` é aplicável nesta fase — Phase 1 é
 scaffolding sem lógica de negócio. Rastreabilidade funcional (US1-US4) só
 passa a existir a partir da Phase 2/3.
+
+## T005 — VO `PoliticaRetencao`
+
+| Task | Critério de aceite | Verificação | Resultado | Evidência |
+|---|---|---|---|---|
+| T005 | VO `PoliticaRetencao` (`categoria`, `prazoEmDias` positivo, `baseLegal`, `atualizadaEm`) com teste unit cobrindo rejeição de `prazoEmDias <= 0` (#306) | Leitura de `politica-retencao.vo.ts` vs. shape exigido; `npx vitest run tests/platform/shared-value-objects/politica-retencao.vo.test.ts` | PASS | `src/platform/shared-value-objects/domain/politica-retencao.vo.ts`; `tests/platform/shared-value-objects/politica-retencao.vo.test.ts` (9 testes); `test-execution-report.md` |
+| T005 (ampliado) | `prazoEmDias` não inteiro, `baseLegal` vazia/whitespace, `atualizadaEm` inválida também rejeitados, cada um com erro de domínio próprio (`PrazoEmDiasInvalidoError`, `BaseLegalInvalidaError`, `AtualizadaEmInvalidaError`, todos `ErroDominio`) | Leitura do VO + execução dos 9 casos (`it.each` para múltiplos valores inválidos) | PASS | idem |
+| — (regressão) | Suíte do repositório não quebra com a inclusão do VO | `npx vitest run --reporter=default` completo (HEAD `4db548f`) | PASS (7 arquivos falhando por dependência ausente pré-existente — `@aws-sdk/client-eventbridge`, `pino`, `@opentelemetry/instrumentation-aws-lambda` — fora de escopo deste diff) | `test-execution-report.md` |

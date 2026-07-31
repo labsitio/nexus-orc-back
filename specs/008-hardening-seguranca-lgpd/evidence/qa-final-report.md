@@ -1,5 +1,9 @@
 # QA Final Report — T001-T003 (Phase 1: Setup)
 
+> Ver seção "T005" ao final deste documento para a validação mais recente
+> (VO `PoliticaRetencao`, PR #437). O conteúdo abaixo documenta a validação
+> histórica de T001-T003 e é preservado para rastreabilidade.
+
 ## SPEC_ID e versão testada
 `008-hardening-seguranca-lgpd`. PR #407, branch `feat/008-hardening`,
 commit `64ef79c`. Primeira validação (não é reteste; sem BUG anterior).
@@ -86,3 +90,80 @@ corrigida antes que T004+ (que exige testes unit reais) possa ser validada
 por QA. Ação recomendada: dev-back-end ou DevOps investigar a config de
 `vitest.config.ts`/`allure-vitest` como item da próxima task, não como
 defeito desta.
+
+---
+
+# QA Final Report — T005 (VO PoliticaRetencao)
+
+## SPEC_ID e versao testada
+008-hardening-seguranca-lgpd. PR #437, branch feat/008-hardening-conformidade-t005,
+commit 4db548f. Primeira validacao (nao e reteste; sem BUG anterior).
+
+## Resumo executivo
+T005 implementa o VO PoliticaRetencao (categoria, prazoEmDias, baseLegal,
+atualizadaEm) com 3 erros de dominio proprios (PrazoEmDiasInvalidoError,
+BaseLegalInvalidaError, AtualizadaEmInvalidaError, todos ErroDominio). Unico
+arquivo de producao alterado: politica-retencao.vo.ts (novo). Teste unitario
+com 9 casos cobre caminho valido, todos os ramos de erro e equals.
+
+## Requisitos cobertos e nao cobertos
+- Criterio de aceite da task ("teste unit cobrindo rejeicao de prazoEmDias <= 0"):
+  coberto, PASS -- e ampliado para nao-inteiro, baseLegal vazia/whitespace e
+  atualizadaEm invalida.
+- Shape do VO conforme especificado pelo dev-back-end: confirmado por leitura
+  de codigo, PASS.
+- Nenhum outro RF/RN/RNF de spec.md (US1-US4) e exigivel por esta task isolada
+  (VO puro, sem uso ainda por caso de uso/agregado).
+
+## Suites executadas e comandos
+- npx vitest run tests/platform/shared-value-objects/politica-retencao.vo.test.ts
+- npx vitest run --reporter=default (suite completa, para regressao)
+- npm test (config completa com reporter Allure)
+- npx tsc --noEmit
+- npx eslint no arquivo de producao e no teste
+- npx vitest run --coverage (isolado no arquivo do VO)
+
+Detalhe completo em qa/test-execution-report.md.
+
+## Quantidade de testes por tipo
+9 testes unitarios (ja entregues pelo dev-back-end junto com T005; QA validou,
+sem necessidade de criar novos, por ja cobrirem o criterio de aceite e todos
+os ramos de erro do VO).
+
+## Resultado: aprovados, falhos, ignorados e instaveis
+- politica-retencao.vo.test.ts: 9/9 aprovados.
+- Suite completa (--reporter=default): 230 aprovados, 27 ignorados
+  (skipped pre-existentes), 7 arquivos falhos -- todos por dependencia de
+  runtime ausente em outros modulos (BC extracao/ingestao-identificacao),
+  confirmados nao relacionados a este diff.
+- tsc/eslint: sem erros.
+
+## Cobertura inicial e final
+Repositorio nao possui threshold de cobertura configurado. Para o arquivo em
+diff, politica-retencao.vo.ts: todos os statements/branches exercitados pelos
+9 testes (caminho valido + 3 ramos de erro + equals), confirmado por leitura
+de codigo -- a tabela text do reporter v8 omite a linha individual do arquivo
+(ver nota em qa/test-execution-report.md). Nenhuma lacuna de cobertura
+conhecida para este VO.
+
+## Allure
+Gerado com sucesso nesta validacao -- allure-results/ contem os 9 resultados
+de PoliticaRetencao. Ver qa/allure-report.md.
+
+## Bugs por severidade e status
+Nenhum bug de producao encontrado nesta validacao.
+
+## Riscos residuais
+- 7 arquivos de teste seguem falhando por dependencias de runtime ausentes
+  (@aws-sdk/client-eventbridge, pino, @opentelemetry/instrumentation-aws-lambda)
+  em modulos nao relacionados a 008 -- pre-existente, fora do escopo deste PR.
+- Cobertura estrutural do repositorio como um todo ainda baixa (maior parte
+  dos modulos de outros BCs sem teste) -- nao e escopo desta task.
+
+## Limitacoes do ambiente
+Nenhuma limitacao bloqueante identificada nesta validacao -- ao contrario do
+registrado na Fase 1, a suite completa (incluindo o reporter Allure) rodou
+sem erro de inicializacao neste ambiente/commit.
+
+## Parecer final
+APROVADO PELO QA
