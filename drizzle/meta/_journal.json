@@ -50,6 +50,13 @@
       "when": 1785453712703,
       "tag": "0006_extracoes_orcamento_historico_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785459746513,
+      "tag": "0007_daffy_bulldozer",
+      "breakpoints": true
     }
   ]
 }

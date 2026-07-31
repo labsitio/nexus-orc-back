@@ -53,6 +53,12 @@ class ArmazenamentoBrutoFake implements ArmazenamentoBrutoGateway {
   async lerConteudoBruto(): Promise<Uint8Array> {
     return new Uint8Array([1, 2, 3]);
   }
+  async gerarUrlUpload(): Promise<string> {
+    throw new Error('não usado neste teste');
+  }
+  async confirmarUpload(): Promise<ReferenciaS3 | undefined> {
+    throw new Error('não usado neste teste');
+  }
 }
 
 class ConversorFake implements MarkItDownConversaoACL {

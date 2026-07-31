@@ -5,6 +5,33 @@ import type { Construct } from 'constructs';
 
 const BUCKET_NAME = 'nexo-orcamentos-raw';
 
+/** Prefixo dos uploads via presigned URL ainda não confirmados (T021/#26). */
+const PREFIXO_UPLOAD_PENDENTE = 'pending-uploads/';
+
+/**
+ * Duplica `RETENCAO_UPLOAD_PENDENTE_HORAS` de
+ * `src/.../infrastructure/s3-armazenamento-bruto.gateway.ts` — CDK roda via
+ * Node nativo sem remapeamento `.js`→`.ts` (diferente de `tsc`/`vitest`), então
+ * importar daquele módulo quebraria a resolução dos imports internos dele em
+ * cascata; duplicar 1 constante inteira é mais barato que trocar o runtime do
+ * CDK. Manter os dois valores em sincronia manualmente ao alterar qualquer um.
+ *
+ * ponytail: duplicação deliberada de uma constante — se crescer para mais de
+ * um valor compartilhado entre `src/` e `infra/`, resolver o runtime do CDK
+ * (ex.: `tsx` como app entrypoint) em vez de duplicar mais.
+ */
+const RETENCAO_UPLOAD_PENDENTE_HORAS = 2;
+
+/**
+ * Expiração do "órfão" de upload (T024/#29, ADR-002: "upload sem confirmação
+ * nunca dispara pipeline" — mas o objeto fica no S3 mesmo assim se o cliente
+ * nunca chamar `confirmar-upload`). Maior que `RETENCAO_UPLOAD_PENDENTE_HORAS`
+ * (retenção Object Lock explícita do PUT presigned, `gerarUrlUpload`) — S3
+ * Lifecycle nunca apaga objeto ainda sob Object Lock ativo, então a regra só
+ * funciona de fato depois que essa retenção já tiver passado.
+ */
+const EXPIRACAO_UPLOAD_PENDENTE_DIAS = 1;
+
 /**
  * Storage do BC Ingestão & Identificação (spec 001, T012).
  *
@@ -33,6 +60,13 @@ export class IngestaoIdentificacaoStorageStack extends Stack {
     super(scope, id, props);
     this.terminationProtection = true;
 
+    if (EXPIRACAO_UPLOAD_PENDENTE_DIAS * 24 <= RETENCAO_UPLOAD_PENDENTE_HORAS) {
+      throw new Error(
+        'EXPIRACAO_UPLOAD_PENDENTE_DIAS precisa ser maior que RETENCAO_UPLOAD_PENDENTE_HORAS — ' +
+          'senão a lifecycle rule tenta apagar objeto ainda sob Object Lock (S3 ignora silenciosamente).',
+      );
+    }
+
     const key = new kms.Key(this, 'OrcamentosRawKey', {
       alias: 'alias/nexo-orcamentos-raw',
       description:
@@ -54,6 +88,15 @@ export class IngestaoIdentificacaoStorageStack extends Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
       removalPolicy: RemovalPolicy.RETAIN,
+      lifecycleRules: [
+        {
+          id: 'ExpirarUploadPendenteNaoConfirmado',
+          enabled: true,
+          prefix: PREFIXO_UPLOAD_PENDENTE,
+          expiration: Duration.days(EXPIRACAO_UPLOAD_PENDENTE_DIAS),
+          noncurrentVersionExpiration: Duration.days(EXPIRACAO_UPLOAD_PENDENTE_DIAS),
+        },
+      ],
     });
   }
 }

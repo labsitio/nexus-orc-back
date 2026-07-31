@@ -1,7 +1,16 @@
-import type { S3Client } from '@aws-sdk/client-s3';
+import type { CopyObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { describe, expect, it, vi } from 'vitest';
-import { S3ArmazenamentoBrutoGateway } from '../../../../src/bounded-contexts/ingestao-identificacao/infrastructure/s3-armazenamento-bruto.gateway.js';
+import {
+  chaveUploadPendente,
+  S3ArmazenamentoBrutoGateway,
+} from '../../../../src/bounded-contexts/ingestao-identificacao/infrastructure/s3-armazenamento-bruto.gateway.js';
+import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
+
+vi.mock('@aws-sdk/s3-request-presigner', () => ({
+  getSignedUrl: vi.fn(),
+}));
 
 function s3ClientFake(send: (command: unknown) => unknown): S3Client {
   return { send } as unknown as S3Client;
@@ -59,5 +68,100 @@ describe('S3ArmazenamentoBrutoGateway', () => {
         }),
       ),
     ).rejects.toThrow(/Body/);
+  });
+
+  it('gerarUrlUpload assina PutObject na chave determinística pending-uploads/<orcamentoId>-<nomeArquivo>', async () => {
+    vi.mocked(getSignedUrl).mockResolvedValue('https://s3.exemplo/presigned?sig=abc');
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(vi.fn()), 'nexo-orcamentos-raw');
+    const orcamentoId = OrcamentoId.novo();
+
+    const url = await gateway.gerarUrlUpload(orcamentoId, 'orcamento.pdf');
+
+    expect(url).toBe('https://s3.exemplo/presigned?sig=abc');
+    expect(getSignedUrl).toHaveBeenCalledTimes(1);
+    const [, comando, opcoes] = vi.mocked(getSignedUrl).mock.calls[0]!;
+    expect((comando as PutObjectCommand).input.Bucket).toBe('nexo-orcamentos-raw');
+    expect((comando as PutObjectCommand).input.Key).toBe(
+      chaveUploadPendente(orcamentoId, 'orcamento.pdf'),
+    );
+    expect((comando as PutObjectCommand).input.ObjectLockMode).toBe('GOVERNANCE');
+    const retainUntil = (comando as PutObjectCommand).input.ObjectLockRetainUntilDate as Date;
+    expect(retainUntil.getTime()).toBeGreaterThan(Date.now());
+    expect(retainUntil.getTime()).toBeLessThanOrEqual(Date.now() + 2 * 60 * 60 * 1000 + 1000);
+    expect(opcoes).toMatchObject({ expiresIn: 15 * 60 });
+  });
+
+  it('confirmarUpload copia de pending-uploads/ para o prefixo definitivo do canal e devolve a nova ReferenciaS3', async () => {
+    const orcamentoId = OrcamentoId.novo();
+    const send = vi.fn((command: unknown) => {
+      if ((command as { constructor: { name: string } }).constructor.name === 'HeadObjectCommand') {
+        return Promise.resolve({ VersionId: 'v-pendente' });
+      }
+      return Promise.resolve({ VersionId: 'v-final' });
+    });
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    const referencia = await gateway.confirmarUpload(
+      'PORTAL_WEB',
+      orcamentoId,
+      'orcamento pdf.pdf',
+    );
+
+    expect(referencia).toEqual(
+      ReferenciaS3.de({
+        bucket: 'nexo-orcamentos-raw',
+        key: `portal-web/${orcamentoId.toString()}-orcamento pdf.pdf`,
+        versionId: 'v-final',
+      }),
+    );
+    expect(send).toHaveBeenCalledTimes(2);
+    const copia = send.mock.calls[1]?.[0] as CopyObjectCommand;
+    expect(copia.input.Bucket).toBe('nexo-orcamentos-raw');
+    expect(copia.input.Key).toBe(`portal-web/${orcamentoId.toString()}-orcamento pdf.pdf`);
+    expect(copia.input.CopySource).toBe(
+      `nexo-orcamentos-raw/${chaveUploadPendente(orcamentoId, 'orcamento%20pdf.pdf')}?versionId=v-pendente`,
+    );
+  });
+
+  it('confirmarUpload devolve undefined quando o objeto não existe (upload não concluído)', async () => {
+    const erroNaoEncontrado = Object.assign(new Error('not found'), { name: 'NotFound' });
+    const send = vi.fn().mockRejectedValue(erroNaoEncontrado);
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    const referencia = await gateway.confirmarUpload('API_REST', OrcamentoId.novo(), 'x.pdf');
+
+    expect(referencia).toBeUndefined();
+  });
+
+  it('confirmarUpload propaga erro inesperado do S3 (não mascara como upload ausente)', async () => {
+    const send = vi.fn().mockRejectedValue(new Error('acesso negado'));
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    await expect(gateway.confirmarUpload('API_REST', OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
+      /acesso negado/,
+    );
+  });
+
+  it('confirmarUpload lança erro se o HeadObject não devolver VersionId', async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    await expect(gateway.confirmarUpload('API_REST', OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
+      /VersionId/,
+    );
+  });
+
+  it('confirmarUpload lança erro se o CopyObject não devolver VersionId', async () => {
+    const send = vi.fn((command: unknown) => {
+      if ((command as { constructor: { name: string } }).constructor.name === 'HeadObjectCommand') {
+        return Promise.resolve({ VersionId: 'v-pendente' });
+      }
+      return Promise.resolve({});
+    });
+    const gateway = new S3ArmazenamentoBrutoGateway(s3ClientFake(send), 'nexo-orcamentos-raw');
+
+    await expect(gateway.confirmarUpload('API_REST', OrcamentoId.novo(), 'x.pdf')).rejects.toThrow(
+      /VersionId/,
+    );
   });
 });

@@ -5,6 +5,7 @@ import { ConfirmarRevisaoHumanaLambdaRoleStack } from '../lib/confirmar-revisao-
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
 import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
+import { ReceberOrcamentoLambdaRoleStack } from '../lib/receber-orcamento-lambda-role-stack.ts';
 import { ValidadorQueueStack } from '../lib/validador-queue-stack.ts';
 
 const app = new App();
@@ -14,6 +15,11 @@ const storageStack = new IngestaoIdentificacaoStorageStack(
   'IngestaoIdentificacaoStorageStack',
   { description: 'Storage (S3) do BC Ingestão & Identificação — spec 001, T012.' },
 );
+
+new ReceberOrcamentoLambdaRoleStack(app, 'ReceberOrcamentoLambdaRoleStack', {
+  description: 'IAM role do(s) Lambda(s) que executam ReceberOrcamento — spec 001, T026.',
+  orcamentosRawBucket: storageStack.orcamentosRawBucket,
+});
 
 const dominioEventBusStack = new DominioEventBusStack(app, 'DominioEventBusStack', {
   description:
