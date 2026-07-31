@@ -1,19 +1,9 @@
 import { ErroDominio } from '../errors/erro-dominio.js';
+import type { ContextoValidacao } from './contexto-validacao.vo.js';
 import type { NivelConfianca } from './nivel-confianca.vo.js';
 
 export type AcaoRoteamento = 'APROVAR' | 'ENCAMINHAR_COMPRADOR' | 'SOLICITAR_REENVIO';
 export type AgenteOrigemDecisao = 'ORQUESTRADOR' | 'HUMANO';
-
-/**
- * Contrato mínimo de `ContextoValidacao` (VO de T009, spec 005, ainda não
- * mergeado em `main` no momento desta implementação — ver ADR/PR desta
- * task). Não duplica o arquivo de T009: expõe apenas o campo que a
- * invariante de `DecisaoRoteamento` precisa. Quando T009 for mergeado,
- * substituir por import do VO real (mesmo shape estrutural esperado).
- */
-export interface ContextoValidacaoParaDecisao {
-  readonly resultado: 'VALIDADO' | 'VALIDADO_COM_RESSALVA';
-}
 
 export class AprovacaoSemValidacaoError extends ErroDominio {
   constructor() {
@@ -50,7 +40,7 @@ export interface CriarDecisaoRoteamentoInput {
    * validar a invariante "nunca aprovar sem validação bem-sucedida" no
    * momento da construção.
    */
-  readonly contextoValidacao?: ContextoValidacaoParaDecisao;
+  readonly contextoValidacao?: ContextoValidacao;
 }
 
 const RESULTADOS_VALIDACAO_APROVAVEIS = new Set(['VALIDADO', 'VALIDADO_COM_RESSALVA']);
