@@ -36,7 +36,7 @@
 - [x] T013 Infrastructure: `DrizzleExtracaoOrcamentoRepository` implementando `ExtracaoOrcamentoRepository`, traduzindo linha↔agregado, nunca vazando tipo JSONB bruto para fora da Infra.
 - [x] T014 [P] Infrastructure: `S3LeituraBrutaGateway` implementando `LeituraBrutaGateway` — read-only sobre `nexo-orcamentos-raw`, sem nenhuma permissão de escrita. #79
 - [x] T015 Infrastructure: `EventBridgePublisher` implementando `EventPublisher` (instância própria deste BC, mesmo bus `nexo-dominio-bus`). #80
-- [ ] T016 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta da spec 001).
+- [x] T016 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta da spec 001). #81
 
 **Checkpoint**: Domain testável isoladamente (sem infra), repositório e publisher funcionais contra ambiente local (LocalStack).
 
