@@ -26,3 +26,16 @@
 | `TentativaExtracao` é sucesso XOR insucesso, nunca ambos/nenhum | Integridade de domínio | Integração (Postgres real) | INSERT com ambos os campos e com nenhum → violação de CHECK | `extracao-orcamento.schema.test.ts` (2 testes) | **BLOQUEADO por BUG-003** (mesma causa raiz) |
 | Migração aplica sem erro em Postgres real a partir do baseline (pré-condição p/ CI e T013) | Deploy/CI | Integração (Postgres real) | `drizzle-kit migrate` a partir do estado pós-T002 | manual (`drizzle-kit migrate` + `psql` direto) | **FAIL** — `bugs/BUG-003.md`, CRÍTICA |
 | `db:generate` sem diff pendente (schema TS ≡ migração commitada) | Consistência schema/migração | Estático | `npx drizzle-kit generate` | manual | PASS |
+
+## Leva T015 (issue #80, PR #429, commit `3580e09`)
+
+| Critério de aceite (tasks.md) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| `EventBridgePublisher` implementa `EventPublisher` (Domain), instância própria do BC Extração, mesmo bus `nexo-dominio-bus` | Contrato/integração | Unit (mock `EventBridgeClient`) | publica com `EventBusName`, `Source: nexo.extracao`, `DetailType` e `Detail` (JSON do envelope) corretos | `eventbridge.publisher.test.ts` (1 teste) | PASS |
+| Falha reportada pelo EventBridge (`FailedEntryCount > 0`) vira erro descritivo, nunca falha silenciosa | Confiabilidade/observabilidade | Unit | `ErrorMessage` presente → mensagem inclui detailType, orcamentoId, bus e motivo | `eventbridge.publisher.test.ts` (1 teste) | PASS |
+| Fallback de mensagem quando EventBridge não informa `ErrorMessage` | Confiabilidade | Unit | `Entries: [{}]` → erro com "motivo desconhecido" | `eventbridge.publisher.test.ts` (1 teste) | PASS |
+
+Limitação: sem LocalStack neste worktree — sem teste de integração real contra
+EventBridge (`PutEventsCommand` de verdade). Risco residual: comportamento real
+do SDK AWS (retries, throttling) não exercitado; mitigado por ser mock fiel ao
+shape de retorno documentado do SDK (`FailedEntryCount`/`Entries[].ErrorMessage`).

@@ -1,5 +1,60 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
+## Validação — T015 (issue #80), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #429, branch `feat/002-t015-eventbridge-publisher`, commit `3580e09`
+
+### Resumo executivo
+`EventPublisher` (Domain, novo) + `EventBridgePublisher` (Infrastructure, novo)
+do BC Extração. Réplica do contrato já usado em spec-001, instância própria
+(nunca compartilha client entre BCs), `source` fixo `nexo.extracao`, mesmo bus
+`nexo-dominio-bus`, erro descritivo (com fallback) quando `PutEventsCommand`
+reporta `FailedEntryCount > 0`. `backend-reviewer` já aprovou (1 NIT cosmético
+em `tasks.md`/T011, não bloqueante).
+
+### Requisitos cobertos
+- Publica com `source`/`detail-type`/bus corretos (contrato).
+- Erro descritivo com `ErrorMessage` do EventBridge.
+- Erro com fallback quando `ErrorMessage` ausente.
+
+### Lacuna conhecida
+Sem LocalStack neste worktree — sem teste de integração real contra
+EventBridge. Mitigado por mock fiel ao shape do SDK; risco residual (retries,
+throttling reais) não é do escopo de T015.
+
+### Suítes executadas e comandos
+```bash
+npx vitest run
+# Test Files  49 passed | 6 skipped (55)
+#      Tests  224 passed | 27 skipped (251)
+
+npx tsc --noEmit
+# sem erros
+
+npx eslint src/bounded-contexts/extracao/domain/gateways/event-publisher.ts \
+  src/bounded-contexts/extracao/infrastructure/eventbridge.publisher.ts \
+  tests/bounded-contexts/extracao/infrastructure/eventbridge.publisher.test.ts
+# sem erros
+```
+Os 6 arquivos skipped são testes de integração Postgres/schema pré-existentes
+(`describe.skipIf` sem `DATABASE_URL`), não relacionados a esta PR.
+
+### Cobertura
+`eventbridge.publisher.ts`: 3 branches exercitados (sucesso, erro com
+`ErrorMessage`, erro sem `ErrorMessage`) — 100% das linhas e branches do
+arquivo novo.
+
+### Bugs
+Nenhum. Nenhum defeito de produção encontrado.
+
+### Parecer final
+**APROVADO PELO QA** — critérios de aceite de T015 satisfeitos, suíte completa
+sem regressão, typecheck e lint limpos.
+
+---
+
 ## Reteste — T012 (issue #77), BUG-003 corrigido
 
 ### SPEC_ID e versão testada
