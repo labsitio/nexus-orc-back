@@ -41,7 +41,7 @@ Conforme `plan.md` desta spec e convenção herdada de 001: `src/platform/confor
 - [x] T007 [P] Implementar VO `ReferenciaTitular` em `src/platform/conformidade/domain/value-objects/referencia-titular.vo.ts`. (#308, PR #441)
 - [x] T008 Definir contrato dos Domain Events (`SolicitacaoEsquecimentoRegistrada`, `DadoPessoalAnonimizadoNoContexto`, `SolicitacaoEsquecimentoConcluida`, `SolicitacaoEsquecimentoPrazoExcedido`, `RetencaoAplicadaNoContexto`) como tipos TS em `src/platform/conformidade/domain/events/` — cada um com `schemaVersion: 1` e os campos definidos em `plan.md`. Depende de T004–T007.
 - [x] T009 Reaproveitar (import, não reimplementar) `EventPublisher`/`EventBridgePublisher` já estabelecido em 001 — confirmar publicação no mesmo bus `nexo-dominio-bus`, `detail-type` = nome do evento, `source = nexo.conformidade` para eventos publicados pelo componente de plataforma. (#310)
-- [ ] T010 Popular manualmente a tabela `platform.contextos_com_dado_pessoal` com a linha `ingestao-identificacao` (único BC arquitetado até aqui) — registrar como dado de seed, não hardcode em código de domínio.
+- [x] T010 Popular manualmente a tabela `platform.contextos_com_dado_pessoal` com a linha `ingestao-identificacao` (único BC arquitetado até aqui) — registrar como dado de seed, não hardcode em código de domínio. (#311)
 
 **Checkpoint**: VOs e contratos de evento prontos — User Stories podem começar em paralelo.
 

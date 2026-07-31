@@ -10,8 +10,9 @@ import {
 } from 'drizzle-orm/pg-core';
 
 // Schema Aurora dedicado ao componente de plataforma Conformidade (plan.md,
-// seção Infrastructure). Tabelas vazias nesta task (T002) — sem seed, sem
-// regra de negócio, apenas estrutura para o journal do Drizzle Kit.
+// seção Infrastructure). Tabelas vazias nesta task (T002) — sem regra de
+// negócio, apenas estrutura para o journal do Drizzle Kit. Seed de
+// `contextos_com_dado_pessoal` em ./seed/contextos-com-dado-pessoal.seed.ts (T010).
 export const platformSchema = pgSchema('platform');
 
 /** Agregado de coordenação `SolicitacaoEsquecimento` (plan.md, Domain). */
