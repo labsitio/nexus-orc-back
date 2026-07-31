@@ -94,7 +94,7 @@
 ### Tests (US3)
 
 - [x] T035 [P] [US3] Unit test `ExtracaoOrcamento.registrarConfirmacaoHumana` — só válido a partir de `PENDENTE_REVISAO_HUMANA`; valor real → `EXTRAIDO`; indisponibilidade confirmada → `EXTRAIDO_COM_PENDENCIA_CONFIRMADA`; histórico nunca sobrescrito. Já coberto pela suíte existente em `tests/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.test.ts` (describe `ExtracaoOrcamento.registrarConfirmacaoHumana`, linhas 104-130) — nenhum teste novo necessário.
-- [ ] T036 [P] [US3] Unit test de imutabilidade: tentativa de sobrescrever `referenciaBrutaS3` ou `referenciaClassificacao` após criação lança `ReferenciaImutavelError`.
+- [x] T036 [P] [US3] Unit test de imutabilidade: tentativa de sobrescrever `referenciaBrutaS3` ou `referenciaClassificacao` após criação lança `ReferenciaImutavelError`. Já coberto pela suíte existente em `tests/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.test.ts` (describe `ExtracaoOrcamento — imutabilidade de referências`, linhas 146-156) — nenhum teste novo necessário. #101
 - [ ] T037 [P] [US3] Contract test `POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana` (aceito em `PENDENTE_REVISAO_HUMANA`; 409 Problem Details em qualquer outro status).
 
 ### Implementation (US3)
