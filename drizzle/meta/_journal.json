@@ -57,6 +57,13 @@
       "when": 1785459746513,
       "tag": "0007_daffy_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785492252098,
+      "tag": "0008_enable_pgvector_extension",
+      "breakpoints": true
     }
   ]
 }
