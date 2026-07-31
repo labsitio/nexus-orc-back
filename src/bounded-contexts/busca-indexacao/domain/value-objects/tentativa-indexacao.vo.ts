@@ -42,12 +42,22 @@ export class TentativaIndexacao {
           'resultado INDEXADO exige modeloEmbedding não vazio',
         );
       }
+      if (props.motivoFalha !== undefined) {
+        throw new TentativaIndexacaoInvalidaError(
+          'resultado INDEXADO não pode vir acompanhado de motivoFalha',
+        );
+      }
       return new TentativaIndexacao('INDEXADO', props.timestamp, props.modeloEmbedding, undefined);
     }
 
     if (!props.motivoFalha?.trim()) {
       throw new TentativaIndexacaoInvalidaError(
-        'resultado FALHA_TECNICA exige motivoFalha não vazio — nunca "falhou" genérico',
+        'resultado FALHA_TECNICA exige motivoFalha não vazio',
+      );
+    }
+    if (props.modeloEmbedding !== undefined) {
+      throw new TentativaIndexacaoInvalidaError(
+        'resultado FALHA_TECNICA não pode vir acompanhado de modeloEmbedding',
       );
     }
     return new TentativaIndexacao('FALHA_TECNICA', props.timestamp, undefined, props.motivoFalha);

@@ -53,6 +53,28 @@ describe('TentativaIndexacao', () => {
     ).toThrow(TentativaIndexacaoInvalidaError);
   });
 
+  it('rejeita INDEXADO acompanhado de motivoFalha', () => {
+    expect(() =>
+      TentativaIndexacao.de({
+        resultado: 'INDEXADO',
+        timestamp,
+        modeloEmbedding: 'modelo',
+        motivoFalha: 'não deveria vir',
+      }),
+    ).toThrow(TentativaIndexacaoInvalidaError);
+  });
+
+  it('rejeita FALHA_TECNICA acompanhado de modeloEmbedding', () => {
+    expect(() =>
+      TentativaIndexacao.de({
+        resultado: 'FALHA_TECNICA',
+        timestamp,
+        motivoFalha: 'serviço indisponível',
+        modeloEmbedding: 'não deveria vir',
+      }),
+    ).toThrow(TentativaIndexacaoInvalidaError);
+  });
+
   it('rejeita timestamp inválido', () => {
     expect(() =>
       TentativaIndexacao.de({
