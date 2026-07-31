@@ -77,7 +77,7 @@
 ### Tests (US2)
 
 - [x] T027 [P] [US2] Unit test `ExtracaoOrcamento.registrarTentativaExtrator` com campo obrigatório de confiança insuficiente → transita direto para `PENDENTE_REVISAO_HUMANA`, nunca para `EXTRAIDO`, campo permanece `extraido: false`/`valor: null`. Já coberto por `tests/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.test.ts` (escrito junto de T009) — nenhum código novo necessário. #92
-- [ ] T029 [P] [US2] Integration test: campo ambíguo conhecido → `ExtracaoEscalonadaParaRevisaoHumana` publicado diretamente pelo Extrator (sem revisor de IA) → status reflete `PENDENTE_REVISAO_HUMANA`.
+- [x] T029 [P] [US2] Integration test: campo ambíguo conhecido → `ExtracaoEscalonadaParaRevisaoHumana` publicado diretamente pelo Extrator (sem revisor de IA) → status reflete `PENDENTE_REVISAO_HUMANA`. #94
 
 > **Nota (revisão)**: T028 (unit test do revisor de extração) e T030–T034 (implementação do `BedrockRevisorExtracaoGateway`, caso de uso `RevisarExtracaoComIA`, fila `revisor-extracao-queue`, regra EventBridge e role `RevisorExtracaoLambdaRole`) foram **removidos** — o Agente Revisor de Extração deixou de existir. O caminho de baixa confiança agora é publicado diretamente pelo `ExtrairDadosOrcamento` (T022) via `registrarTentativaExtrator` (T009). Os IDs T028 e T030–T034 não existem mais; os demais IDs foram mantidos estáveis para preservar a rastreabilidade das issues do GitHub.
 
