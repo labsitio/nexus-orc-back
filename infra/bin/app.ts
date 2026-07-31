@@ -7,6 +7,7 @@ import { ContextoExtracaoQueueStack } from '../lib/contexto-extracao-queue-stack
 import { DecisaoWorkflowQueueStack } from '../lib/decisao-workflow-queue-stack.ts';
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
 import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
+import { IndexadorQueueStack } from '../lib/indexador-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
 import { ReceberOrcamentoLambdaRoleStack } from '../lib/receber-orcamento-lambda-role-stack.ts';
 import { ValidadorQueueStack } from '../lib/validador-queue-stack.ts';
@@ -74,4 +75,8 @@ new DecisaoWorkflowQueueStack(app, 'DecisaoWorkflowQueueStack', {
   description:
     'Fila decisao-workflow-queue + DLQ + alarme, roteada por regra EventBridge — spec 005, T003/T006.',
   dominioBus: dominioEventBusStack.dominioBus,
+});
+
+new IndexadorQueueStack(app, 'IndexadorQueueStack', {
+  description: 'Fila indexador-queue + DLQ + alarme (BC Busca & Indexação) — spec 004, T004.',
 });
