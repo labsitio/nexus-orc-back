@@ -1,9 +1,10 @@
+import type { MetodoAnonimizacao } from '../../../shared-value-objects/domain/dado-anonimizado.vo.js';
 import type { DomainEventEnvelope } from './domain-event.js';
 
 /** Shape plano (JSON) de um `DadoAnonimizado` — nunca carrega o valor original (ADR-004/T006). */
 export interface DadoAnonimizadoPayload {
   readonly campoOriginal: string;
-  readonly metodo: 'MASCARAMENTO' | 'REMOCAO';
+  readonly metodo: MetodoAnonimizacao;
   readonly aplicadoEm: string;
   readonly solicitacaoId: string;
 }
