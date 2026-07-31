@@ -41,7 +41,7 @@ Monorepo único, conforme `plan.md` desta spec — `src/shared-kernel/`, `src/bo
 
 **⚠️ CRITICAL**: nenhuma implementação de US1/US2/US3 é aceitável antes desta fase estar completa e testada.
 
-- [ ] T004 Provisionar Cognito custom attribute `custom:tenant_id` (imutável pós-onboarding) — infraestrutura, IAM/Cognito.
+- [x] T004 Provisionar Cognito custom attribute `custom:tenant_id` (imutável pós-onboarding) — infraestrutura, IAM/Cognito. Runbook em `specs/007-isolamento-multitenant-dados/infra/cognito-custom-attribute-tenant-id.md` (User Pool não é gerenciado por IaC neste repo — nenhuma spec 001-006 provisiona o pool via CDK/Terraform; mutação de schema é operacional, executada uma única vez por ambiente). (#267)
 - [ ] T005 Implementar `TenantContextMiddleware` (plugin Fastify) em `src/interface/shared/tenant-context.middleware.ts` — extrai/valida claim JWT, popula `request.tenantContext`, rejeita com 401 Problem Details se ausente/inválida. Nunca aceita `tenantId` de query/path/body.
 - [ ] T006 [P] Criar tabela `sftp_tenant_mapping` (Drizzle schema + migration) e resolver `tenantId` no trigger Lambda do canal SFTP a partir do mapeamento usuário/servidor (nunca do conteúdo do arquivo).
 - [ ] T007 Habilitar RLS no Aurora Serverless v2: migration adicionando `tenant_id UUID NOT NULL` + `CREATE POLICY tenant_isolation ... USING (tenant_id = current_setting('app.current_tenant_id')::uuid)` nas tabelas `orcamentos` e `orcamentos_historico` (retrofit de 001).
