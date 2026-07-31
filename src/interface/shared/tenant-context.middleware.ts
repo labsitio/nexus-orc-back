@@ -2,17 +2,12 @@ import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import type { preHandlerHookHandler } from 'fastify';
 import { criarTenantContext, type TenantContext } from '../../shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../shared-kernel/tenant/tenant-id.vo.js';
+import type { ProblemDetails } from './problem-details.schema.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
     tenantContext?: TenantContext;
   }
-}
-
-export interface ProblemDetails {
-  readonly type: string;
-  readonly title: string;
-  readonly status: number;
 }
 
 export interface TenantContextMiddlewareConfig {
@@ -44,6 +39,7 @@ export function criarTenantContextMiddleware(
     const cabecalho = request.headers.authorization;
     const token = cabecalho?.startsWith('Bearer ') ? cabecalho.slice('Bearer '.length) : undefined;
     if (!token) {
+      request.log.warn({ motivo: 'sem_token' }, 'TenantContextMiddleware: requisição rejeitada');
       await responderNaoAutenticado(reply, 'Header Authorization: Bearer <token> ausente');
       return;
     }
@@ -52,12 +48,14 @@ export function criarTenantContextMiddleware(
     try {
       payload = await verifier.verify(token);
     } catch {
+      request.log.warn({ motivo: 'token_invalido' }, 'TenantContextMiddleware: requisição rejeitada');
       await responderNaoAutenticado(reply, 'Token JWT inválido ou expirado');
       return;
     }
 
     const claimTenantId = payload['custom:tenant_id'];
     if (typeof claimTenantId !== 'string' || claimTenantId.length === 0) {
+      request.log.warn({ motivo: 'claim_ausente' }, 'TenantContextMiddleware: requisição rejeitada');
       await responderNaoAutenticado(reply, 'Claim custom:tenant_id ausente no token');
       return;
     }
@@ -66,6 +64,7 @@ export function criarTenantContextMiddleware(
     try {
       tenantId = TenantId.de(claimTenantId);
     } catch {
+      request.log.warn({ motivo: 'claim_invalida' }, 'TenantContextMiddleware: requisição rejeitada');
       await responderNaoAutenticado(reply, 'Claim custom:tenant_id inválida');
       return;
     }

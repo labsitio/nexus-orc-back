@@ -40,14 +40,8 @@ export const statusIngestaoResponseSchema = z.object({
 
 export type StatusIngestaoResponse = z.infer<typeof statusIngestaoResponseSchema>;
 
-// ponytail: ProblemDetails duplicado localmente (RFC 7807) até um 2º BC
-// precisar do mesmo contrato — promover para shared-kernel nesse momento.
-export const problemDetailsSchema = z.object({
-  type: z.string().url().optional(),
-  title: z.string(),
-  status: z.number().int(),
-  detail: z.string().optional(),
-  instance: z.string().optional(),
-});
-
-export type ProblemDetails = z.infer<typeof problemDetailsSchema>;
+// Promovido para src/interface/shared/ (T005, #268) — segundo consumidor
+// (TenantContextMiddleware) apareceu, conforme o ponytail original previa.
+// Não vai para shared-kernel/: ADR-004 restringe o Shared Kernel exclusivamente
+// a tenant-id.vo.ts.
+export { problemDetailsSchema, type ProblemDetails } from '../../../../interface/shared/problem-details.schema.js';
