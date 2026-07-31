@@ -4,6 +4,7 @@ import {
   CriterioAusenteError,
   DecisaoRoteamento,
   ReenvioSemFundamentoError,
+  type ContextoValidacaoParaDecisao,
 } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/decisao-roteamento.vo.js';
 import { NivelConfianca } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/nivel-confianca.vo.js';
 
@@ -20,7 +21,10 @@ describe('DecisaoRoteamento', () => {
     ).toThrow(AprovacaoSemValidacaoError);
   });
 
-  it('rejeita APROVAR com contextoValidacao reprovado', () => {
+  it('rejeita APROVAR com contextoValidacao em resultado inesperado (defesa contra dado upstream malformado)', () => {
+    const contextoValidacaoMalformado = {
+      resultado: 'REPROVADO',
+    } as unknown as ContextoValidacaoParaDecisao;
     expect(() =>
       DecisaoRoteamento.criar({
         acao: 'APROVAR',
@@ -28,7 +32,7 @@ describe('DecisaoRoteamento', () => {
         criterio: 'confiança suficiente',
         agenteOrigem: 'ORQUESTRADOR',
         requerIntegracaoExterna: false,
-        contextoValidacao: { resultado: 'REPROVADO' },
+        contextoValidacao: contextoValidacaoMalformado,
       }),
     ).toThrow(AprovacaoSemValidacaoError);
   });

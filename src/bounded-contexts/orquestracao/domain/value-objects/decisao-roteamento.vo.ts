@@ -12,7 +12,7 @@ export type AgenteOrigemDecisao = 'ORQUESTRADOR' | 'HUMANO';
  * substituir por import do VO real (mesmo shape estrutural esperado).
  */
 export interface ContextoValidacaoParaDecisao {
-  readonly resultado: 'VALIDADO' | 'VALIDADO_COM_RESSALVA' | string;
+  readonly resultado: 'VALIDADO' | 'VALIDADO_COM_RESSALVA';
 }
 
 export class AprovacaoSemValidacaoError extends ErroDominio {
