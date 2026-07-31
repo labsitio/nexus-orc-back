@@ -53,11 +53,11 @@
 - [x] T017 [P] [US1] Unit test do agregado `ExtracaoOrcamento.criar(referenciaClassificacao, referenciaBrutaS3)` + `registrarTentativaExtrator` com todos os campos obrigatórios completos → transita para `EXTRAIDO`. Já coberto por `tests/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.test.ts` (escrito junto de T009) — nenhum código novo necessário. #82
 - [x] T018 [P] [US1] Unit test do `MarkItDownConversaoExtracaoACL` (mock de saída do MarkItDown) — sanitização de conteúdo antes de compor prompt (mitigação de prompt injection, mesmo padrão da spec 001). Implementação (Infrastructure) criada junto, réplica do padrão de `ingestao-identificacao` (nenhuma outra task do BC previa essa implementação). #83
 - [x] T019 [P] [US1] Contract test `GET /v1/orcamentos/{orcamentoId}/extracao/status` em `tests/bounded-contexts/extracao/contract/`. #84
-- [ ] T020 [P] [US1] Integration test: `OrcamentoClassificado` publicado → `OrcamentoExtraido` publicado, payload com itens/condições estruturados, p95 medido em ambiente de teste local (LocalStack).
+- [x] T020 [P] [US1] Integration test: `OrcamentoClassificado` publicado → `OrcamentoExtraido` publicado, payload com itens/condições estruturados, p95 medido em ambiente de teste local (LocalStack). #85
 
 ### Implementation (US1)
 
-- [ ] T021 [US1] Infrastructure: `BedrockExtratorGateway` + `BedrockExtracaoACL` (structured output/tool-use, nunca parsing de texto livre por regex).
+- [x] T021 [US1] Infrastructure: `BedrockExtratorGateway` + `BedrockExtracaoACL` (structured output/tool-use, nunca parsing de texto livre por regex). #86
 - [ ] T022 [US1] Application: caso de uso `ExtrairDadosOrcamento` (consome `OrcamentoClassificado`, converte via MarkItDown, invoca Extrator, aplica `registrarTentativaExtrator`, persiste, publica `OrcamentoExtraido` se todos os campos obrigatórios OK ou `ExtracaoEscalonadaParaRevisaoHumana` se 1+ campo sem confiança).
 - [ ] T023 [US1] Interface: handler Lambda consumidor SQS de `extrator-queue`, invocando `ExtrairDadosOrcamento`.
 - [ ] T024 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/extracao/status` (query, Zod schema de response, Problem Details para erro).
