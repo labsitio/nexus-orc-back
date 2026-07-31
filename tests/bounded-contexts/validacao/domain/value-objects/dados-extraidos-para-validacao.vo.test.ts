@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { CNPJ } from '../../../../../src/bounded-contexts/validacao/domain/value-objects/cnpj.vo.js';
 import {
   DadosExtraidosParaValidacao,
   DadosExtraidosParaValidacaoInvalidosError,
@@ -19,7 +18,7 @@ const item = () =>
 describe('DadosExtraidosParaValidacao', () => {
   it('aceita payload completo traduzido do evento upstream', () => {
     const dados = DadosExtraidosParaValidacao.de({
-      cnpjFornecedor: CNPJ.de('11222333000181'),
+      cnpjFornecedor: '11222333000181',
       itens: [item()],
       condicoesComerciais: 'à vista',
       dataEmissaoProposta: new Date('2026-01-10T00:00:00.000Z'),
@@ -31,7 +30,7 @@ describe('DadosExtraidosParaValidacao', () => {
   it('rejeita lista de itens vazia', () => {
     expect(() =>
       DadosExtraidosParaValidacao.de({
-        cnpjFornecedor: CNPJ.de('11222333000181'),
+        cnpjFornecedor: '11222333000181',
         itens: [],
         condicoesComerciais: 'à vista',
         dataEmissaoProposta: new Date('2026-01-10T00:00:00.000Z'),
@@ -43,7 +42,7 @@ describe('DadosExtraidosParaValidacao', () => {
   it('rejeita dataEmissaoProposta inválida', () => {
     expect(() =>
       DadosExtraidosParaValidacao.de({
-        cnpjFornecedor: CNPJ.de('11222333000181'),
+        cnpjFornecedor: '11222333000181',
         itens: [item()],
         condicoesComerciais: 'à vista',
         dataEmissaoProposta: new Date('data-invalida'),

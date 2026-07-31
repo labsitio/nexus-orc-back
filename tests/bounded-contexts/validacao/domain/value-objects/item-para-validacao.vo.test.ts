@@ -29,7 +29,7 @@ describe('ItemParaValidacao', () => {
     expect(item.categoria).toBeUndefined();
   });
 
-  it('rejeita descricao vazia', () => {
+  it('rejeita descricao em branco (deve ser omitida, não vazia, para representar ausência)', () => {
     expect(() =>
       ItemParaValidacao.de({
         descricao: '   ',
@@ -38,6 +38,16 @@ describe('ItemParaValidacao', () => {
         extraido: false,
       }),
     ).toThrow(ItemParaValidacaoInvalidoError);
+  });
+
+  it('aceita descricao ausente mesmo com extraido:false — pendência confirmada da Extração não isenta o campo obrigatório aqui', () => {
+    const item = ItemParaValidacao.de({
+      quantidade: 1,
+      precoUnitario: Dinheiro.de(1000, 'BRL'),
+      extraido: false,
+    });
+    expect(item.descricao).toBeUndefined();
+    expect(item.extraido).toBe(false);
   });
 
   it('rejeita quantidade <= 0', () => {

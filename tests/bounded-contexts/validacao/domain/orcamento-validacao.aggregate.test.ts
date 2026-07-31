@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { CNPJ } from '../../../../src/bounded-contexts/validacao/domain/value-objects/cnpj.vo.js';
 import { DadosExtraidosParaValidacao } from '../../../../src/bounded-contexts/validacao/domain/value-objects/dados-extraidos-para-validacao.vo.js';
 import { Dinheiro } from '../../../../src/bounded-contexts/validacao/domain/value-objects/dinheiro.vo.js';
 import { InconsistenciaDetectada } from '../../../../src/bounded-contexts/validacao/domain/value-objects/inconsistencia-detectada.vo.js';
@@ -16,7 +15,7 @@ const orcamentoId = () => OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a1')
 
 const dadosExtraidos = () =>
   DadosExtraidosParaValidacao.de({
-    cnpjFornecedor: CNPJ.de('11222333000181'),
+    cnpjFornecedor: '11222333000181',
     itens: [
       ItemParaValidacao.de({
         descricao: 'Item',

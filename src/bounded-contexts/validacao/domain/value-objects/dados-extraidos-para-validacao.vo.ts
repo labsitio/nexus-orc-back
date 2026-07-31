@@ -1,4 +1,3 @@
-import { CNPJ } from './cnpj.vo.js';
 import { ItemParaValidacao } from './item-para-validacao.vo.js';
 import { PeriodoValidade } from './periodo-validade.vo.js';
 import { ErroDominio } from '../errors/erro-dominio.js';
@@ -10,7 +9,14 @@ export class DadosExtraidosParaValidacaoInvalidosError extends ErroDominio {
 }
 
 export interface DadosExtraidosParaValidacaoProps {
-  readonly cnpjFornecedor: CNPJ;
+  /**
+   * String bruta traduzida pelo ACL — deliberadamente não é o VO `CNPJ`
+   * aqui: a regra "CNPJ válido" (T010) é uma das 4 regras determinísticas
+   * do Domain, não uma invariante de construção deste VO. Formato/dígito
+   * verificador inválido vira `InconsistenciaDetectada('CNPJ_INVALIDO')`
+   * via `validarCnpjValido`, nunca um erro de domínio não capturado aqui.
+   */
+  readonly cnpjFornecedor: string;
   readonly itens: readonly ItemParaValidacao[];
   readonly condicoesComerciais: string;
   readonly dataEmissaoProposta: Date;
@@ -25,7 +31,7 @@ export interface DadosExtraidosParaValidacaoProps {
  */
 export class DadosExtraidosParaValidacao {
   private constructor(
-    readonly cnpjFornecedor: CNPJ,
+    readonly cnpjFornecedor: string,
     readonly itens: readonly ItemParaValidacao[],
     readonly condicoesComerciais: string,
     readonly dataEmissaoProposta: Date,
