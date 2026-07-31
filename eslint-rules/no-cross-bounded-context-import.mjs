@@ -19,6 +19,11 @@ function extractBc(filePath) {
 
 function checkSource(context, filename, fromBc, node, source) {
   if (typeof source !== 'string') return;
+  // Specifiers não-relativos (sem ".") são checados pelo texto literal, sem
+  // resolução de tsconfig `paths` — hoje seguro porque o projeto não tem path
+  // aliases configurados. Se `paths` for adicionado no futuro apontando para
+  // dentro de bounded-contexts/ sem o literal "bounded-contexts" no specifier,
+  // revisitar esta regra para resolver via ts-config-paths antes de comparar.
   const target = source.startsWith('.') ? path.resolve(path.dirname(filename), source) : source;
   const toBc = extractBc(target);
   if (toBc && toBc !== fromBc) {
