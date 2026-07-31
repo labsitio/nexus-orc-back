@@ -394,3 +394,163 @@ Nenhuma limitação de ambiente impediu a validação dos 7 critérios de aceite
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# Validação adicional — T006 (SPEC_ID: 007-isolamento-multitenant-dados)
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: 007-isolamento-multitenant-dados
+- Issue: #269
+- PR: #478 (draft, aprovado pelo backend-reviewer com veredito APPROVE WITH NITS)
+- Branch: feat/007-isolamento-multitenant
+- Worktree: `.claude/worktrees/agent-007-multitenant`
+- Commit testado: 3f3b009 (conteúdo relevante; HEAD atual após merge de reconciliação 891b8f5)
+- Tipo de validação: primeira validação (sem reteste anterior)
+
+## 2. Resumo executivo
+T006 cria a tabela `sftp_tenant_mapping` (PK composta `servidor_id`/`usuario`, `tenant_id` uuid
+not null) e resolve `tenantId` no trigger Lambda do canal SFTP a partir do mapeamento
+usuário/servidor — nunca do conteúdo do arquivo. A cadeia é: `S3SftpTenantResolverGateway` lê as
+tags `aws:transfer:server-id`/`aws:transfer:user-name` do objeto S3 (via
+`GetObjectTaggingCommand`) e delega a `SftpTenantMappingRepository` (implementação Drizzle) apenas
+quando ambas as tags existem — evitando lookup de banco desnecessário quando o pré-requisito de
+infraestrutura (Managed Workflow com step `TAG` no AWS Transfer Family) não está configurado. O
+handler `criarHandlerSftpUpload` resolve o `tenantId` antes de chamar `ReceberOrcamento.executar`,
+mas trata o mapeamento ausente como log-only (`console.warn`), sem bloquear o processamento —
+correto para esta fase Foundational, já que `ReceberOrcamento` ainda não exige `tenantId` (T016
+formaliza a exigência). O achado MAJOR do backend-reviewer (tags do AWS Transfer Family não são
+automáticas, exigem Managed Workflow configurado) foi endereçado com um runbook dedicado
+(`specs/007-isolamento-multitenant-dados/infra/aws-transfer-family-tagging-tenant.md`), sem
+alteração de comportamento de código — sem esse workflow, o gateway retorna `undefined` para todo
+arquivo, que é exatamente o comportamento log-only já esperado, sem regressão frente ao
+comportamento anterior a T006.
+
+## 3. Requisitos cobertos e não cobertos
+Cobertos (5 critérios de aceite do pedido de validação — ver matriz de rastreabilidade para o
+mapeamento completo):
+1. Migration cria a tabela com PK composta correta (`servidor_id`, `usuario`), `tenant_id uuid not
+   null` — confirmado por leitura de `drizzle/0010_sftp_tenant_mapping.sql` e comparação com o
+   schema Drizzle.
+2. Repositório resolve `tenantId` corretamente por `(servidorId, usuario)`, retorna `undefined` se
+   não encontrado, não confunde usuários diferentes do mesmo servidor — 3 cenários cobertos por
+   teste de integração (Postgres real), pulados nesta execução por ausência de `DATABASE_URL` no
+   ambiente (comportamento correto de `skipIf`, ver seção 11).
+3. Gateway S3 extrai as duas tags corretas e delega ao repositório; retorna `undefined` sem sequer
+   chamar o repositório quando as tags estão ausentes — 3/3 testes unit verdes, com asserção
+   explícita `expect(mapeamento.resolverTenantId).not.toHaveBeenCalled()` no cenário sem tags.
+4. Handler SFTP resolve `tenantId` antes de `ReceberOrcamento.executar`, não lança erro quando
+   ausente (log-only), não quebra nenhum dos 5 testes de regressão pré-existentes (idempotência,
+   múltiplos registros, prefixo, `versionId` ausente, referência do próprio evento) — 7/7 testes
+   verdes (5 pré-existentes + 2 novos T006).
+5. Nenhuma regressão no teste de integração multicanal (4 canais, mesmo shape de
+   `OrcamentoRecebido`) — 1/1 teste verde.
+
+Não cobertos (fora do escopo de T006, dependem de tasks futuras já mapeadas em `tasks.md`):
+- `ReceberOrcamento` ainda não exige/propaga `tenantId` formalmente (T016, Phase 3 — US1) — nesta
+  fase Foundational, o `tenantId` resolvido é apenas logado, por design.
+- Execução real do Managed Workflow de tagging no AWS Transfer Family (runbook desta task) —
+  documentado, não executado, requer acesso operacional AWS que este agente/QA não possui.
+
+## 4. Suítes executadas e comandos
+```
+cd .claude/worktrees/agent-007-multitenant
+npx vitest run tests/bounded-contexts/ingestao-identificacao/infrastructure/s3-sftp-tenant-resolver.gateway.test.ts \
+  tests/bounded-contexts/ingestao-identificacao/interface/events/sftp-upload.handler.test.ts \
+  tests/bounded-contexts/ingestao-identificacao/application/receber-orcamento-multicanal.integration.test.ts \
+  tests/bounded-contexts/ingestao-identificacao/infrastructure/persistence/drizzle-sftp-tenant-mapping.repository.test.ts
+
+npx vitest run tests/bounded-contexts/ingestao-identificacao   # regressão do BC inteiro
+
+npx eslint .
+npx tsc --noEmit -p .
+```
+`DATABASE_URL` não configurada neste ambiente — confirmado (`echo $DATABASE_URL` vazio); a suíte
+de integração do repositório (`drizzle-sftp-tenant-mapping.repository.test.ts`) foi corretamente
+pulada via `describe.skipIf(!DATABASE_URL)` (3 testes skipped), não uma falha silenciosa. Gap de
+ambiente conhecido e já reportado em ciclos anteriores desta spec: 6 suítes do BC falham por
+dependências não instaladas (`pino`, `@aws-sdk/client-bedrock-runtime`,
+`@aws-sdk/client-eventbridge`, `@aws-sdk/client-lambda`,
+`@opentelemetry/instrumentation-aws-lambda`) e `tsc --noEmit -p .` reporta `Cannot find module
+'aws-lambda'` — nenhum desses erros é introduzido por T006 (o próprio `sftp-upload.handler.ts` já
+importava `aws-lambda` antes deste diff, para tipar `S3Event`/`S3Handler`).
+
+## 5. Quantidade de testes por tipo
+- Unitário: 3 testes em `s3-sftp-tenant-resolver.gateway.test.ts` (S3Client mockado) + 2 novos
+  testes em `sftp-upload.handler.test.ts` (dedicados a T006).
+- Integração (Postgres real, condicional a `DATABASE_URL`): 3 testes em
+  `drizzle-sftp-tenant-mapping.repository.test.ts` — pulados nesta execução, existem e rodam no CI.
+- Regressão: 5 testes pré-existentes de `sftp-upload.handler.test.ts` (idempotência/redelivery,
+  múltiplos registros, prefixo, `versionId` ausente) + 1 teste de
+  `receber-orcamento-multicanal.integration.test.ts` (shape de evento entre 4 canais), ambos
+  ajustados apenas na assinatura de chamada (`criarHandlerSftpUpload` com 2º argumento), sem
+  enfraquecimento de asserção.
+- Regressão do BC completo (`tests/bounded-contexts/ingestao-identificacao`): 146 testes passando,
+  17 pulados (14 de suítes `skipIf(!DATABASE_URL)` de outras tasks + 3 desta task), 6 suítes
+  falhando por gap de dependência pré-existente e não relacionado a este diff.
+
+## 6. Resultado
+- Aprovados: 11 (suíte restrita a T006) / 146 (regressão completa do BC executável)
+- Falhos: 0 (relacionados a T006); 6 suítes falhando por gap de dependência pré-existente, não
+  relacionado a este diff
+- Ignorados: 3 (repositório, `skipIf` correto por ausência de `DATABASE_URL`) / 17 (regressão
+  completa do BC, mesma causa em outras tasks)
+- Instáveis: 0
+- Lint (`npx eslint .`): limpo, sem violação.
+- Typecheck (`npx tsc --noEmit -p .`): único erro relacionado ao diff é o gap de ambiente
+  pré-existente (`Cannot find module 'aws-lambda'`), não uma regressão introduzida por T006.
+
+## 7. Cobertura (arquivos tocados por T006, via `npx vitest run <suíte T006> --coverage`)
+- `S3SftpTenantResolverGateway`: 100% statements/functions/lines, 83,33% branches (única branch
+  não coberta é o parâmetro opcional `versionId` do `GetObjectTaggingCommand`, sem impacto na
+  lógica de resolução testada).
+- `DrizzleSftpTenantMappingRepository`: 0% nesta execução local — suíte de integração pulada por
+  ausência de `DATABASE_URL` (comportamento esperado do `skipIf`, não uma lacuna de teste; a suíte
+  cobre os 3 critérios de aceite do repositório e roda no CI, que provisiona Postgres antes da
+  suíte).
+- `sftp-tenant-mapping.schema.ts`: 50% statements/lines, 100% branches, 0% functions — arquivo
+  puramente declarativo (`pgTable`/`primaryKey` do Drizzle); a "função" não coberta é o callback do
+  índice de PK, exercitado implicitamente pela migration gerada e pelos testes de integração
+  quando rodam com banco real.
+- `criarHandlerSftpUpload`: cobertura funcional confirmada pelos 7/7 testes verdes da suíte do
+  handler; não isolado no relatório textual desta execução por particularidade do glob de
+  `--coverage.include` do provider v8 nesta versão do Vitest (limitação de tooling, não de teste).
+
+## 8. Allure
+`allure-results/` gerado na raiz do repositório via reporter já configurado em `vitest.config.ts`
+(`allure-vitest/reporter`). Execução da suíte relacionada a T006 (`s3-sftp-tenant-resolver.gateway.test.ts`,
+`sftp-upload.handler.test.ts`, `receber-orcamento-multicanal.integration.test.ts`,
+`drizzle-sftp-tenant-mapping.repository.test.ts`) produziu os `*-result.json` correspondentes.
+Nenhum dado sensível envolvido — fixtures usam tags/servidor/usuário sintéticos (`s-123`,
+`fornecedor-x`), sem PII real.
+
+## 9. Bugs por severidade e status
+Nenhum bug encontrado. Código de produção revisado linha a linha (schema, migration, repositório
+Drizzle, gateway S3, handler) contra os 5 critérios de aceite — nenhuma via de resolução de
+`tenantId` lê do conteúdo do arquivo; a ordem de chamada (`resolver` antes de
+`ReceberOrcamento.executar`) e o comportamento log-only foram confirmados tanto por leitura do
+código quanto por teste dedicado.
+
+## 10. Riscos residuais
+- Pré-requisito de infraestrutura documentado no runbook (Managed Workflow com step `TAG` no AWS
+  Transfer Family) ainda não confirmado como executado em nenhum ambiente real — sem ele, o
+  `tenantId` do canal SFTP nunca é resolvido (sempre log-only), mas isso não é uma regressão frente
+  ao comportamento anterior a T006 (canal SFTP não resolvia `tenantId` de forma alguma antes desta
+  task). Rastreamento de execução real é responsabilidade operacional, fora do escopo de código.
+- Onboarding do mapeamento `sftp_tenant_mapping` (preenchimento por tenant) é operacional, fora do
+  escopo desta task — mesmo padrão já aceito para o custom attribute Cognito (T004).
+- `ReceberOrcamento` ainda não formaliza a exigência de `tenantId` (T016) — o guardrail completo de
+  isolamento multi-tenant para o canal SFTP só se fecha quando T016 e T018 (RLS/`SET LOCAL`)
+  estiverem implementados; T006 é a peça de resolução, não o enforcement.
+
+## 11. Limitações do ambiente
+- `DATABASE_URL` não configurada neste ambiente de validação — suíte de integração do repositório
+  corretamente pulada (`skipIf`), não executada contra Postgres real nesta sessão. Recomenda-se
+  confirmação de execução verde no CI (que provisiona o banco) antes de considerar T006
+  definitivamente encerrada em produção.
+- Gap de dependências não instaladas (`pino`, alguns `@aws-sdk/*`, tipos `aws-lambda`) já reportado
+  em ciclos anteriores desta spec — não bloqueia este gate, pois nenhuma falha relacionada toca o
+  diff de T006.
+
+## 12. Parecer final
+APROVADO PELO QA

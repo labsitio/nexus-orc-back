@@ -1,5 +1,6 @@
 import type { S3Event, S3Handler } from 'aws-lambda';
 import type { ReceberOrcamento } from '../../application/use-cases/receber-orcamento.js';
+import type { SftpTenantResolverGateway } from '../../domain/gateways/sftp-tenant-resolver.gateway.js';
 import { ReferenciaS3 } from '../../domain/value-objects/referencia-s3.vo.js';
 
 /** Prefixo do canal SFTP — o mesmo usado pela regra de notificação S3/Transfer Family (plan.md). */
@@ -17,8 +18,18 @@ const PREFIXO_SFTP = 'sftp-incoming/';
  * `bucket/key#versionId` como `Idempotency-Key` (achado MAJOR do
  * backend-reviewer): reaproveita o mesmo gate de admissão de `ReceberOrcamento`
  * para nunca publicar `OrcamentoRecebido` duplicado num reprocessamento.
+ *
+ * `resolverTenant` (T006, spec 007): resolve `tenantId` do mapeamento
+ * usuário/servidor AWS Transfer Family, nunca do conteúdo do arquivo.
+ * Apenas resolvido/logado aqui — `ReceberOrcamento` ainda não exige
+ * `tenantId` (T016, Phase 3 desta spec, formaliza a exigência para todos os
+ * canais uniformemente); mapeamento ausente é registrado, não bloqueia o
+ * processamento nesta fase Foundational.
  */
-export function criarHandlerSftpUpload(receberOrcamento: ReceberOrcamento): S3Handler {
+export function criarHandlerSftpUpload(
+  receberOrcamento: ReceberOrcamento,
+  resolverTenant: SftpTenantResolverGateway,
+): S3Handler {
   return async (event: S3Event) => {
     for (const record of event.Records) {
       const bucket = record.s3.bucket.name;
@@ -34,9 +45,17 @@ export function criarHandlerSftpUpload(receberOrcamento: ReceberOrcamento): S3Ha
         );
       }
 
+      const referenciaBruta = ReferenciaS3.de({ bucket, key, versionId });
+      const tenantId = await resolverTenant.resolver(referenciaBruta);
+      if (!tenantId) {
+        console.warn(
+          `TenantId não resolvido para s3://${bucket}/${key} — mapeamento usuário/servidor ausente em sftp_tenant_mapping (onboarding pendente?)`,
+        );
+      }
+
       await receberOrcamento.executar({
         canal: 'SFTP',
-        referenciaBruta: ReferenciaS3.de({ bucket, key, versionId }),
+        referenciaBruta,
         idempotencyKey: `${bucket}/${key}#${versionId}`,
       });
     }

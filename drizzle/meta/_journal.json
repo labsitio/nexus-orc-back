@@ -71,6 +71,13 @@
       "when": 1785503597995,
       "tag": "0009_busca_indexacao_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785507739905,
+      "tag": "0010_sftp_tenant_mapping",
+      "breakpoints": true
     }
   ]
 }
