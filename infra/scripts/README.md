@@ -58,3 +58,53 @@ exit code `0`. Qualquer ação que tenha sucesso é reportada como `CRÍTICO`
 e o script sai com código `1` — indica ausência ou falha da SCP e possível
 vazamento de dado de prod para dev/hml (guardrail não-negociável da spec
 008, meta de 0 incidentes).
+
+## `verificar-contrato-assume-role-por-conta.sh` (spec 008, T012)
+
+Teste de contrato que valida, via `aws-cli`, que a role de deploy de CI/CD
+(OIDC) do ambiente corrente **não consegue assumir** a role de deploy de
+nenhum outro ambiente — `sts:AssumeRole` restrito por conta, reforçando que
+cada ambiente tem sua própria role de deploy (T015), nunca uma role única
+multi-conta.
+
+Ver `specs/008-hardening-seguranca-lgpd/spec.md` ("Segregação de
+ambientes") e `tasks.md` (T012, User Story 1 — Segregação de Ambientes).
+
+### Pré-requisitos (fora do escopo desta task, cabem a Ricardo/DevOps)
+
+- T013: 3 contas AWS (dev, hml, prod) provisionadas sob a mesma AWS
+  Organization.
+- T015: role de deploy OIDC do GitHub Actions específica de cada conta
+  (dev/hml/prod), com trust policy que não confia em outras contas.
+
+Sem T015, o script falha (AssumeRole não bloqueado, ou role inexistente) —
+isso é o esperado até essa task ser entregue, não um defeito deste teste.
+
+### Por que não roda no CI padrão (push/PR)
+
+Mesmo motivo do teste de SCP acima: exige credenciais reais de uma role de
+deploy de ambiente (T015) e nunca deve rodar contra produção — o script se
+recusa a executar se a conta corrente for `AWS_PROD_ACCOUNT_ID`.
+
+Ver `.github/workflows/verificar-contrato-assume-role-por-conta.yml` para
+o job de pipeline dedicado, disparado manualmente (`workflow_dispatch`)
+por Ricardo/DevOps depois que T015 estiver pronta.
+
+### Execução manual
+
+```bash
+AWS_PROD_ACCOUNT_ID=111111111111 \
+OUTRAS_DEPLOY_ROLE_ARNS="arn:aws:iam::222222222222:role/nexo-deploy-hml arn:aws:iam::111111111111:role/nexo-deploy-prod" \
+./infra/scripts/verificar-contrato-assume-role-por-conta.sh
+```
+
+Credenciais AWS ativas (via `aws sts get-caller-identity`) MUST ser da role
+de deploy de dev ou hml — nunca da role de produção.
+
+### Saída esperada
+
+`OK [AssumeRole -> <arn>]: bloqueado (AccessDenied)` para cada role de
+outro ambiente testada, e exit code `0`. Qualquer AssumeRole que tenha
+sucesso é reportado como `CRÍTICO` e o script sai com código `1` — indica
+que a role de deploy corrente pode agir sobre outro ambiente/conta,
+violando a segregação exigida (guardrail não-negociável da spec 008).
