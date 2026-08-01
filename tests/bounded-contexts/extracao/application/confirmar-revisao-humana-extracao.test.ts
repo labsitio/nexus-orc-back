@@ -4,10 +4,14 @@ import {
   ConfirmarRevisaoHumanaExtracao,
   ExtracaoNaoEncontradaError,
 } from '../../../../src/bounded-contexts/extracao/application/use-cases/confirmar-revisao-humana-extracao.js';
-import { ExtracaoOrcamento } from '../../../../src/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.js';
+import {
+  ExtracaoOrcamento,
+  TransicaoInvalidaExtracaoError,
+} from '../../../../src/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.js';
 import { CampoExtraido } from '../../../../src/bounded-contexts/extracao/domain/value-objects/campo-extraido.vo.js';
 import { CondicoesComerciais } from '../../../../src/bounded-contexts/extracao/domain/value-objects/condicoes-comerciais.vo.js';
 import { DescricaoProduto } from '../../../../src/bounded-contexts/extracao/domain/value-objects/descricao-produto.vo.js';
+import { Dinheiro } from '../../../../src/bounded-contexts/extracao/domain/value-objects/dinheiro.vo.js';
 import { ItemOrcamento } from '../../../../src/bounded-contexts/extracao/domain/value-objects/item-orcamento.vo.js';
 import { NivelConfianca } from '../../../../src/bounded-contexts/extracao/domain/value-objects/nivel-confianca.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/extracao/domain/value-objects/orcamento-id.vo.js';
@@ -78,6 +82,38 @@ function extracaoPendente(): ExtracaoOrcamento {
     precoUnitario: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
   });
   extracao.registrarTentativaExtrator([itemIncompleto], condicoesCompletas());
+  return extracao;
+}
+
+function itemCompleto(): ItemOrcamento {
+  return ItemOrcamento.de({
+    descricao: CampoExtraido.extraido(
+      DescricaoProduto.de('Parafuso M6'),
+      confiancaAlta,
+      'EXTRATOR',
+    ),
+    quantidade: CampoExtraido.extraido(Quantidade.de(10), confiancaAlta, 'EXTRATOR'),
+    precoUnitario: CampoExtraido.extraido(Dinheiro.de(1099, 'BRL'), confiancaAlta, 'EXTRATOR'),
+  });
+}
+
+/** Extração PENDENTE_REVISAO_HUMANA com itens completos, mas `prazoValidade` pendente. */
+function extracaoPendenteCondicoesComerciais(): ExtracaoOrcamento {
+  const extracao = ExtracaoOrcamento.criar(
+    OrcamentoId.de(ORCAMENTO_ID),
+    ReferenciaClassificacao.de({
+      fornecedorIdentificado: 'Fornecedor X',
+      formatoIdentificado: 'PDF',
+      agenteOrigem: 'CLASSIFICADOR',
+    }),
+    ReferenciaS3.de({ bucket: 'nexo-orcamentos-raw', key: 'portal/arquivo.pdf', versionId: 'v1' }),
+  );
+  const condicoesIncompletas = CondicoesComerciais.de({
+    condicoesPagamento: CampoExtraido.extraido('30 dias', confiancaAlta, 'EXTRATOR'),
+    prazoValidade: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
+    condicoesEntrega: CampoExtraido.extraido('FOB', confiancaAlta, 'EXTRATOR'),
+  });
+  extracao.registrarTentativaExtrator([itemCompleto()], condicoesIncompletas);
   return extracao;
 }
 
@@ -194,7 +230,7 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
     ).rejects.toThrow(CaminhoConfirmacaoInvalidoError);
   });
 
-  it('propaga TransicaoInvalidaExtracaoError do agregado quando status não é PENDENTE_REVISAO_HUMANA', async () => {
+  it('rejeita status PENDENTE (Extrator ainda não tentou) com TransicaoInvalidaExtracaoError', async () => {
     const extracao = ExtracaoOrcamento.criar(
       OrcamentoId.de(ORCAMENTO_ID),
       ReferenciaClassificacao.de({
@@ -221,6 +257,83 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
           {
             caminho: 'itens[0].precoUnitario',
             valor: { valorCentavos: 1, moeda: 'BRL' },
+            indisponivel: false,
+          },
+        ],
+      }),
+    ).rejects.toThrow(TransicaoInvalidaExtracaoError);
+  });
+
+  it('rejeita status já resolvido (EXTRAIDO_COM_PENDENCIA_CONFIRMADA) com TransicaoInvalidaExtracaoError — nunca reconfirma', async () => {
+    const extracao = extracaoPendente();
+    extracao.registrarConfirmacaoHumana(extracao.itens, condicoesCompletas());
+    expect(extracao.status).toBe('EXTRAIDO_COM_PENDENCIA_CONFIRMADA');
+
+    const caso = new ConfirmarRevisaoHumanaExtracao(
+      new RepositorioFake(extracao),
+      new EventPublisherFake(),
+    );
+
+    await expect(
+      caso.executar({
+        orcamentoId: ORCAMENTO_ID,
+        camposConfirmados: [
+          {
+            caminho: 'itens[0].precoUnitario',
+            valor: { valorCentavos: 1, moeda: 'BRL' },
+            indisponivel: false,
+          },
+        ],
+      }),
+    ).rejects.toThrow(TransicaoInvalidaExtracaoError);
+  });
+
+  it('rejeita valor com shape inválido (precoUnitario com moeda ausente) — nunca deixa TypeError vazar da borda', async () => {
+    const extracao = extracaoPendente();
+    const caso = new ConfirmarRevisaoHumanaExtracao(
+      new RepositorioFake(extracao),
+      new EventPublisherFake(),
+    );
+
+    await expect(
+      caso.executar({
+        orcamentoId: ORCAMENTO_ID,
+        camposConfirmados: [
+          { caminho: 'itens[0].precoUnitario', valor: { valorCentavos: 100 }, indisponivel: false },
+        ],
+      }),
+    ).rejects.toThrow(CaminhoConfirmacaoInvalidoError);
+  });
+
+  it('rejeita valor de tipo errado (precoUnitario como número solto em vez de objeto)', async () => {
+    const extracao = extracaoPendente();
+    const caso = new ConfirmarRevisaoHumanaExtracao(
+      new RepositorioFake(extracao),
+      new EventPublisherFake(),
+    );
+
+    await expect(
+      caso.executar({
+        orcamentoId: ORCAMENTO_ID,
+        camposConfirmados: [{ caminho: 'itens[0].precoUnitario', valor: 100, indisponivel: false }],
+      }),
+    ).rejects.toThrow(CaminhoConfirmacaoInvalidoError);
+  });
+
+  it('rejeita prazoValidade com data ISO inválida', async () => {
+    const extracao = extracaoPendenteCondicoesComerciais();
+    const caso = new ConfirmarRevisaoHumanaExtracao(
+      new RepositorioFake(extracao),
+      new EventPublisherFake(),
+    );
+
+    await expect(
+      caso.executar({
+        orcamentoId: ORCAMENTO_ID,
+        camposConfirmados: [
+          {
+            caminho: 'condicoesComerciais.prazoValidade',
+            valor: 'não-é-uma-data',
             indisponivel: false,
           },
         ],

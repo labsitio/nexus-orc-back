@@ -1,5 +1,10 @@
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import { ErroDominio } from '../../domain/errors/erro-dominio.js';
+import type {
+  ExtracaoOrcamento,
+  StatusExtracao,
+} from '../../domain/extracao-orcamento.aggregate.js';
+import { TransicaoInvalidaExtracaoError } from '../../domain/extracao-orcamento.aggregate.js';
 import { OrcamentoExtraido } from '../../domain/events/orcamento-extraido.event.js';
 import { OrcamentoExtraidoComPendenciaConfirmada } from '../../domain/events/orcamento-extraido-pendencia-confirmada.event.js';
 import { CampoExtraido } from '../../domain/value-objects/campo-extraido.vo.js';
@@ -47,9 +52,69 @@ export class CaminhoConfirmacaoInvalidoError extends ErroDominio {
   }
 }
 
+/** Nunca deveria ocorrer — invariante do agregado (T009): status só chega a
+ * `PENDENTE_REVISAO_HUMANA` depois de `registrarTentativaExtrator` já ter
+ * preenchido `condicoesComerciais`. */
+export class ExtracaoSemCondicoesComerciaisError extends ErroDominio {
+  constructor(orcamentoId: string) {
+    super(
+      `ExtracaoOrcamento ${orcamentoId} está PENDENTE_REVISAO_HUMANA sem condicoesComerciais — invariante do agregado violada`,
+    );
+  }
+}
+
 const ITEM_CAMINHO_RE = /^itens\[(\d+)\]\.(descricao|quantidade|precoUnitario)$/;
 const CONDICOES_CAMINHO_RE =
   /^condicoesComerciais\.(condicoesPagamento|prazoValidade|condicoesEntrega)$/;
+
+/** Shape de `valor` da borda (Zod: `z.unknown()`) — nunca confiar sem checar antes do VO. */
+function comoObjeto(valor: unknown, caminho: string): Record<string, unknown> {
+  if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) {
+    throw new CaminhoConfirmacaoInvalidoError(caminho, 'valor esperado é um objeto');
+  }
+  return valor as Record<string, unknown>;
+}
+
+function comoString(valor: unknown, caminho: string): string {
+  if (typeof valor !== 'string') {
+    throw new CaminhoConfirmacaoInvalidoError(caminho, 'valor esperado é uma string');
+  }
+  return valor;
+}
+
+function comoStringOpcional(valor: unknown, caminho: string): string | undefined {
+  return valor === undefined ? undefined : comoString(valor, caminho);
+}
+
+function comoNumero(valor: unknown, caminho: string): number {
+  if (typeof valor !== 'number') {
+    throw new CaminhoConfirmacaoInvalidoError(caminho, 'valor esperado é um number');
+  }
+  return valor;
+}
+
+function resolverDescricaoProduto(valor: unknown, caminho: string): DescricaoProduto {
+  const obj = comoObjeto(valor, caminho);
+  return DescricaoProduto.de(
+    comoString(obj.descricao, caminho),
+    comoStringOpcional(obj.sku, caminho),
+  );
+}
+
+function resolverDinheiro(valor: unknown, caminho: string): Dinheiro {
+  const obj = comoObjeto(valor, caminho);
+  return Dinheiro.de(comoNumero(obj.valorCentavos, caminho), comoString(obj.moeda, caminho));
+}
+
+/**
+ * `ExtracaoOrcamento.status` é um getter sem setter — o TS trata leitura
+ * direta (`extracao.status`) como narrowable e não invalida o narrowing após
+ * chamadas de método que mutam o agregado (`registrarConfirmacaoHumana`).
+ * Indireção via função evita o narrowing indevido.
+ */
+function statusDe(extracao: ExtracaoOrcamento): StatusExtracao {
+  return extracao.status;
+}
 
 function campoExtraidoOuIndisponivel<T>(
   campoConfirmado: CampoConfirmadoParams,
@@ -79,34 +144,30 @@ function aplicarConfirmacaoItem(
   campoConfirmado: CampoConfirmadoParams,
 ): ItemOrcamentoParams {
   switch (campo) {
-    case 'descricao': {
+    case 'descricao':
       exigirNaoExtraido(item.descricao, campoConfirmado.caminho);
-      const valor = campoConfirmado.valor as { descricao: string; sku?: string };
       return {
         ...item,
         descricao: campoExtraidoOuIndisponivel(campoConfirmado, () =>
-          DescricaoProduto.de(valor.descricao, valor.sku),
+          resolverDescricaoProduto(campoConfirmado.valor, campoConfirmado.caminho),
         ),
       };
-    }
-    case 'quantidade': {
+    case 'quantidade':
       exigirNaoExtraido(item.quantidade, campoConfirmado.caminho);
-      const valor = campoConfirmado.valor as number;
       return {
         ...item,
-        quantidade: campoExtraidoOuIndisponivel(campoConfirmado, () => Quantidade.de(valor)),
+        quantidade: campoExtraidoOuIndisponivel(campoConfirmado, () =>
+          Quantidade.de(comoNumero(campoConfirmado.valor, campoConfirmado.caminho)),
+        ),
       };
-    }
-    case 'precoUnitario': {
+    case 'precoUnitario':
       exigirNaoExtraido(item.precoUnitario, campoConfirmado.caminho);
-      const valor = campoConfirmado.valor as { valorCentavos: number; moeda: string };
       return {
         ...item,
         precoUnitario: campoExtraidoOuIndisponivel(campoConfirmado, () =>
-          Dinheiro.de(valor.valorCentavos, valor.moeda),
+          resolverDinheiro(campoConfirmado.valor, campoConfirmado.caminho),
         ),
       };
-    }
   }
 }
 
@@ -117,32 +178,38 @@ function aplicarConfirmacaoCondicoes(
   campoConfirmado: CampoConfirmadoParams,
 ): CondicoesComerciaisParams {
   switch (campo) {
-    case 'condicoesPagamento': {
+    case 'condicoesPagamento':
       exigirNaoExtraido(condicoes.condicoesPagamento, campoConfirmado.caminho);
-      const valor = campoConfirmado.valor as string;
       return {
         ...condicoes,
-        condicoesPagamento: campoExtraidoOuIndisponivel(campoConfirmado, () => valor),
-      };
-    }
-    case 'condicoesEntrega': {
-      exigirNaoExtraido(condicoes.condicoesEntrega, campoConfirmado.caminho);
-      const valor = campoConfirmado.valor as string;
-      return {
-        ...condicoes,
-        condicoesEntrega: campoExtraidoOuIndisponivel(campoConfirmado, () => valor),
-      };
-    }
-    case 'prazoValidade': {
-      exigirNaoExtraido(condicoes.prazoValidade, campoConfirmado.caminho);
-      const valor = campoConfirmado.valor as string;
-      return {
-        ...condicoes,
-        prazoValidade: campoExtraidoOuIndisponivel(campoConfirmado, () =>
-          PeriodoValidade.de(new Date(valor)),
+        condicoesPagamento: campoExtraidoOuIndisponivel(campoConfirmado, () =>
+          comoString(campoConfirmado.valor, campoConfirmado.caminho),
         ),
       };
-    }
+    case 'condicoesEntrega':
+      exigirNaoExtraido(condicoes.condicoesEntrega, campoConfirmado.caminho);
+      return {
+        ...condicoes,
+        condicoesEntrega: campoExtraidoOuIndisponivel(campoConfirmado, () =>
+          comoString(campoConfirmado.valor, campoConfirmado.caminho),
+        ),
+      };
+    case 'prazoValidade':
+      exigirNaoExtraido(condicoes.prazoValidade, campoConfirmado.caminho);
+      return {
+        ...condicoes,
+        prazoValidade: campoExtraidoOuIndisponivel(campoConfirmado, () => {
+          const iso = comoString(campoConfirmado.valor, campoConfirmado.caminho);
+          const data = new Date(iso);
+          if (Number.isNaN(data.getTime())) {
+            throw new CaminhoConfirmacaoInvalidoError(
+              campoConfirmado.caminho,
+              'valor esperado é uma data ISO 8601 válida',
+            );
+          }
+          return PeriodoValidade.de(data);
+        }),
+      };
   }
 }
 
@@ -228,12 +295,13 @@ export class ConfirmarRevisaoHumanaExtracao {
       throw new ExtracaoNaoEncontradaError(params.orcamentoId);
     }
 
+    if (statusDe(extracao) !== 'PENDENTE_REVISAO_HUMANA') {
+      throw new TransicaoInvalidaExtracaoError(statusDe(extracao), 'registrarConfirmacaoHumana');
+    }
+
     const condicoesAtuais = extracao.condicoesComerciais;
     if (!condicoesAtuais) {
-      throw new CaminhoConfirmacaoInvalidoError(
-        'condicoesComerciais',
-        'extração sem condições comerciais registradas — nenhuma tentativa do Extrator ainda',
-      );
+      throw new ExtracaoSemCondicoesComerciaisError(params.orcamentoId);
     }
 
     const { itens, condicoesComerciais } = aplicarConfirmacoes(
@@ -246,7 +314,7 @@ export class ConfirmarRevisaoHumanaExtracao {
     await this.repositorio.salvar(extracao);
 
     const evento =
-      extracao.status === 'EXTRAIDO'
+      statusDe(extracao) === 'EXTRAIDO'
         ? new OrcamentoExtraido(
             extracao.orcamentoId.toString(),
             extracao.itens.map((item) => item.paraPayload()),
