@@ -592,3 +592,158 @@ verificação.
 
 ## Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T012 (Phase 3, US1: Segregação de Ambientes)
+
+## SPEC_ID e versão testada
+`008-hardening-seguranca-lgpd`. PR #512, branch
+`feat/008-t012-contrato-assume-role`, commit `7fed710`. Primeira validação
+(sem BUG anterior).
+
+## Resumo executivo
+T012 não é código de domínio/aplicação/endpoint — é um teste de contrato de
+infraestrutura (`infra/scripts/verificar-contrato-assume-role-por-conta.sh`,
+via `aws-cli`) que valida que a role de deploy de CI/CD (OIDC) de um
+ambiente (dev/hml) não consegue `sts:AssumeRole` a role de deploy de outro
+ambiente/conta — cada ambiente com sua própria role, nunca uma role única
+multi-conta. Segue exatamente o mesmo padrão de T011 (#312, já aprovado):
+script standalone em `infra/scripts/`, workflow `workflow_dispatch`
+dedicado (`.github/workflows/verificar-contrato-assume-role-por-conta.yml`),
+sem credenciais reais no CI padrão, recusa de execução contra a conta de
+produção. Já passou por revisão do backend-reviewer (APPROVE) após uma
+correção (revisão 1, commit `7fed710`): permissão de execução do script
+(sem ela o `workflow_dispatch` falharia com `Permission denied`), redação
+de `Credentials` no log de sucesso/falha crítica (evita vazar
+`AccessKeyId`/`SecretAccessKey`/`SessionToken` reais), e guarda contra
+`OUTRAS_DEPLOY_ROLE_ARNS` vazia produzindo sucesso silencioso sem nenhuma
+verificação real.
+
+**Limitação de ambiente, registrada explicitamente**: não há credenciais
+AWS reais nem contas dev/hml/prod provisionadas neste ambiente de QA — a
+execução do script contra AWS real (o cenário fim-a-fim que ele testa, que
+depende de T013/T015, ainda não entregues) não pôde ser exercitada. A
+validação abaixo é estática (leitura), sintática (YAML, `bash -n`) e
+lógica (mock local isolado da função `assert_assume_role_bloqueado` e das
+2 guardas do script, reproduzido de forma independente da verificação já
+feita pelo backend-reviewer). Ver "Limitações do ambiente".
+
+## Requisitos cobertos e não cobertos
+- Permissão de execução do arquivo (achado do backend-reviewer, revisão 1,
+  corrigido): coberto, PASS — `git ls-tree -l` confirma modo `100755`,
+  idêntico ao padrão de T011.
+- Guarda de segurança contra rodar na conta de produção
+  (`AWS_PROD_ACCOUNT_ID` vs. `aws sts get-caller-identity`) antes de
+  qualquer `sts:assume-role`: coberto, PASS — leitura de código (guarda
+  antes do loop) + execução fim a fim com `aws` fake e conta corrente ==
+  `AWS_PROD_ACCOUNT_ID` (aborta com `exit 1` antes de qualquer AssumeRole).
+- Guarda contra `OUTRAS_DEPLOY_ROLE_ARNS` sem nenhum ARN válido produzindo
+  sucesso silencioso (achado do backend-reviewer, revisão 1, corrigido):
+  coberto, PASS — execução fim a fim com variável só-espaços (zero
+  palavras após word-splitting) resulta em `FALHA` explícita, exit 1.
+- Redação de `Credentials` na saída de sucesso/falha crítica do
+  AssumeRole (achado do backend-reviewer, revisão 1, corrigido): coberto,
+  PASS — mock isolado com `jq` disponível confirma saída filtrada para
+  `{}`, sem `AccessKeyId`/`SecretAccessKey`/`SessionToken` no log.
+- Lógica de `assert_assume_role_bloqueado` nos 3 desfechos possíveis:
+  coberto, PASS — mock isolado (função extraída via `awk`, comandos fake):
+  - AssumeRole cross-conta com sucesso (simula role comprometida cruzando
+    ambiente) → `CRÍTICO` + `RESULTADO=1` + saída redigida;
+  - `AccessDenied` (trust policy restringe a conta de origem) → `OK` +
+    `RESULTADO=0`;
+  - outro erro (ex. `ValidationException`, sem `AccessDenied`) → `FALHA` +
+    `RESULTADO=1`, não confundido com bloqueio esperado.
+- Fluxo feliz completo (2 roles de outros ambientes, ambas bloqueadas):
+  coberto, PASS — execução fim a fim do script real com `aws` fake
+  determinístico, exit 0.
+- Workflow YAML sintaticamente válido: coberto, PASS — parseado com
+  `js-yaml` (`npx js-yaml ...`) sem erro.
+- Workflow dispara apenas via `workflow_dispatch` (nunca `push`/
+  `pull_request`): coberto, PASS — chave `on` do YAML parseado contém
+  exclusivamente `workflow_dispatch`; estrutura (`permissions`,
+  `environment`, `timeout-minutes`, step `configure-aws-credentials@v4`)
+  idêntica ao padrão de T011.
+- README documenta pré-requisitos (T013/T015) e uso (variáveis de
+  ambiente, comando de execução, saída esperada): coberto, PASS — leitura
+  comparada ao script e ao workflow, conteúdo consistente entre os 3
+  arquivos, mesmo padrão de T011.
+- **Não coberto (limitação de ambiente)**: execução real do script contra
+  roles de deploy OIDC verdadeiras de contas dev/hml/prod distintas —
+  nenhuma dessas dependências (T013/T015) existe neste
+  repositório/ambiente. Ver "Limitações do ambiente".
+
+## Suítes executadas e comandos
+- `git ls-tree -l pr-512 infra/scripts/verificar-contrato-assume-role-por-conta.sh`
+  — confirma modo `100755`.
+- `bash -n infra/scripts/verificar-contrato-assume-role-por-conta.sh` —
+  sintaxe válida.
+- `npx --yes js-yaml .github/workflows/verificar-contrato-assume-role-por-conta.yml`
+  — parse YAML sem erro; inspeção do JSON parseado confirma `on` = apenas
+  `workflow_dispatch`.
+- Script de mock QA (scratchpad local, não versionado no repositório):
+  extrai a função `assert_assume_role_bloqueado` do script real via `awk`,
+  executa em subshell isolado 3 cenários (AssumeRole com sucesso /
+  `AccessDenied` / outro erro) com `aws` fake, e executa o script completo
+  fim a fim (não só a função) com `aws` fake via `PATH` cobrindo a guarda
+  de produção, a guarda de lista vazia de roles e o fluxo feliz com 2
+  roles. Não requer `shellcheck`/`python3` (indisponíveis neste ambiente
+  Windows/Git Bash) — validação feita com as ferramentas efetivamente
+  disponíveis (`bash`, `node`/`npx`, `jq`), mesma abordagem de T011.
+
+Detalhe completo em `qa/test-execution-report.md`.
+
+## Quantidade de testes por tipo
+0 testes automatizados novos versionados no repositório — task de
+infraestrutura entregue como script standalone (mesmo padrão de T011). A
+validação de QA consistiu em 4 verificações estáticas/sintáticas
+(permissão, sintaxe bash, YAML, trigger) e 6 cenários de mock lógico
+isolado (3 desfechos de `assert_assume_role_bloqueado` + guarda de
+produção + guarda de lista vazia + fluxo feliz completo), nenhum deles
+executando contra AWS real.
+
+## Resultado: aprovados, falhos, ignorados e instáveis
+Todas as 10 verificações acima: PASS. Nenhuma falha, nenhum teste ignorado
+para ocultar problema. Execução real contra AWS não realizada (ver
+"Limitações do ambiente") — não classificada como ignorada/instável, e sim
+como fora do alcance possível neste ambiente até T013/T015 serem
+entregues.
+
+## Cobertura inicial e final
+Não aplicável — não há suíte de testes de código (vitest/cobertura v8)
+para um script bash de infraestrutura. Mesmo tratamento de T011.
+
+## Allure
+Não aplicável a este tipo de entrega (script de infraestrutura fora do
+runner de testes do monorepo). Nenhum `allure-results` gerado para T012,
+mesmo tratamento de T011.
+
+## Bugs por severidade e status
+Nenhum bug de produção encontrado nesta validação.
+
+## Riscos residuais
+- Execução real do script contra roles de deploy OIDC de dev/hml/prod
+  segue não validada (só será possível após T013/T015). Recomenda-se que
+  Ricardo/DevOps execute o script assim que as contas/roles estiverem
+  prontas, e que o QA seja acionado novamente para validar a execução real
+  antes de considerar a segregação de ambientes (AssumeRole restrito por
+  conta) definitivamente comprovada em produção — mesma recomendação já
+  registrada para T011 (mesmo pré-requisito comum, T013/T015).
+- Mock de QA cobre a lógica local do script, não substitui teste de
+  integração contra a AWS real — mensagens de erro reais da AWS (formato
+  exato de `AccessDenied`) podem variar ligeiramente de ambiente/região/
+  versão de `aws-cli`; a regex de detecção (`AccessDenied`) deve ser
+  reconfirmada na primeira execução real por Ricardo/DevOps.
+
+## Limitações do ambiente
+Confirmado: não há credenciais AWS reais, contas dev/hml/prod nem roles de
+deploy OIDC provisionadas neste ambiente/repositório (T013/T015 são tasks
+futuras, fora do escopo de T012). Não foi possível executar o script
+fim-a-fim contra AWS real. Ferramentas auxiliares também limitadas no
+ambiente Windows/Git Bash usado (`shellcheck` e `python3`/`pyyaml`
+indisponíveis) — contornado com `bash -n` para sintaxe e `js-yaml` (via
+`npx`) para validação do YAML, ambos suficientes para o escopo desta
+verificação, mesma abordagem de T011.
+
+## Parecer final
+APROVADO PELO QA
