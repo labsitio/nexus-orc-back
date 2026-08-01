@@ -58,7 +58,12 @@ RESULTADO=0
 # Regex restrita a AccessDenied de sts:AssumeRole — não confundir com outro
 # tipo de falha (ex.: ARN malformado), que provaria menos sobre a restrição
 # de trust policy por conta.
-ASSUME_ROLE_DENY_REGEX="is not authorized to perform: sts:AssumeRole|AccessDenied"
+ASSUME_ROLE_DENY_REGEX="AccessDenied"
+
+# Conta quantas roles foram efetivamente testadas — lista vazia/mal
+# formatada em OUTRAS_DEPLOY_ROLE_ARNS não pode resultar em "sucesso"
+# silencioso sem nenhuma verificação real ter rodado.
+ROLES_TESTADAS=0
 
 # assert_assume_role_bloqueado <role-arn-alvo>
 # Espera que sts:assume-role para uma role de deploy de OUTRO ambiente falhe
@@ -79,7 +84,15 @@ assert_assume_role_bloqueado() {
 
   if [ "$status" -eq 0 ]; then
     echo "CRÍTICO [$nome]: o AssumeRole NÃO foi bloqueado — teve sucesso. A role de deploy corrente consegue assumir role de outro ambiente/conta, violando a segregação exigida (T015)."
-    echo "$saida"
+    # NUNCA logar a saída bruta aqui: contém Credentials.AccessKeyId/
+    # SecretAccessKey/SessionToken reais da role de outro ambiente/conta —
+    # justamente no momento em que uma role comprometida cruzou ambiente,
+    # o pior momento possível para vazar a credencial em log de CI.
+    if command -v jq >/dev/null 2>&1; then
+      echo "$saida" | jq 'del(.Credentials)' 2>/dev/null || echo "(saída redigida — Credentials suprimidas)"
+    else
+      echo "(saída suprimida — Credentials da sessão assumida não são logadas)"
+    fi
     RESULTADO=1
     return
   fi
@@ -96,8 +109,13 @@ assert_assume_role_bloqueado() {
 for ROLE_ARN in $OUTRAS_DEPLOY_ROLE_ARNS; do
   echo "--- sts:AssumeRole (alvo: $ROLE_ARN) ---"
   assert_assume_role_bloqueado "$ROLE_ARN"
+  ROLES_TESTADAS=$((ROLES_TESTADAS + 1))
   echo
 done
+
+if [ "$ROLES_TESTADAS" -eq 0 ]; then
+  fail "OUTRAS_DEPLOY_ROLE_ARNS não continha nenhum ARN válido — nenhuma verificação foi executada. Não declarar sucesso sem testar ao menos uma role."
+fi
 
 if [ "$RESULTADO" -eq 0 ]; then
   echo "RESULTADO: role de deploy da conta corrente não assume role de nenhum outro ambiente verificado — restrição por conta confirmada."
