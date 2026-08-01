@@ -85,6 +85,13 @@
       "when": 1785518222728,
       "tag": "0011_validacoes_orcamento_faixas_preco_reais",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785586799148,
+      "tag": "0012_rls_orcamentos_tenant_isolation",
+      "breakpoints": true
     }
   ]
 }
