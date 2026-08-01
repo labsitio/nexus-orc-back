@@ -18,6 +18,11 @@ import {
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
+// T007 (RLS): placeholder até T014/T016/T018 propagarem tenantId real via
+// Domain/Application (spec 007) — mesmo valor de `TENANT_ID_PROVISORIO` em
+// `drizzle-orcamento.repository.ts`.
+const TENANT_ID_TESTE = '00000000-0000-7000-8000-000000000000';
+
 // drizzle-orm embrulha o erro do driver em `Failed query: ...`; o nome da
 // constraint Postgres violada só aparece em `error.cause.message`.
 async function esperarViolacaoDeConstraint(promise: Promise<unknown>, constraint: RegExp) {
@@ -45,6 +50,12 @@ describe.skipIf(!DATABASE_URL)('schema orcamentos / orcamentos_historico (Postgr
   // linha sobrevive à suíte, banco compartilhado permanece limpo.
   beforeEach(async () => {
     await client.query('BEGIN');
+    // RLS (T007): sem `app.current_tenant_id`, a política `tenant_isolation`
+    // nega toda linha destas tabelas. `set_config(..., true)` equivale a
+    // `SET LOCAL` mas aceita bind parameter (`SET LOCAL x = $1` é erro de
+    // sintaxe no Postgres) — mesma correção aplicada em
+    // `drizzle-orcamento.repository.ts`.
+    await client.query(`select set_config('app.current_tenant_id', $1, true)`, [TENANT_ID_TESTE]);
   });
 
   afterEach(async () => {
@@ -97,6 +108,7 @@ describe.skipIf(!DATABASE_URL)('schema orcamentos / orcamentos_historico (Postgr
   async function inserirOrcamento(id: string) {
     await db.insert(orcamentos).values({
       id,
+      tenantId: TENANT_ID_TESTE,
       canal: 'API_REST',
       recebidoEm: new Date(),
       bucket: 'nexo-orcamentos-raw',
@@ -106,10 +118,36 @@ describe.skipIf(!DATABASE_URL)('schema orcamentos / orcamentos_historico (Postgr
     });
   }
 
+  it('RLS habilitada e política tenant_isolation presente em orcamentos / orcamentos_historico', async () => {
+    const rls = await client.query<{
+      relname: string;
+      relrowsecurity: boolean;
+      relforcerowsecurity: boolean;
+    }>(
+      `select relname, relrowsecurity, relforcerowsecurity from pg_class
+       where relname in ('orcamentos', 'orcamentos_historico')`,
+    );
+    expect(rls.rows).toHaveLength(2);
+    for (const linha of rls.rows) {
+      expect(linha.relrowsecurity).toBe(true);
+      expect(linha.relforcerowsecurity).toBe(true);
+    }
+
+    const politicas = await client.query<{ tablename: string; policyname: string }>(
+      `select tablename, policyname from pg_policies
+       where tablename in ('orcamentos', 'orcamentos_historico') and policyname = 'tenant_isolation'`,
+    );
+    expect(politicas.rows.map((r) => r.tablename).sort()).toEqual([
+      'orcamentos',
+      'orcamentos_historico',
+    ]);
+  });
+
   it('CHECK orcamentos_resultado_completo_ou_ausente rejeita grupo resultado parcial', async () => {
     await esperarViolacaoDeConstraint(
       db.insert(orcamentos).values({
         id: randomUUID(),
+        tenantId: TENANT_ID_TESTE,
         canal: 'API_REST',
         recebidoEm: new Date(),
         bucket: 'nexo-orcamentos-raw',
@@ -126,6 +164,7 @@ describe.skipIf(!DATABASE_URL)('schema orcamentos / orcamentos_historico (Postgr
     await esperarViolacaoDeConstraint(
       db.insert(orcamentos).values({
         id: randomUUID(),
+        tenantId: TENANT_ID_TESTE,
         canal: 'API_REST',
         recebidoEm: new Date(),
         bucket: 'nexo-orcamentos-raw',
@@ -148,6 +187,7 @@ describe.skipIf(!DATABASE_URL)('schema orcamentos / orcamentos_historico (Postgr
     await esperarViolacaoDeConstraint(
       db.insert(orcamentosHistorico).values({
         orcamentoId,
+        tenantId: TENANT_ID_TESTE,
         agente: 'CLASSIFICADOR',
         ocorreuEm: new Date(),
         resultadoFornecedorIdentificado: 'fornecedor-x',
@@ -162,6 +202,7 @@ describe.skipIf(!DATABASE_URL)('schema orcamentos / orcamentos_historico (Postgr
     await inserirOrcamento(orcamentoId);
     await db.insert(orcamentosHistorico).values({
       orcamentoId,
+      tenantId: TENANT_ID_TESTE,
       agente: 'CLASSIFICADOR',
       ocorreuEm: new Date(),
       motivoInsucesso: 'confianca-baixa',
@@ -182,6 +223,7 @@ describe.skipIf(!DATABASE_URL)('schema orcamentos / orcamentos_historico (Postgr
     await inserirOrcamento(orcamentoId);
     await db.insert(orcamentosHistorico).values({
       orcamentoId,
+      tenantId: TENANT_ID_TESTE,
       agente: 'CLASSIFICADOR',
       ocorreuEm: new Date(),
       motivoInsucesso: 'confianca-baixa',
