@@ -3,6 +3,7 @@ import {
   CaminhoConfirmacaoInvalidoError,
   ConfirmarRevisaoHumanaExtracao,
   ExtracaoNaoEncontradaError,
+  ExtracaoSemCondicoesComerciaisError,
 } from '../../../../src/bounded-contexts/extracao/application/use-cases/confirmar-revisao-humana-extracao.js';
 import {
   ExtracaoOrcamento,
@@ -339,5 +340,150 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
         ],
       }),
     ).rejects.toThrow(CaminhoConfirmacaoInvalidoError);
+  });
+
+  it('confirma descricao e quantidade pendentes de um item com valor real', async () => {
+    const extracao = ExtracaoOrcamento.criar(
+      OrcamentoId.de(ORCAMENTO_ID),
+      ReferenciaClassificacao.de({
+        fornecedorIdentificado: 'Fornecedor X',
+        formatoIdentificado: 'PDF',
+        agenteOrigem: 'CLASSIFICADOR',
+      }),
+      ReferenciaS3.de({
+        bucket: 'nexo-orcamentos-raw',
+        key: 'portal/arquivo.pdf',
+        versionId: 'v1',
+      }),
+    );
+    const itemComDescricaoEQuantidadePendentes = ItemOrcamento.de({
+      descricao: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
+      quantidade: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
+      precoUnitario: CampoExtraido.extraido(Dinheiro.de(1099, 'BRL'), confiancaAlta, 'EXTRATOR'),
+    });
+    extracao.registrarTentativaExtrator(
+      [itemComDescricaoEQuantidadePendentes],
+      condicoesCompletas(),
+    );
+    const caso = new ConfirmarRevisaoHumanaExtracao(
+      new RepositorioFake(extracao),
+      new EventPublisherFake(),
+    );
+
+    await caso.executar({
+      orcamentoId: ORCAMENTO_ID,
+      camposConfirmados: [
+        {
+          caminho: 'itens[0].descricao',
+          valor: { descricao: 'Parafuso M8', sku: 'PRF-M8' },
+          indisponivel: false,
+        },
+        { caminho: 'itens[0].quantidade', valor: 25, indisponivel: false },
+      ],
+    });
+
+    expect(extracao.status).toBe('EXTRAIDO');
+  });
+
+  it('confirma condicoesPagamento e condicoesEntrega pendentes com valor real', async () => {
+    const extracao = ExtracaoOrcamento.criar(
+      OrcamentoId.de(ORCAMENTO_ID),
+      ReferenciaClassificacao.de({
+        fornecedorIdentificado: 'Fornecedor X',
+        formatoIdentificado: 'PDF',
+        agenteOrigem: 'CLASSIFICADOR',
+      }),
+      ReferenciaS3.de({
+        bucket: 'nexo-orcamentos-raw',
+        key: 'portal/arquivo.pdf',
+        versionId: 'v1',
+      }),
+    );
+    const condicoesIncompletas = CondicoesComerciais.de({
+      condicoesPagamento: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
+      prazoValidade: CampoExtraido.extraido(
+        PeriodoValidade.de(new Date('2026-12-31')),
+        confiancaAlta,
+        'EXTRATOR',
+      ),
+      condicoesEntrega: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
+    });
+    extracao.registrarTentativaExtrator([itemCompleto()], condicoesIncompletas);
+    const caso = new ConfirmarRevisaoHumanaExtracao(
+      new RepositorioFake(extracao),
+      new EventPublisherFake(),
+    );
+
+    await caso.executar({
+      orcamentoId: ORCAMENTO_ID,
+      camposConfirmados: [
+        {
+          caminho: 'condicoesComerciais.condicoesPagamento',
+          valor: '60 dias',
+          indisponivel: false,
+        },
+        { caminho: 'condicoesComerciais.condicoesEntrega', valor: 'CIF', indisponivel: false },
+      ],
+    });
+
+    expect(extracao.status).toBe('EXTRAIDO');
+  });
+
+  it('confirma prazoValidade pendente com data ISO válida', async () => {
+    const extracao = extracaoPendenteCondicoesComerciais();
+    const caso = new ConfirmarRevisaoHumanaExtracao(
+      new RepositorioFake(extracao),
+      new EventPublisherFake(),
+    );
+
+    await caso.executar({
+      orcamentoId: ORCAMENTO_ID,
+      camposConfirmados: [
+        {
+          caminho: 'condicoesComerciais.prazoValidade',
+          valor: '2027-01-15T00:00:00.000Z',
+          indisponivel: false,
+        },
+      ],
+    });
+
+    expect(extracao.status).toBe('EXTRAIDO');
+  });
+
+  it('lança ExtracaoSemCondicoesComerciaisError quando agregado está PENDENTE_REVISAO_HUMANA sem condicoesComerciais (invariante violada)', async () => {
+    const extracaoInconsistente = ExtracaoOrcamento.reconstituir({
+      orcamentoId: OrcamentoId.de(ORCAMENTO_ID),
+      referenciaClassificacao: ReferenciaClassificacao.de({
+        fornecedorIdentificado: 'Fornecedor X',
+        formatoIdentificado: 'PDF',
+        agenteOrigem: 'CLASSIFICADOR',
+      }),
+      referenciaBrutaS3: ReferenciaS3.de({
+        bucket: 'nexo-orcamentos-raw',
+        key: 'portal/arquivo.pdf',
+        versionId: 'v1',
+      }),
+      status: 'PENDENTE_REVISAO_HUMANA',
+      itens: [itemCompleto()],
+      condicoesComerciais: undefined,
+      historico: [],
+    });
+    const caso = new ConfirmarRevisaoHumanaExtracao(
+      new RepositorioFake(extracaoInconsistente),
+      new EventPublisherFake(),
+    );
+
+    await expect(
+      caso.executar({
+        orcamentoId: ORCAMENTO_ID,
+        camposConfirmados: [
+          {
+            caminho: 'condicoesComerciais.prazoValidade',
+            valor: '2027-01-15T00:00:00.000Z',
+            indisponivel: false,
+          },
+        ],
+      }),
+    ).rejects.toThrow(ExtracaoSemCondicoesComerciaisError);
   });
 });

@@ -142,3 +142,29 @@ Diferencial desta leva frente a T020/T027 (não redundante): único teste que pe
 
 ### Fora desta leva
 - Consulta de status via HTTP (`GET /v1/orcamentos/{id}/extracao/status`, T024) não implementada ainda — "status reflete a pendência" verificado no estado persistido do agregado (`ExtracaoOrcamentoRepository.salvar`), fonte de dados de onde o futuro endpoint lerá.
+
+## Leva T038 (issue #103, PR #521, commit `76ccbed`)
+
+| Critério de aceite (plan.md §§ "Application — Casos de uso"/"Domain — Agregados") | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| `orcamentoId` inexistente → `ExtracaoNaoEncontradaError` | Consistência | Unit | repositório fake devolve `undefined` | teste 1 | PASS |
+| Só aceita a partir de `PENDENTE_REVISAO_HUMANA`; qualquer outro status → `TransicaoInvalidaExtracaoError` do agregado | Consistência/contrato de transição | Unit | status `PENDENTE` e status já terminal (`EXTRAIDO_COM_PENDENCIA_CONFIRMADA`) | testes 6-7 | PASS |
+| Valor real completa campo pendente (`itens[].precoUnitario`, `.descricao`, `.quantidade`, `condicoesComerciais.*`) → `EXTRAIDO`, publica `OrcamentoExtraido` | Financeiro/silencioso (crítico) | Unit | 4 cenários felizes (precoUnitario, descricao+quantidade, condicoesPagamento+condicoesEntrega, prazoValidade ISO válida) | teste 2 (dev-back-end) + 3 testes adicionados pelo QA | PASS |
+| `indisponivel: true` → mantém `extraido: false`/`valor: null`, `agenteOrigem: 'HUMANO'`; 1+ pendência → `EXTRAIDO_COM_PENDENCIA_CONFIRMADA`, publica `OrcamentoExtraidoComPendenciaConfirmada` | Financeiro/silencioso (crítico) | Unit | assert direto no VO real (`CampoExtraido.extraido`/`.valor`) | teste 3 | PASS |
+| Nunca reabre campo já `extraido: true` | Integridade de dado já validado | Unit | tentativa de reconfirmar `itens[0].descricao` já extraído → `CaminhoConfirmacaoInvalidoError` | teste 4 | PASS |
+| Caminho (`itens[N].campo`/`condicoesComerciais.campo`) fora do intervalo ou em formato desconhecido → `CaminhoConfirmacaoInvalidoError` | Robustez de contrato | Unit | índice fora do array; string arbitrária | testes 5, 6 (numeração do arquivo) | PASS |
+| Shape/tipo de `valor` (borda Zod `unknown`) inválido nunca vaza `TypeError` — sempre `CaminhoConfirmacaoInvalidoError` | Robustez de borda | Unit | objeto com campo obrigatório ausente (moeda), número solto em vez de objeto, string não-ISO para `prazoValidade` | testes 9-11 | PASS |
+| Branch defensivo "nunca deveria ocorrer": `PENDENTE_REVISAO_HUMANA` sem `condicoesComerciais` → `ExtracaoSemCondicoesComerciaisError` | Invariante do agregado | Unit | `ExtracaoOrcamento.reconstituir(...)` com `condicoesComerciais: undefined` | teste adicionado pelo QA | PASS |
+| `referenciaBrutaS3`/`referenciaClassificacao` nunca tocados pelo caso de uso | Imutabilidade (Princípio III) | Inspeção de código (nenhuma chamada aos métodos `never` do agregado no arquivo de produção) | — | leitura de código, não teste automatizado | PASS |
+
+Cobertura do critério "Nunca decide o evento fora da regra do agregado":
+a implementação lê `extracao.status` **após** `registrarConfirmacaoHumana` para
+decidir entre `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada` —
+não há lógica de decisão duplicada na Application, só delegação ao Domain
+(mesmo padrão já validado em T020/T029).
+
+### Fora desta leva
+- Mapeamento HTTP (409 para `TransicaoInvalidaExtracaoError`, 400 para
+  `CaminhoConfirmacaoInvalidoError`, 404 para `ExtracaoNaoEncontradaError`) —
+  T039, endpoint REST ainda não implementado.
+- `IAM ConfirmarRevisaoHumanaExtracaoLambdaRole` — T040.

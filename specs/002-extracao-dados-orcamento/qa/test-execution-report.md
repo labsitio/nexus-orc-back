@@ -385,3 +385,57 @@ ambiente local**, não como defeito de produção nem de teste.
 ## Falhas classificadas
 Nenhuma falha de teste. 1 achado de code review (não é falha de teste) —
 ver `bugs/BUG-001.md` (getter `historico` sem cópia defensiva, severidade BAIXA).
+
+## Leva T038 (issue #103, PR #521, commit `76ccbed`)
+
+Primeira validação de QA. `backend-reviewer` já havia aprovado (APPROVE) após
+1 rodada de correção (guard de transição via `TransicaoInvalidaExtracaoError`
+do agregado, e validação de shape por campo em vez de cast inseguro sobre
+`valor: unknown`).
+
+### Comando
+`cd nexus-orc-back-wt-002b && npx vitest run --reporter=default tests/bounded-contexts/extracao`
+(NÃO `pnpm test` — `allure-vitest` quebra a suíte inteira por motivo ambiental
+pré-existente, ver `test-plan.md` § Limitações).
+
+### Resultado
+- Suíte completa do BC Extração: **30 arquivos passaram, 2 skipped (persistência
+  Drizzle, sem banco disponível neste worktree), 141 testes passaram, 0 falha**
+  (baseline antes do QA: 137 testes; +4 testes adicionados pelo QA neste
+  arquivo).
+- Arquivo do caso de uso sob teste, após QA adicionar 4 testes de cobertura
+  (ver abaixo): `confirmar-revisao-humana-extracao.test.ts` — **15 testes,
+  100% aprovados** (11 do dev-back-end + 4 novos de QA).
+- `npx tsc --noEmit -p .` — sem erros.
+- `npx eslint tests/bounded-contexts/extracao/application/confirmar-revisao-humana-extracao.test.ts src/bounded-contexts/extracao/application/use-cases/confirmar-revisao-humana-extracao.ts` — sem erros.
+
+### Lacuna de cobertura identificada e testes adicionados pelo QA
+Cobertura inicial do arquivo de produção (`confirmar-revisao-humana-extracao.ts`,
+apenas com os 11 testes do dev-back-end): 80.89% statements / 76.92% branches.
+Caminhos felizes (`valor` real, sem `indisponivel`) para `condicoesPagamento`,
+`condicoesEntrega`, `prazoValidade` (data ISO válida), `descricao` e
+`quantidade` de item não estavam exercitados — só os caminhos de erro e o de
+`precoUnitario`. QA adicionou, sem alterar nenhum arquivo de produção:
+1. Confirmação de `descricao` e `quantidade` pendentes de um item, valor real.
+2. Confirmação de `condicoesPagamento` e `condicoesEntrega` pendentes, valor real.
+3. Confirmação de `prazoValidade` pendente com data ISO 8601 válida.
+4. `ExtracaoSemCondicoesComerciaisError` (branch defensivo, "nunca deveria
+   ocorrer" segundo o próprio comentário do código) — construído via
+   `ExtracaoOrcamento.reconstituir(...)` (factory pública já existente para
+   reidratação pelo repositório) com `status: 'PENDENTE_REVISAO_HUMANA'` e
+   `condicoesComerciais: undefined`, sem cast nem mock de classe.
+
+Cobertura final do arquivo: **98.87% statements / 92.3% branches / 100%
+functions / 98.85% lines.** Única linha não coberta: ramo `sku === undefined`
+de `comoStringOpcional` dentro de `resolverDescricaoProduto` — branch trivial,
+já coberto indiretamente em `descricao-produto.vo.test.ts` no nível do VO;
+risco residual desprezível, não bloqueante.
+
+### Falhas classificadas
+Nenhuma. Nenhum defeito de produção encontrado nesta leva — comportamento do
+caso de uso confere integralmente com `plan.md` §§ "Application — Casos de
+uso" e "Domain — Agregados" (busca por `orcamentoId`, guard de status via erro
+do agregado, nunca reabre campo `extraido: true`, decide o evento a publicar
+lendo o `status` resultante do agregado — nunca decide a regra de negócio por
+conta própria, imutabilidade de `referenciaBrutaS3`/`referenciaClassificacao`
+preservada).
