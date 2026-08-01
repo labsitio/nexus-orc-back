@@ -1,5 +1,5 @@
 {
-  "id": "3209da47-7996-4441-8c85-97866d90887d",
+  "id": "9b517ae8-04d2-4193-a1f4-930c80afd719",
   "prevId": "ae0f6e80-5091-43a2-9bf1-482292b30e4e",
   "version": "7",
   "dialect": "postgresql",
@@ -12,12 +12,6 @@
           "name": "id",
           "type": "uuid",
           "primaryKey": true,
-          "notNull": true
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
           "notNull": true
         },
         "canal": {
@@ -90,23 +84,7 @@
           "notNull": false
         }
       },
-      "indexes": {
-        "orcamentos_tenant_id_idx": {
-          "name": "orcamentos_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -131,12 +109,6 @@
           "name": "id",
           "type": "bigserial",
           "primaryKey": true,
-          "notNull": true
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
           "notNull": true
         },
         "orcamento_id": {
@@ -189,21 +161,6 @@
           "columns": [
             {
               "expression": "orcamento_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "orcamentos_historico_tenant_id_idx": {
-          "name": "orcamentos_historico_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -945,6 +902,44 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "orquestracao.decisoes_workflow": {
+      "name": "decisoes_workflow",
+      "schema": "orquestracao",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "orquestracao.decisoes_workflow_historico": {
+      "name": "decisoes_workflow_historico",
+      "schema": "orquestracao",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -968,7 +963,8 @@
     "platform": "platform",
     "extracao": "extracao",
     "validacao": "validacao",
-    "busca_indexacao": "busca_indexacao"
+    "busca_indexacao": "busca_indexacao",
+    "orquestracao": "orquestracao"
   },
   "sequences": {},
   "roles": {},

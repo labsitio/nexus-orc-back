@@ -1,8 +1,9 @@
 # QA Final Report — T001-T003 (Phase 1: Setup)
 
-> Ver seção "T005" ao final deste documento para a validação mais recente
-> (VO `PoliticaRetencao`, PR #437). O conteúdo abaixo documenta a validação
-> histórica de T001-T003 e é preservado para rastreabilidade.
+> Ver seção "T011" ao final deste documento para a validação mais recente
+> (teste de infraestrutura SCP segregação de ambientes, PR #508). O conteúdo
+> abaixo documenta a validação histórica de T001-T003 e é preservado para
+> rastreabilidade.
 
 ## SPEC_ID e versão testada
 `008-hardening-seguranca-lgpd`. PR #407, branch `feat/008-hardening`,
@@ -445,6 +446,149 @@ Nenhum bug de produção encontrado nesta validação.
 ## Limitações do ambiente
 Nenhuma limitação bloqueante identificada além da já registrada (reporter
 Allure intermitente, contornável, sem impacto na validação funcional).
+
+## Parecer final
+APROVADO PELO QA
+
+---
+
+# QA Final Report — T011 (Phase 3, US1: Segregação de Ambientes)
+
+## SPEC_ID e versão testada
+`008-hardening-seguranca-lgpd`. PR #508 (draft), branch
+`feat/008-t011-scp-infra-test`, commit `8baa2ee`. Primeira validação (sem
+BUG anterior).
+
+## Resumo executivo
+T011 não é código de domínio/aplicação/endpoint — é um teste de
+infraestrutura (`infra/scripts/verificar-scp-segregacao-ambientes.sh`, via
+`aws-cli`) que valida que a SCP (Service Control Policy) da conta AWS
+dev/hml bloqueia `rds:CopyDBSnapshot`, `rds:RestoreDBInstanceFromDBSnapshot`
+e `s3:CopyObject` com origem na conta de produção. Documentado para
+Ricardo/DevOps executar manualmente ou via `workflow_dispatch`
+(`.github/workflows/verificar-scp-segregacao-ambientes.yml`) — não roda no
+CI padrão (push/PR), pois este repositório não tem credenciais AWS reais
+nem as contas dev/hml/prod provisionadas (T013/T014/T015, fora do escopo
+desta task). O backend-reviewer já aprovou (APPROVE WITH NITS) após uma
+rodada de correção de 2 MAJOR (permissão de execução do script; limpeza
+best-effort real de recurso órfão em caso de sucesso inesperado da ação
+bloqueada) e 2 minor/nit (regex de explicit-deny mais específica; sufixo de
+nome de recurso com nanossegundos).
+
+**Limitação de ambiente, registrada explicitamente**: não há credenciais
+AWS reais nem contas dev/hml/prod provisionadas neste ambiente de QA — a
+execução do script contra AWS real (o cenário fim-a-fim que ele testa) não
+pôde ser exercitada. A validação abaixo é estática (leitura), sintática
+(YAML, `bash -n`) e lógica (mock local isolado da função `assert_bloqueado`
+e da guarda de conta de produção, reproduzido de forma independente da
+verificação já feita pelo backend-reviewer na correção). Ver "Limitações do
+ambiente".
+
+## Requisitos cobertos e não cobertos
+- Permissão de execução do arquivo (`chmod +x`, MAJOR corrigido pelo
+  dev-back-end): coberto, PASS — `git ls-files -s` confirma modo `100755`.
+- Guarda de segurança contra rodar na conta de produção
+  (`AWS_PROD_ACCOUNT_ID` vs. `aws sts get-caller-identity`) posicionada
+  antes de qualquer chamada destrutiva: coberto, PASS — leitura de código
+  (linhas 49-56, antes de qualquer `aws rds`/`aws s3api`, que só aparecem a
+  partir da linha 109) + mock isolado simulando `CURRENT_ACCOUNT_ID ==
+  AWS_PROD_ACCOUNT_ID` (aborta com `exit 1` antes de qualquer ação).
+- Lógica de `assert_bloqueado` nos 3 desfechos possíveis: coberto, PASS —
+  mock isolado (função extraída do script real via `awk`, executada com
+  comandos fake, independente da verificação de correção já feita):
+  - sucesso inesperado (simula vazamento) → `CRÍTICO` + `RESULTADO=1` +
+    comando de limpeza best-effort efetivamente invocado;
+  - falha por explicit deny de SCP (mensagem real do erro AWS) → `OK` +
+    `RESULTADO=0`;
+  - falha por outro motivo (ex. `ValidationException`, sem a frase de SCP)
+    → `FALHA` + `RESULTADO=1`, não confundido com bloqueio por SCP.
+- Regex de detecção de explicit-deny (`with an explicit deny in a service
+  control policy`) restrita o suficiente para não casar com
+  `AccessDenied`/`ValidationException` genéricos: coberto, PASS (extraída
+  dinamicamente do script real no mock, não hardcoded pelo QA).
+- Sufixo de nome de recurso com nanossegundos (`date +%s%N`) evita colisão
+  entre execuções próximas: coberto, PASS — leitura de código.
+- Workflow YAML sintaticamente válido: coberto, PASS — parseado com
+  `js-yaml` (`npx js-yaml ...`) sem erro.
+- Workflow dispara apenas via `workflow_dispatch` (nunca `push`/
+  `pull_request`): coberto, PASS — chave `on` do YAML parseado contém
+  exclusivamente `workflow_dispatch`.
+- README documenta pré-requisitos (T013/T014/T015, snapshot/objeto de teste
+  não sensíveis em prod) e uso (variáveis de ambiente, comando de execução,
+  saída esperada): coberto, PASS — leitura manual comparada ao script e ao
+  workflow, conteúdo consistente entre os 3 arquivos.
+- **Não coberto (limitação de ambiente)**: execução real do script contra
+  contas AWS dev/hml/prod verdadeiras, incluindo o comportamento real da
+  SCP (T013/T014) e da role OIDC (T015) — nenhuma dessas dependências existe
+  neste repositório/ambiente. Ver "Limitações do ambiente".
+
+## Suítes executadas e comandos
+- `git ls-files -s infra/scripts/verificar-scp-segregacao-ambientes.sh` —
+  confirma modo `100755`.
+- `bash -n infra/scripts/verificar-scp-segregacao-ambientes.sh` — sintaxe
+  válida.
+- `npx --yes js-yaml .github/workflows/verificar-scp-segregacao-ambientes.yml`
+  — parse YAML sem erro; inspeção programática confirma `on` = apenas
+  `workflow_dispatch`.
+- Script de mock QA (scratchpad local, não versionado no repositório):
+  extrai a função `assert_bloqueado` do script real via `awk` e a
+  `SCP_DENY_REGEX` real via `grep`, executa em subshell isolado 3 cenários
+  (sucesso inesperado / explicit deny / outro erro) com comandos fake no
+  lugar de `aws-cli`, e testa a guarda de conta de produção com
+  `CURRENT_ACCOUNT_ID` simulado. Não requer `shellcheck`/`python3`
+  (indisponíveis neste ambiente Windows/Git Bash) — validação feita com as
+  ferramentas efetivamente disponíveis (`bash`, `node`/`npx`).
+
+Detalhe completo em `qa/test-execution-report.md`.
+
+## Quantidade de testes por tipo
+0 testes automatizados novos versionados no repositório — esta é uma task
+de infraestrutura entregue como script standalone (não há suíte de
+domínio/aplicação a estender). A validação de QA consistiu em 4 verificações
+estáticas/sintáticas (permissão, sintaxe bash, YAML, trigger) e 4 cenários
+de mock lógico isolado (guarda de produção + 3 desfechos de
+`assert_bloqueado`), nenhum deles executando contra AWS real.
+
+## Resultado: aprovados, falhos, ignorados e instáveis
+Todas as 8 verificações acima: PASS. Nenhuma falha, nenhum teste ignorado
+para ocultar problema. Execução real contra AWS não realizada (ver
+"Limitações do ambiente") — não classificada como ignorada/instável, e sim
+como fora do alcance possível neste ambiente.
+
+## Cobertura inicial e final
+Não aplicável — não há suíte de testes de código (vitest/cobertura v8) para
+um script bash de infraestrutura. Repositório não possui ferramenta de
+cobertura para shell scripts.
+
+## Allure
+Não aplicável a este tipo de entrega (script de infraestrutura fora do
+runner de testes do monorepo). Nenhum `allure-results` gerado para T011.
+
+## Bugs por severidade e status
+Nenhum bug de produção encontrado nesta validação.
+
+## Riscos residuais
+- Execução real do script contra AWS dev/hml/prod segue não validada (só
+  será possível após T013/T014/T015). Recomenda-se que Ricardo/DevOps
+  execute o script assim que as contas/SCP/role OIDC estiverem prontas, e
+  que o QA seja acionado novamente para validar a execução real antes de
+  considerar a segregação de ambientes definitivamente comprovada em
+  produção.
+- Mock de QA cobre a lógica local do script, não substitui teste de
+  integração contra a AWS real — mensagens de erro reais da AWS podem
+  variar ligeiramente de ambiente/região/versão de `aws-cli`; a regex de
+  detecção (`with an explicit deny in a service control policy`) deve ser
+  reconfirmada na primeira execução real por Ricardo/DevOps.
+
+## Limitações do ambiente
+Confirmado: não há credenciais AWS reais, contas dev/hml/prod, SCP aplicada
+nem role OIDC provisionadas neste ambiente/repositório (T013/T014/T015 são
+tasks futuras, fora do escopo de T011). Não foi possível executar o script
+fim-a-fim contra AWS real. Ferramentas auxiliares também limitadas no
+ambiente Windows/Git Bash usado (`shellcheck` e `python3`/`pyyaml`
+indisponíveis) — contornado com `bash -n` para sintaxe e `js-yaml` (via
+`npx`) para validação do YAML, ambos suficientes para o escopo desta
+verificação.
 
 ## Parecer final
 APROVADO PELO QA

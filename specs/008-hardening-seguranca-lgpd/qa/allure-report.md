@@ -44,3 +44,10 @@ completa 293 passed/27 skipped/0 failed). Risco residual: adaptador
 registrada desde T001 (investigar/corrigir `vitest.config.ts`/versão do
 `allure-vitest` como item de infraestrutura, fora do escopo de código de
 produção de T009) permanece em aberto.
+
+## T011 -- nao aplicavel (commit `8baa2ee`)
+
+Entrega e um script bash de infraestrutura fora do runner vitest -- nenhum
+`allure-results` a gerar. Validacao registrada como evidencia textual em
+`qa-final-report.md` e `test-execution-report.md` (saida dos comandos
+`bash -n`, `js-yaml` e do mock isolado de `assert_bloqueado`).

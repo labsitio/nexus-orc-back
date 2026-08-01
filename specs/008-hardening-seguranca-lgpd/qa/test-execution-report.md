@@ -335,3 +335,69 @@ técnicos e verificáveis (mesma interface, mesmo bus, `source` correto,
 sem mecanismo alternativo, sem SDK vazando para Domain) estão satisfeitos.
 Registrado como ambiguidade de redação entre `tasks.md` e `plan.md`, não como
 defeito de implementação — sem impacto no gate desta task.
+
+## T011 -- Teste de infraestrutura: SCP bloqueia segregacao de ambientes (commit `8baa2ee`)
+
+Entrega e um script bash de infraestrutura, sem suite vitest a executar.
+Validacao de QA feita por 4 verificacoes estaticas/sintaticas e mock logico
+isolado (nao executa contra AWS real -- ver limitacao de ambiente).
+
+### Permissao de execucao
+
+    $ git ls-files -s infra/scripts/verificar-scp-segregacao-ambientes.sh
+    100755 5be375df... 0 infra/scripts/verificar-scp-segregacao-ambientes.sh
+
+PASS -- modo 100755 confirmado.
+
+### Sintaxe bash
+
+    $ bash -n infra/scripts/verificar-scp-segregacao-ambientes.sh
+    (sem saida -- sintaxe OK)
+
+### Validacao do workflow YAML
+
+    $ npx --yes js-yaml .github/workflows/verificar-scp-segregacao-ambientes.yml
+    (JSON parseado sem erro)
+
+Inspecao programatica confirma chave `on` do YAML parseado contendo
+exclusivamente `workflow_dispatch` -- nunca dispara em push/pull_request.
+
+### Mock isolado de `assert_bloqueado` e da guarda de producao
+
+Script de QA (scratchpad, nao versionado no repositorio) extrai a funcao
+`assert_bloqueado` do script real via `awk` e a `SCP_DENY_REGEX` real via
+`grep`, e executa 3 casos com comandos fake:
+
+    === Caso A: sucesso inesperado (simula vazamento) ===
+    CRITICO [teste]: a acao NAO foi bloqueada -- teve sucesso...
+    Executando limpeza best-effort do recurso criado: echo LIMPEZA_EXECUTADA
+    LIMPEZA_EXECUTADA
+    RESULTADO_FINAL=1
+
+    === Caso B: explicit deny de SCP ===
+    OK [teste]: bloqueado pela SCP (explicit deny).
+    RESULTADO_FINAL=0
+
+    === Caso C: outro erro (nao SCP) ===
+    FALHA [teste]: comando falhou, mas nao por explicit deny de SCP...
+    RESULTADO_FINAL=1
+
+    === Caso D: guarda conta de producao ===
+    FALHA: credenciais atuais pertencem a conta de producao (999999999999)
+    - abortando por seguranca.
+    exit code guarda (esperado 1): 1
+
+Todos os 4 casos produziram o resultado esperado. Confirma, de forma
+independente da correcao ja validada pelo backend-reviewer: (1) sucesso
+inesperado e tratado como CRITICO com limpeza best-effort efetivamente
+invocada; (2) explicit deny de SCP e o unico caminho que resulta em OK;
+(3) outro erro nao e confundido com bloqueio por SCP; (4) a guarda de
+conta de producao aborta antes de qualquer chamada destrutiva.
+
+### Limitacao de ambiente
+
+Nao ha credenciais AWS reais nem contas dev/hml/prod provisionadas neste
+ambiente (T013/T014/T015 pendentes) -- execucao real do script contra AWS
+nao pode ser exercitada neste QA. `shellcheck` e `python3`/`pyyaml` tambem
+indisponiveis no ambiente Windows/Git Bash usado; contornado com `bash -n`
+e `js-yaml` via `npx`, suficientes para o escopo desta verificacao.
