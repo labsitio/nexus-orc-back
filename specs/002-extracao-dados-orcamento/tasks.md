@@ -61,7 +61,7 @@
 - [x] T022 [US1] Application: caso de uso `ExtrairDadosOrcamento` (consome `OrcamentoClassificado`, converte via MarkItDown, invoca Extrator, aplica `registrarTentativaExtrator`, persiste, publica `OrcamentoExtraido` se todos os campos obrigatórios OK ou `ExtracaoEscalonadaParaRevisaoHumana` se 1+ campo sem confiança). #87
 - [x] T023 [US1] Interface: handler Lambda consumidor SQS de `extrator-queue`, invocando `ExtrairDadosOrcamento`. Dependia de ADR-003 (spec 001, `referenciaBruta` no payload de `OrcamentoClassificado` — PR #483) para poder construir `referenciaBrutaS3`. #88
 - [ ] T024 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/extracao/status` (query, Zod schema de response, Problem Details para erro).
-- [ ] T025 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema da spec 001.
+- [x] T025 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema da spec 001. #90
 - [x] T026 [US1] IAM: role dedicada `ExtratorLambdaRole` (least privilege: `bedrock:InvokeModel` restrito ao ARN do modelo aprovado, `s3:GetObject` restrito ao prefixo do bucket raw, sem `PutObject`/`DeleteObject`). #91
 
 **Checkpoint**: US1 funcional e testável isoladamente — orçamento classificado com documento bem formado é extraído com sucesso, sem intervenção manual.
