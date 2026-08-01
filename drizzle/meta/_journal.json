@@ -99,6 +99,13 @@
       "when": 1785588425596,
       "tag": "0013_rls_orcamentos_tenant_isolation",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785589023772,
+      "tag": "0014_indices_orcamento_completo",
+      "breakpoints": true
     }
   ]
 }

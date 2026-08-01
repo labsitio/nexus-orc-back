@@ -6,7 +6,9 @@ export class TentativaIndexacaoInvalidaError extends ErroDominio {
   }
 }
 
-export type ResultadoTentativaIndexacao = 'INDEXADO' | 'FALHA_TECNICA';
+export const RESULTADOS_TENTATIVA_INDEXACAO = ['INDEXADO', 'FALHA_TECNICA'] as const;
+
+export type ResultadoTentativaIndexacao = (typeof RESULTADOS_TENTATIVA_INDEXACAO)[number];
 
 export interface TentativaIndexacaoProps {
   readonly resultado: ResultadoTentativaIndexacao;

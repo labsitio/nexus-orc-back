@@ -10,7 +10,12 @@ export class OrigemValidacaoInvalidaError extends ErroDominio {
 
 export type OrigemValidacaoValor = 'VALIDADO' | 'VALIDADO_COM_RESSALVA';
 
-const VALORES_VALIDOS: readonly OrigemValidacaoValor[] = ['VALIDADO', 'VALIDADO_COM_RESSALVA'];
+export const VALORES_ORIGEM_VALIDACAO: readonly OrigemValidacaoValor[] = [
+  'VALIDADO',
+  'VALIDADO_COM_RESSALVA',
+];
+
+const VALORES_VALIDOS = VALORES_ORIGEM_VALIDACAO;
 
 /**
  * Enum fechado da origem do orçamento indexado — de qual evento upstream

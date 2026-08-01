@@ -17,7 +17,9 @@ export class IndiceOrcamentoInconsistenteError extends ErroDominio {
   }
 }
 
-export type EstadoIndexacao = 'PENDENTE' | 'INDEXADO' | 'FALHA_INDEXACAO';
+export const ESTADOS_INDEXACAO = ['PENDENTE', 'INDEXADO', 'FALHA_INDEXACAO'] as const;
+
+export type EstadoIndexacao = (typeof ESTADOS_INDEXACAO)[number];
 
 export interface IndiceOrcamentoProps {
   readonly orcamentoId: OrcamentoId;
