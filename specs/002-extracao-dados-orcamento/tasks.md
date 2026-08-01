@@ -99,7 +99,7 @@
 
 ### Implementation (US3)
 
-- [ ] T038 [US3] Application: caso de uso `ConfirmarRevisaoHumanaExtracao` (valida status, aplica `registrarConfirmacaoHumana`, publica `OrcamentoExtraido` ou `OrcamentoExtraidoComPendenciaConfirmada`).
+- [x] T038 [US3] Application: caso de uso `ConfirmarRevisaoHumanaExtracao` (valida status, aplica `registrarConfirmacaoHumana`, publica `OrcamentoExtraido` ou `OrcamentoExtraidoComPendenciaConfirmada`). #103
 - [ ] T039 [US3] Interface: controller `POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana`, Zod schema (campos confirmados: valor real OU marcação explícita "indisponível"), Problem Details para 409.
 - [ ] T040 [US3] IAM: role dedicada `ConfirmarRevisaoHumanaExtracaoLambdaRole`, least privilege.
 
