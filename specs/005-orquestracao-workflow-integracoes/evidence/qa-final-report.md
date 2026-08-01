@@ -57,3 +57,66 @@ Node do PATH padrão é v16 (incompatível); uso de `$HOME/.nvm/versions/node/v2
 **APROVADO PELO QA**
 
 Diff IaC puro, escopo exato, typecheck e synth limpos, EventPattern confirmado byte-a-byte contra o contrato documentado em `plan.md` das specs 003 e 005, sem regressão introduzida, sem defeito de produto. Racional do backend-reviewer sobre o evento upstream ainda não implementado é aceito por QA como risco de coordenação já registrado e não bloqueante, idêntico ao padrão já aprovado em T004/T005.
+
+---
+
+## Validação — T013 (issue #219), primeira validação
+
+### SPEC_ID e versão testada
+- SPEC_ID: 005-orquestracao-workflow-integracoes
+- PR: #513, branch `feat/005-t013-domain-events`, commit `7c0376d`
+- Primeira validação (sem BUG anterior)
+
+### Resumo executivo
+PR define os 5 Domain Events de desfecho do agregado `DecisaoWorkflow` (BC Orquestração): `OrcamentoAprovadoParaProcessamento`, `OrcamentoEncaminhadoParaComprador`, `OrcamentoReenvioSolicitado`, `IntegracaoExternaSolicitada`, `DecisaoWorkflowEscalonadaParaComprador`. Domain puro (sem framework/ORM/SDK), sem import cruzado de outro Bounded Context. Título desatualizado da issue #219 (menciona 6 eventos incluindo `decisao-workflow-baixa-confianca-detectada`, removido do `plan.md`/`tasks.md` vigentes após eliminação do Agente Revisor de Workflow) — não é lacuna de escopo; `plan.md`/`tasks.md` atuais confirmam 5 eventos, exatamente os implementados.
+
+### Requisitos cobertos (T013, plan.md "Domain Events" linhas 119-127)
+1. Todos os 5 eventos: `schemaVersion: 1` (literal `1 as const`), `orcamentoId: string`, `ocorreuEm` ISO 8601 (`Date.toISOString()`, default `new Date()`), `detailType` estático correspondente ao nome da classe — CONFIRMADO por leitura de código e teste parametrizado (`domain-events.test.ts`, `describe.each`).
+2. `OrcamentoAprovadoParaProcessamento`/`OrcamentoEncaminhadoParaComprador`/`OrcamentoReenvioSolicitado` carregam `agenteOrigem: AgenteOrigemDecisao`, `criterio: string`, `nivelConfianca: number | null` (comentário explícito: null apenas quando `HUMANO`); `OrcamentoReenvioSolicitado` adicionalmente `motivoDadoAusente: string` — CONFIRMADO, e teste dedicado cobre valor não vazio referenciando pendência concreta.
+3. `IntegracaoExternaSolicitada`: payload restrito a `orcamentoId`/`acaoOrigem`/`ocorreuEm` (+ envelope `detailType`/`schemaVersion`) — CONFIRMADO por leitura de código e por teste que assere `Object.keys(evento).sort()` exatamente igual a `['acaoOrigem','detailType','ocorreuEm','orcamentoId','schemaVersion']`. Nenhum campo de protocolo de sistema parceiro presente — requisito de segurança/desacoplamento do spec.md satisfeito.
+4. `DecisaoWorkflowEscalonadaParaComprador` carrega `nivelConfianca: number` (não nullable, sempre reportado pelo Orquestrador) — CONFIRMADO.
+5. Nenhum import de framework/ORM/SDK no Domain (`grep -rn "^import" src/bounded-contexts/orquestracao/domain/events/*.ts` — apenas imports internos a `./domain-event.js` e `../value-objects/decisao-roteamento.vo.js`, ambos do mesmo BC); nenhum import cruzado de outro Bounded Context — CONFIRMADO.
+
+### Suítes executadas e comandos
+```
+npx vitest run tests/bounded-contexts/orquestracao/domain/events/domain-events.test.ts
+→ 8 passed
+
+npx vitest run tests/bounded-contexts/orquestracao
+→ 72 passed | 1 skipped (10 arquivos) — skip pré-existente (teste de integração Drizzle
+  dependente de banco local, não relacionado a esta PR)
+
+npx eslint src/bounded-contexts/orquestracao/domain/events tests/bounded-contexts/orquestracao/domain/events
+→ sem erros/warnings
+
+npx tsc --noEmit -p .
+→ erros pré-existentes de ambiente (módulos @aws-sdk/*, pino, @opentelemetry/* ausentes
+  em node_modules — dependências não instaladas neste worktree), todos em BCs extracao/
+  ingestao-identificacao/validacao/platform-conformidade; nenhum erro em
+  src/bounded-contexts/orquestracao/** — confirmado via grep, zero ocorrências.
+  Classificado como problema de ambiente, não relacionado a esta PR.
+```
+
+### Cobertura estrutural (escopo: arquivos desta PR)
+```
+npx vitest run tests/bounded-contexts/orquestracao/domain/events/domain-events.test.ts \
+  --coverage --coverage.include='src/bounded-contexts/orquestracao/domain/events/**'
+→ Statements 100% (37/37) | Branches 100% (5/5) | Functions 100% (5/5) | Lines 100% (37/37)
+```
+
+### Allure
+Não configurado no repositório (nenhum adaptador Allure presente em `package.json`/config de runner nas validações anteriores desta spec nem das specs 001-004). Mantida a convenção já aceita: evidência via saída do `vitest` reproduzível neste relatório, sem lacuna nova introduzida por esta PR.
+
+### Bugs encontrados
+Nenhum.
+
+### Riscos residuais
+Nenhum novo. Risco de coordenação já registrado na validação de T006 (eventos upstream de spec 003 ainda pendentes) não se aplica aqui — T013 define eventos de desfecho publicados pela própria spec 005, sem dependência de spec externa.
+
+### Limitações do ambiente
+`node_modules` deste worktree não possui as dependências de infraestrutura (`@aws-sdk/*`, `pino`, `@opentelemetry/*`), gerando erros de `tsc --noEmit` fora do escopo desta PR (BCs extracao/ingestao-identificacao/validacao/platform-conformidade). Não bloqueante — nenhum arquivo de `orquestracao/domain/events` afetado.
+
+### Parecer final
+**APROVADO PELO QA**
+
+Os 5 Domain Events cobrem exatamente o contrato descrito em `plan.md` (schemaVersion 1, orcamentoId, ocorreuEm ISO, detailType estático, payloads plausíveis conforme regra de negócio de `DecisaoRoteamento`), Domain puro sem framework/ORM/SDK e sem import cruzado de BC, teste unitário existente passa integralmente com 100% de cobertura estrutural no escopo da PR, lint limpo. Discrepância de título da issue #219 é cosmética (GitHub, não código) e já documentada tanto no PR quanto neste relatório — não bloqueia o gate.
