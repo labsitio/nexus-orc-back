@@ -2,8 +2,11 @@ import { ErroDominio } from '../errors/erro-dominio.js';
 import type { ContextoValidacao } from './contexto-validacao.vo.js';
 import type { NivelConfianca } from './nivel-confianca.vo.js';
 
-export type AcaoRoteamento = 'APROVAR' | 'ENCAMINHAR_COMPRADOR' | 'SOLICITAR_REENVIO';
-export type AgenteOrigemDecisao = 'ORQUESTRADOR' | 'HUMANO';
+export const ACOES_ROTEAMENTO = ['APROVAR', 'ENCAMINHAR_COMPRADOR', 'SOLICITAR_REENVIO'] as const;
+export type AcaoRoteamento = (typeof ACOES_ROTEAMENTO)[number];
+
+export const AGENTES_ORIGEM_DECISAO = ['ORQUESTRADOR', 'HUMANO'] as const;
+export type AgenteOrigemDecisao = (typeof AGENTES_ORIGEM_DECISAO)[number];
 
 export class AprovacaoSemValidacaoError extends ErroDominio {
   constructor() {
