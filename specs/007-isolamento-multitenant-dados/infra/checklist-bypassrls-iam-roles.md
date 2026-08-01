@@ -71,9 +71,9 @@ WHERE rolname = current_user;
 ```
 
 Já coberto automaticamente em CI/local por
-`tests/security/isolamento-multitenant/rls-enforcement.test.ts`, que cria uma role dedicada
-`NOSUPERUSER NOBYPASSRLS` e confirma adversarialmente que o isolamento cross-tenant se sustenta
-mesmo com uma role real (não apenas configuração de catálogo) — ver
+`tests/security/isolamento-multitenant/rls-enforcement.test.ts` (T007, #270), que cria uma role
+dedicada `NOSUPERUSER NOBYPASSRLS` e confirma adversarialmente que o isolamento cross-tenant se
+sustenta mesmo com uma role real (não apenas configuração de catálogo) — ver
 `specs/007-isolamento-multitenant-dados/qa/test-plan-T007.md`. A role local de dev/CI (`nexo`,
 docker-compose) é `SUPERUSER BYPASSRLS=true` e **nunca** deve ser usada como modelo para a role de
 produção — é exclusiva de ambiente de desenvolvimento.
