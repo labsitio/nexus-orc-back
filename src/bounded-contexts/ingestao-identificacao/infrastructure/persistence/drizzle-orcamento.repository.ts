@@ -120,11 +120,16 @@ export class DrizzleOrcamentoRepository implements OrcamentoRepository {
     await this.db.transaction(async (tx) => {
       // RLS (T007): sessão precisa de `app.current_tenant_id` antes de
       // qualquer SELECT/INSERT nestas tabelas — ver `TENANT_ID_PROVISORIO`.
-      // `SET LOCAL` não aceita bind parameter para o valor (erro de sintaxe
-      // do Postgres) — interpolação literal seguindo `sql.raw` é segura aqui
-      // porque `TENANT_ID_PROVISORIO` já passou pela validação estrita de
-      // formato UUID v7 de `TenantId.de` (nunca input externo).
-      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${TENANT_ID_PROVISORIO}'`));
+      // `set_config(..., true)` equivale a `SET LOCAL` mas aceita bind
+      // parameter normal do Drizzle — `SET LOCAL x = $1` é erro de sintaxe
+      // no Postgres (não aceita parâmetro na posição do valor), o que forçaria
+      // interpolação de string manual. T008 vai reaproveitar este trecho para
+      // o `tenantId` real do `TenantContext` (vindo do JWT) — `set_config`
+      // parametrizado evita herdar um padrão de SQL cru interpolado no ponto
+      // exato que substituirá uma constante local por dado de request.
+      await tx.execute(
+        sql`select set_config('app.current_tenant_id', ${TENANT_ID_PROVISORIO}, true)`,
+      );
 
       // Serializa `salvar` concorrente do mesmo agregado (ex.: retry de Lambda
       // + invocação original) — sem este lock, duas transações poderiam ler a
@@ -192,9 +197,11 @@ export class DrizzleOrcamentoRepository implements OrcamentoRepository {
 
   async buscarPorId(id: OrcamentoId): Promise<Orcamento | undefined> {
     return this.db.transaction(async (tx) => {
-      // RLS (T007): mesma exigência de `SET LOCAL` do `salvar` — ver
+      // RLS (T007): mesma exigência de `set_config` do `salvar` — ver
       // `TENANT_ID_PROVISORIO`.
-      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${TENANT_ID_PROVISORIO}'`));
+      await tx.execute(
+        sql`select set_config('app.current_tenant_id', ${TENANT_ID_PROVISORIO}, true)`,
+      );
 
       const [linhaOrcamento] = await tx
         .select()

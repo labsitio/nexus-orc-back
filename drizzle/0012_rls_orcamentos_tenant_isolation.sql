@@ -1,5 +1,15 @@
-ALTER TABLE "orcamentos" ADD COLUMN "tenant_id" uuid NOT NULL;--> statement-breakpoint
-ALTER TABLE "orcamentos_historico" ADD COLUMN "tenant_id" uuid NOT NULL;--> statement-breakpoint
+-- Expand/contract (achado MAJOR de revisão): `ADD COLUMN ... NOT NULL` sem
+-- `DEFAULT` falha se a tabela já tiver linha em qualquer ambiente (ADR-005
+-- garante "nenhum tenant real em produção", não garante tabela vazia em
+-- staging/dev com dado de specs 001-006 já mergeadas). `DEFAULT` provisório
+-- backfilla linhas existentes com o mesmo placeholder documentado em
+-- `DrizzleOrcamentoRepository` (`TENANT_ID_PROVISORIO`) e é removido em
+-- seguida — nenhuma linha nova depende dele, `orcamento.schema.ts` não
+-- declara default (T014/T016/T018 propagam o tenantId real).
+ALTER TABLE "orcamentos" ADD COLUMN "tenant_id" uuid NOT NULL DEFAULT '00000000-0000-7000-8000-000000000000';--> statement-breakpoint
+ALTER TABLE "orcamentos" ALTER COLUMN "tenant_id" DROP DEFAULT;--> statement-breakpoint
+ALTER TABLE "orcamentos_historico" ADD COLUMN "tenant_id" uuid NOT NULL DEFAULT '00000000-0000-7000-8000-000000000000';--> statement-breakpoint
+ALTER TABLE "orcamentos_historico" ALTER COLUMN "tenant_id" DROP DEFAULT;--> statement-breakpoint
 CREATE INDEX "orcamentos_tenant_id_idx" ON "orcamentos" USING btree ("tenant_id");--> statement-breakpoint
 CREATE INDEX "orcamentos_historico_tenant_id_idx" ON "orcamentos_historico" USING btree ("tenant_id");--> statement-breakpoint
 -- Isolamento multi-tenant estrutural (plan.md ADR-003, T007): RLS é a garantia

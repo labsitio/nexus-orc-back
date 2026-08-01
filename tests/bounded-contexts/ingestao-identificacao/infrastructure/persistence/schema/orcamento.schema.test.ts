@@ -51,8 +51,11 @@ describe.skipIf(!DATABASE_URL)('schema orcamentos / orcamentos_historico (Postgr
   beforeEach(async () => {
     await client.query('BEGIN');
     // RLS (T007): sem `app.current_tenant_id`, a política `tenant_isolation`
-    // nega toda linha destas tabelas.
-    await client.query(`SET LOCAL app.current_tenant_id = '${TENANT_ID_TESTE}'`);
+    // nega toda linha destas tabelas. `set_config(..., true)` equivale a
+    // `SET LOCAL` mas aceita bind parameter (`SET LOCAL x = $1` é erro de
+    // sintaxe no Postgres) — mesma correção aplicada em
+    // `drizzle-orcamento.repository.ts`.
+    await client.query(`select set_config('app.current_tenant_id', $1, true)`, [TENANT_ID_TESTE]);
   });
 
   afterEach(async () => {
