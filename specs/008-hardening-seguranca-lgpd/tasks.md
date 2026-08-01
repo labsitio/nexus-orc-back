@@ -55,7 +55,7 @@ Conforme `plan.md` desta spec e convenção herdada de 001: `src/platform/confor
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Teste de infraestrutura (via `cdk-nag`/`aws-cli` em pipeline, documentado como script para Ricardo/DevOps executarem) validando que a SCP da conta dev/hml bloqueia `rds:CopyDBSnapshot`/`rds:RestoreDBInstanceFromDBSnapshot` e `s3:CopyObject` com origem na conta prod.
+- [x] T011 [P] [US1] Teste de infraestrutura (via `cdk-nag`/`aws-cli` em pipeline, documentado como script para Ricardo/DevOps executarem) validando que a SCP da conta dev/hml bloqueia `rds:CopyDBSnapshot`/`rds:RestoreDBInstanceFromDBSnapshot` e `s3:CopyObject` com origem na conta prod. (#312)
 - [ ] T012 [P] [US1] Teste de contrato garantindo que a role de deploy de CI/CD de um ambiente não assume role de outro ambiente (verificação de `sts:AssumeRole` restrito por conta).
 
 ### Implementation for User Story 1
