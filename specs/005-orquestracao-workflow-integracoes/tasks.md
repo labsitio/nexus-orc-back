@@ -39,7 +39,7 @@
 - [x] T013 [P] Domain: definir os 5 Domain Events (`orcamento-aprovado-para-processamento`, `orcamento-encaminhado-para-comprador`, `orcamento-reenvio-solicitado`, `integracao-externa-solicitada`, `decisao-workflow-escalonada-para-comprador`) com `schemaVersion: 1`, `source: nexo.orquestracao`, conforme convenção do `plan.md`. `decisao-workflow-escalonada-para-comprador` é publicado diretamente quando o Orquestrador não atinge confiança suficiente.
 - [x] T014 [P] Domain: definir interfaces de repositório/gateway (`decisao-workflow.repository.ts`, `agente-orquestrador.gateway.ts`, `orcamento-classificado-event.acl.ts`, `orcamento-extraido-event.acl.ts`, `orcamento-validado-event.acl.ts`) — sem implementação, apenas contratos TypeScript.
 - [x] T015 Infrastructure: schema Drizzle das tabelas `decisoes_workflow` (estado atual, contextos/decisão em colunas JSONB) e `decisoes_workflow_historico` (append-only, sem UPDATE/DELETE) + migração.
-- [ ] T016 Infrastructure: `DrizzleDecisaoWorkflowRepository` implementando `DecisaoWorkflowRepository`, traduzindo linha↔agregado.
+- [x] T016 Infrastructure: `DrizzleDecisaoWorkflowRepository` implementando `DecisaoWorkflowRepository`, traduzindo linha↔agregado.
 - [ ] T017 [P] Infrastructure: `OrcamentoClassificadoEventACL`, `OrcamentoExtraidoEventACL`, `OrcamentoValidadoEventACL` traduzindo os 3 payloads de evento upstream — nunca importam tipos de domínio dos BCs de origem.
 - [ ] T018 Infrastructure: `EventBridgePublisher` implementando `EventPublisher` (instância própria deste BC, mesmo bus `nexo-dominio-bus`).
 - [ ] T019 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta das specs 001–003).
