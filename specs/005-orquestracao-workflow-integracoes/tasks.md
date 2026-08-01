@@ -15,7 +15,7 @@
 ## Phase 1: Setup (Shared Infrastructure)
 
 - [x] T001 Criar estrutura de pastas `src/bounded-contexts/orquestracao/{domain,application,infrastructure,interface}` e `tests/bounded-contexts/orquestracao/{domain,application,contract}` conforme `plan.md` (monorepo já inicializado pelas specs 001–003 — não repetir setup daquelas specs).
-- [ ] T002 [P] Migração Drizzle Kit: schema inicial do BC Orquestração (tabelas vazias, baseline) — ADR-001 da spec 001, herdado.
+- [x] T002 [P] Migração Drizzle Kit: schema inicial do BC Orquestração (tabelas vazias, baseline) — ADR-001 da spec 001, herdado.
 - [x] T003 [P] Provisionar 3 filas SQS (`contexto-classificacao-queue`, `contexto-extracao-queue`, `decisao-workflow-queue`), cada uma com DLQ própria + alarme CloudWatch em mensagem na DLQ (IaC — Ricardo/DevOps).
 - [x] T004 [P] Provisionar regra EventBridge no bus `nexo-dominio-bus` roteando `detail-type: OrcamentoClassificado`, `source: nexo.ingestao-identificacao` → `contexto-classificacao-queue`.
 - [x] T005 [P] Provisionar regra EventBridge roteando `detail-type: OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, `source: nexo.extracao` → `contexto-extracao-queue`.
