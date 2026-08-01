@@ -7,8 +7,8 @@ import {
   ConfirmarRevisaoHumanaExtracao,
   ExtracaoNaoEncontradaError,
 } from '../../application/use-cases/confirmar-revisao-humana-extracao.js';
-import type { ProblemDetails } from './status.schema.js';
-import { orcamentoIdParamSchema } from './status.schema.js';
+import type { ProblemDetails, StatusExtracaoResponse } from './status.schema.js';
+import { orcamentoIdParamSchema, statusExtracaoResponseSchema } from './status.schema.js';
 import { revisaoHumanaExtracaoBodySchema } from './revisao-humana.schema.js';
 import type { RotaOpts } from './route-opts.js';
 
@@ -19,10 +19,12 @@ import type { RotaOpts } from './route-opts.js';
  * neste momento): evita depender de um arquivo que ainda não existe nesta
  * branch e reduz colisão de merge. Duplicação pontual, aceita — se `T024`
  * mergear primeiro, promover para função compartilhada fica registrado como
- * débito (ponytail).
+ * débito (ponytail). Validada contra `statusExtracaoResponseSchema` antes do
+ * envio — mesma rede de segurança runtime contra drift de contrato usada em
+ * `ingestao-identificacao/interface/http/status.controller.ts`.
  */
-function paraResposta(extracao: ExtracaoOrcamento) {
-  return {
+function paraResposta(extracao: ExtracaoOrcamento): StatusExtracaoResponse {
+  return statusExtracaoResponseSchema.parse({
     orcamentoId: extracao.orcamentoId.toString(),
     status: extracao.status,
     itens: extracao.itens.map((item) => item.paraPayload()),
@@ -33,7 +35,7 @@ function paraResposta(extracao: ExtracaoOrcamento) {
       resultado: tentativa.resultado ?? null,
       motivoInsucesso: tentativa.motivoInsucesso ?? null,
     })),
-  };
+  });
 }
 
 /**
