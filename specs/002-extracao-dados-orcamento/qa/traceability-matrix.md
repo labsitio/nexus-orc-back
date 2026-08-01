@@ -143,6 +143,24 @@ Diferencial desta leva frente a T020/T027 (não redundante): único teste que pe
 ### Fora desta leva
 - Consulta de status via HTTP (`GET /v1/orcamentos/{id}/extracao/status`, T024) não implementada ainda — "status reflete a pendência" verificado no estado persistido do agregado (`ExtracaoOrcamentoRepository.salvar`), fonte de dados de onde o futuro endpoint lerá.
 
+## Leva T039 (issue #104, PR #526, commit `cd73e66`)
+
+| Critério de aceite (spec.md US3) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| `orcamentoId` inválido (não-UUID) → 400 Problem Details | Contrato/borda | Unit (Fastify `inject`) | `orcamentoId` = `'nao-e-uuid'` | `revisao-humana.controller.test.ts` (2/6) | PASS |
+| Body inválido (`camposConfirmados` vazio) → 400 Problem Details | Contrato/borda | Unit | `{ camposConfirmados: [] }` | `revisao-humana.controller.test.ts` (3/6) | PASS |
+| Extração não encontrada → 404 Problem Details (mapeado de `ExtracaoNaoEncontradaError`) | Contrato | Unit | caso de uso mockado rejeita com `ExtracaoNaoEncontradaError` | `revisao-humana.controller.test.ts` (4/6) | PASS |
+| Caminho de confirmação inválido → 400 Problem Details (mapeado de `CaminhoConfirmacaoInvalidoError`) | Contrato | Unit | caso de uso mockado rejeita com `CaminhoConfirmacaoInvalidoError` | `revisao-humana.controller.test.ts` (5/6) | PASS |
+| Extração não está `PENDENTE_REVISAO_HUMANA` → 409 Problem Details (mapeado de `TransicaoInvalidaExtracaoError`), qualquer outro status | Contrato/governança | Unit | caso de uso mockado rejeita com `TransicaoInvalidaExtracaoError` | `revisao-humana.controller.test.ts` (6/6) | PASS |
+| Confirmação aplicada com sucesso → 200 com `StatusExtracaoResponse` validado contra `statusExtracaoResponseSchema` (nunca drift de contrato) | Contrato/regressão | Unit | caso de uso mockado resolve `ExtracaoOrcamento` real em `EXTRAIDO` → resposta batida contra o schema Zod | `revisao-humana.controller.test.ts` (1/6) | PASS |
+| Valor real → `EXTRAIDO` + evento `OrcamentoExtraido`; indisponibilidade confirmada → `EXTRAIDO_COM_PENDENCIA_CONFIRMADA` + evento `OrcamentoExtraidoComPendenciaConfirmada` (regra de negócio, não decidida pelo controller) | Financeiro/silencioso (crítico) | Unit (camada correta: caso de uso, não o controller — controller só mapeia HTTP) | já coberto em T038, não redundante aqui: controller mocka `.executar()` inteiro, nunca reimplementa a decisão de evento | `confirmar-revisao-humana-extracao.test.ts` (T038, 15 testes, ainda válido — retorno `void → ExtracaoOrcamento` não alterou nenhuma asserção existente) | PASS |
+| `referenciaBrutaS3`/`referenciaClassificacao` nunca tocados em nenhum dos dois caminhos | Rastreabilidade | Inspeção de código | `registrarConfirmacaoHumana` (agregado) só atribui `_itens`/`_condicoesComerciais`/`_historico`; classe não expõe setter para as duas referências (imutabilidade estrutural, T009, não alterada por T039) | leitura de código (`extracao-orcamento.aggregate.ts`), não teste novo desta leva | PASS |
+| Documentação inline do controller (`paraResposta` duplicado deliberadamente, débito registrado) não introduz drift de contrato | Manutenibilidade | Estático | schema Zod (`statusExtracaoResponseSchema.parse`) usado antes de qualquer resposta enviada — mesma rede de segurança runtime do BC `ingestao-identificacao` | leitura de código + teste 1/6 (produz 200 só se `parse` não lançar) | PASS |
+
+### Fora desta leva
+- IAM `ConfirmarRevisaoHumanaExtracaoLambdaRole` (T040) — não implementada ainda.
+- Composição raiz (Lambda handler HTTP real) que instancia repositório/publisher concretos e registra a rota — não existe ainda neste BC (mesmo padrão observado em `ingestao-identificacao`, onde a composição fica fora de `interface/http/*.controller.ts`); T039 entrega só o controller, consistente com o escopo da task em `tasks.md`.
+
 ## Leva T038 (issue #103, PR #521, commit `76ccbed`)
 
 | Critério de aceite (plan.md §§ "Application — Casos de uso"/"Domain — Agregados") | Risco | Nível | Cenário | Teste | Resultado |
