@@ -5,7 +5,13 @@ import type { TenantContext } from './tenant-context.js';
 type TransacaoCallback<TSchema extends Record<string, unknown>> = Parameters<
   NodePgDatabase<TSchema>['transaction']
 >[0];
-type TenantScopedTx<TSchema extends Record<string, unknown>> = Parameters<
+
+/**
+ * Tipo do `tx` recebido pelo callback de `transacaoTenantScoped` — exportado
+ * para repositórios concretos (T014/T016/T018) que precisem nomeá-lo ao
+ * quebrar uma transação em métodos privados auxiliares.
+ */
+export type TenantScopedTx<TSchema extends Record<string, unknown>> = Parameters<
   TransacaoCallback<TSchema>
 >[0];
 
@@ -24,6 +30,12 @@ type TenantScopedTx<TSchema extends Record<string, unknown>> = Parameters<
  * Repositórios concretos (ex. `DrizzleOrcamentoRepository`, T018) devem
  * estender esta classe e usar `transacaoTenantScoped` em vez de
  * `this.db.transaction` diretamente.
+ *
+ * `tenantContext` é fixado na instância pelo construtor — igual a
+ * `TenantContext` (ver `tenant-context.ts`), MUST NUNCA ser resolvido para um
+ * singleton de longa duração (ex. registrado uma única vez num container de
+ * DI): isso fixaria o tenant da primeira requisição para todas as seguintes.
+ * Uma instância por requisição/transação, sempre.
  */
 export abstract class DrizzleTenantScopedRepositoryBase<
   TSchema extends Record<string, unknown> = Record<string, never>,
