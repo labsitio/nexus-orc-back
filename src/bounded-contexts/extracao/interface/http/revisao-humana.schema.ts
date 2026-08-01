@@ -9,7 +9,8 @@ import { z } from 'zod';
  *
  * Regra de negócio (spec.md): cada campo confirmado recebe valor real OU marcação
  * explícita de indisponibilidade — nunca ambos ausentes (`valor: null` só é válido
- * quando `indisponivel: true`).
+ * quando `indisponivel: true`). Consumido pelo controller em
+ * `revisao-humana.controller.ts` (T039/#104).
  */
 const campoConfirmadoSchema = z
   .object({

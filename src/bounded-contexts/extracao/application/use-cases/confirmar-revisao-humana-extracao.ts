@@ -288,7 +288,7 @@ export class ConfirmarRevisaoHumanaExtracao {
     private readonly eventPublisher: EventPublisher,
   ) {}
 
-  async executar(params: ConfirmarRevisaoHumanaExtracaoParams): Promise<void> {
+  async executar(params: ConfirmarRevisaoHumanaExtracaoParams): Promise<ExtracaoOrcamento> {
     const orcamentoId = OrcamentoId.de(params.orcamentoId);
     const extracao = await this.repositorio.buscarPorOrcamentoId(orcamentoId);
     if (!extracao) {
@@ -326,5 +326,7 @@ export class ConfirmarRevisaoHumanaExtracao {
             condicoesComerciais.paraPayload(),
           );
     await this.eventPublisher.publicar(evento);
+
+    return extracao;
   }
 }
