@@ -56,18 +56,15 @@ function decisaoRoteamentoParaPayload(decisao: DecisaoRoteamento): DecisaoRoteam
 }
 
 /**
- * Reconstrói `DecisaoRoteamento` a partir do payload persistido, revalidando
- * as mesmas invariantes de `DecisaoRoteamento.criar` (nunca aprovar sem
- * validação bem-sucedida, nunca reenvio sem fundamento, nunca decisão
- * automática sem critério) contra o `contextoValidacao` já consolidado do
- * agregado — toda decisão persistida já respeitou essas invariantes no
- * momento da criação, então a revalidação nunca deveria lançar em dado são.
+ * Reidrata `DecisaoRoteamento` a partir do payload persistido via
+ * `reconstituir` — nunca revalida as invariantes de negócio de `criar`
+ * (nunca aprovar sem validação bem-sucedida, nunca reenvio sem fundamento,
+ * nunca decisão automática sem critério): dado já persistido já as
+ * satisfez no momento da decisão, revalidar na leitura acoplaria a
+ * releitura de decisão histórica à regra de negócio atual.
  */
-function decisaoRoteamentoDaLinha(
-  payload: DecisaoRoteamentoPayload,
-  contextoValidacao: ContextoValidacao | undefined,
-): DecisaoRoteamento {
-  return DecisaoRoteamento.criar({
+function decisaoRoteamentoDaLinha(payload: DecisaoRoteamentoPayload): DecisaoRoteamento {
+  return DecisaoRoteamento.reconstituir({
     acao: payload.acao,
     nivelConfianca:
       payload.nivelConfianca !== null ? NivelConfianca.de(payload.nivelConfianca) : null,
@@ -77,7 +74,6 @@ function decisaoRoteamentoDaLinha(
     ...(payload.motivoDadoAusente !== undefined
       ? { motivoDadoAusente: payload.motivoDadoAusente }
       : {}),
-    ...(contextoValidacao !== undefined ? { contextoValidacao } : {}),
   });
 }
 
@@ -104,20 +100,12 @@ function contextoValidacaoDaLinha(linha: LinhaDecisaoWorkflow): ContextoValidaca
   return ContextoValidacao.de(linha.contextoValidacao as ContextoValidacaoParams);
 }
 
-function tentativaDaLinha(
-  linha: LinhaHistorico,
-  contextoValidacao: ContextoValidacao | undefined,
-): TentativaDecisaoWorkflow {
+function tentativaDaLinha(linha: LinhaHistorico): TentativaDecisaoWorkflow {
   return TentativaDecisaoWorkflow.de({
     agente: linha.agente as AgenteOrigemDecisao,
     timestamp: linha.ocorreuEm,
     ...(linha.resultado !== null
-      ? {
-          resultado: decisaoRoteamentoDaLinha(
-            linha.resultado as DecisaoRoteamentoPayload,
-            contextoValidacao,
-          ),
-        }
+      ? { resultado: decisaoRoteamentoDaLinha(linha.resultado as DecisaoRoteamentoPayload) }
       : {}),
     ...(linha.motivoInsucesso !== null ? { motivoInsucesso: linha.motivoInsucesso } : {}),
   });
@@ -127,21 +115,19 @@ function agregadoDaLinha(
   linha: LinhaDecisaoWorkflow,
   historico: readonly TentativaDecisaoWorkflow[],
 ): DecisaoWorkflow {
+  const contextoClassificacao = contextoClassificacaoDaLinha(linha);
+  const contextoExtracao = contextoExtracaoDaLinha(linha);
   const contextoValidacao = contextoValidacaoDaLinha(linha);
   const decisaoAtual = linha.decisaoAtual
-    ? decisaoRoteamentoDaLinha(linha.decisaoAtual as DecisaoRoteamentoPayload, contextoValidacao)
+    ? decisaoRoteamentoDaLinha(linha.decisaoAtual as DecisaoRoteamentoPayload)
     : undefined;
 
   const props: DecisaoWorkflowProps = {
     orcamentoId: OrcamentoId.de(linha.id),
     status: linha.status as StatusDecisaoWorkflow,
     historico,
-    ...(contextoClassificacaoDaLinha(linha) !== undefined
-      ? { contextoClassificacao: contextoClassificacaoDaLinha(linha) }
-      : {}),
-    ...(contextoExtracaoDaLinha(linha) !== undefined
-      ? { contextoExtracao: contextoExtracaoDaLinha(linha) }
-      : {}),
+    ...(contextoClassificacao !== undefined ? { contextoClassificacao } : {}),
+    ...(contextoExtracao !== undefined ? { contextoExtracao } : {}),
     ...(contextoValidacao !== undefined ? { contextoValidacao } : {}),
     ...(decisaoAtual !== undefined ? { decisaoAtual } : {}),
   };
@@ -239,10 +225,6 @@ export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowReposito
       .where(eq(decisoesWorkflowHistorico.decisaoWorkflowId, orcamentoId.toString()))
       .orderBy(asc(decisoesWorkflowHistorico.ocorreuEm), asc(decisoesWorkflowHistorico.id));
 
-    const contextoValidacao = contextoValidacaoDaLinha(linha);
-    return agregadoDaLinha(
-      linha,
-      linhasHistorico.map((linhaHistorico) => tentativaDaLinha(linhaHistorico, contextoValidacao)),
-    );
+    return agregadoDaLinha(linha, linhasHistorico.map(tentativaDaLinha));
   }
 }

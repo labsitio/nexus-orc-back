@@ -91,4 +91,18 @@ export class DecisaoRoteamento {
 
     return new DecisaoRoteamento(input);
   }
+
+  /**
+   * Reidrata uma `DecisaoRoteamento` a partir de estado persistido
+   * (Infrastructure), sem revalidar as invariantes de negócio — dado já
+   * persistido já as satisfez no momento em que `criar` foi chamado. Nunca
+   * usar no caminho de decisão (Application), só em leitura/reconstituição
+   * de agregado (evita que uma mudança futura nas regras de `criar` quebre
+   * a releitura de decisão histórica que já era válida quando tomada).
+   */
+  static reconstituir(
+    input: Omit<CriarDecisaoRoteamentoInput, 'contextoValidacao'>,
+  ): DecisaoRoteamento {
+    return new DecisaoRoteamento(input);
+  }
 }
