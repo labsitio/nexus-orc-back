@@ -1,0 +1,46 @@
+name: Verificar SCP - Segregação de Ambientes
+
+# Spec 008 (Hardening Segurança/LGPD), T011. Disparo manual apenas —
+# depende de contas AWS dev/hml/prod (T013), SCP aplicada (T014) e role de
+# deploy OIDC por ambiente (T015), nenhuma disponível no CI padrão
+# (ci.yml). Executado por Ricardo/DevOps quando os pré-requisitos acima
+# estiverem prontos. Ver infra/scripts/README.md.
+on:
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: 'Conta alvo do teste (dev ou hml, nunca prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - hml
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verificar-scp:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.ambiente }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Role OIDC específica do ambiente (T015) — configurar como secret/var
+      # do GitHub Environment correspondente (`dev` ou `hml`), nunca uma
+      # role única multi-conta.
+      - name: Assumir role de deploy do ambiente (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Rodar teste de infraestrutura (SCP bloqueia cópia de prod)
+        run: ./infra/scripts/verificar-scp-segregacao-ambientes.sh
+        env:
+          AWS_PROD_ACCOUNT_ID: ${{ vars.AWS_PROD_ACCOUNT_ID }}
+          PROD_RDS_SNAPSHOT_ARN: ${{ vars.PROD_RDS_TEST_SNAPSHOT_ARN }}
+          PROD_S3_TEST_OBJECT_URI: ${{ vars.PROD_S3_TEST_OBJECT_URI }}
+          TARGET_S3_BUCKET: ${{ vars.TARGET_S3_TEST_BUCKET }}
