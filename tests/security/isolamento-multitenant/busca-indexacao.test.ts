@@ -13,6 +13,11 @@
 //     `db.transaction` diretamente: MUST falhar explicitamente (fail-closed),
 //     nunca retornar todas as linhas.
 //
+// Vetor (c) do T010 original — `tenantId` forjado via query/path/body na
+// Interface — não duplicado aqui pelo mesmo motivo daquele arquivo: já
+// coberto por `tests/interface/shared/tenant-context.middleware.test.ts`
+// (genérico, não específico de tabela).
+//
 // Não depende de #176 (T016, DrizzlePgvectorIndiceOrcamentoRepository) —
 // como em T010/spec 007, usa um repositório mínimo de teste que estende
 // `DrizzleTenantScopedRepositoryBase` (spec 007, T008), exercitando a
