@@ -7,7 +7,10 @@ import {
 import type { AgenteInterpretadorConsultaGateway } from '../../../../src/bounded-contexts/busca-indexacao/domain/gateways/agente-interpretador-consulta.gateway.js';
 import type { AgenteEmbeddingGateway } from '../../../../src/bounded-contexts/busca-indexacao/domain/gateways/agente-embedding.gateway.js';
 import type { IndiceOrcamentoRepository } from '../../../../src/bounded-contexts/busca-indexacao/domain/repositories/indice-orcamento.repository.js';
-import { CriterioBusca } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/criterio-busca.vo.js';
+import {
+  CriterioBusca,
+  CriterioBuscaInvalidoError,
+} from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/criterio-busca.vo.js';
 import { Dinheiro } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/dinheiro.vo.js';
 import { Embedding } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/embedding.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/orcamento-id.vo.js';
@@ -163,6 +166,21 @@ describe('BuscarOrcamentos', () => {
     expect(criterioFinal.precoMaximo?.equals(precoMaximoExplicito)).toBe(true);
     expect(criterioFinal.periodoRecebimento?.inicio).toEqual(periodoExplicito.inicio);
     expect(criterioFinal.periodoRecebimento?.fim).toEqual(periodoExplicito.fim);
+  });
+
+  it('propaga CriterioBuscaInvalidoError quando o preço explícito e o interpretado se mesclam em moedas diferentes', async () => {
+    const interpretado = CriterioBusca.de({
+      precoMaximo: Dinheiro.de(2, 'USD'),
+      textoLivreResidual: '',
+    });
+    const { useCase } = montarCaso(interpretado);
+
+    await expect(
+      useCase.executar(TENANT_ID, {
+        consultaLinguagemNatural: 'qualquer coisa',
+        filtrosExplicitos: { precoMinimo: Dinheiro.de(1000, 'BRL') },
+      }),
+    ).rejects.toThrow(CriterioBuscaInvalidoError);
   });
 
   it('gera vetor de consulta a partir do textoLivreResidual retornado pela interpretação', async () => {

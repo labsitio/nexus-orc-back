@@ -91,6 +91,10 @@ export class BuscarOrcamentos {
       ? await this.embeddingGateway.gerarEmbedding(criterio.textoLivreResidual)
       : undefined;
 
+    // `input.limite` não é validado aqui (sem teto/negativo) — borda de
+    // entrada é responsabilidade do Zod schema do controller (T039), mesma
+    // disciplina de `tenantId` acima: este caso de uso confia no contrato já
+    // validado pela Interface, nunca revalida o que já é responsabilidade dela.
     return this.repositorio.buscarPorCriterioEVetor(
       criterio,
       vetorConsulta,
