@@ -14,11 +14,12 @@ export interface OrcamentoIndexadoPayload extends DomainEventEnvelope {
 export class OrcamentoIndexado implements OrcamentoIndexadoPayload {
   static readonly detailType = 'OrcamentoIndexado' as const;
   readonly detailType = OrcamentoIndexado.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
+    readonly tenantId: string,
     readonly modeloEmbedding: string,
     ocorreuEm: Date = new Date(),
   ) {

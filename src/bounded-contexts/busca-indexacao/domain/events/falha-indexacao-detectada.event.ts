@@ -18,11 +18,12 @@ export interface FalhaIndexacaoDetectadaPayload extends DomainEventEnvelope {
 export class FalhaIndexacaoDetectada implements FalhaIndexacaoDetectadaPayload {
   static readonly detailType = 'FalhaIndexacaoDetectada' as const;
   readonly detailType = FalhaIndexacaoDetectada.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
+    readonly tenantId: string,
     readonly motivoFalha: string,
     readonly tentativaNumero: number,
     ocorreuEm: Date = new Date(),
