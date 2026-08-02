@@ -22,4 +22,19 @@
 
 Cobertura de branch/statement/function do arquivo `indice-orcamento.aggregate.ts`: 100% após os 3 testes adicionados pelo QA em T012 (baseline do dev-back-end: 93.75% stmts/lines, 84.61% funcs, 100% branch — lacuna nos getters `conteudoIndexavel`/`origemValidacao` e no caminho `reconstituir` com `FALHA_INDEXACAO`); mantida em 100% (39/39 stmts, 8/8 branches) após o retrofit de T012b (3 novos testes cobrindo o novo campo `tenantId`, sem linha nova descoberta).
 
-Fora do escopo desta task (cobertos por outras tasks/specs): `TentativaIndexacao.de` (VO, testado em `tentativa-indexacao.vo.test.ts`), persistência com `tenant_id`/RLS e `DrizzleTenantScopedRepositoryBase` (T015b/T016), eventos de domínio com `tenantId` no payload (T013b), ACL (T018), isolamento cross-tenant ponta a ponta (T027b).
+Fora do escopo desta task (cobertos por outras tasks/specs): `TentativaIndexacao.de` (VO, testado em `tentativa-indexacao.vo.test.ts`), persistência com `tenant_id`/RLS e `DrizzleTenantScopedRepositoryBase` (T015b/T016), ACL (T018), isolamento cross-tenant ponta a ponta (T027b).
+
+## T013b (PR #533) — Domain Events `OrcamentoIndexado`/`FalhaIndexacaoDetectada`, `schemaVersion: 2` + `tenantId`
+
+| Requisito / critério (tasks.md T013b, ADR-005 retrofit) | Cenário | Teste | Resultado |
+|---|---|---|---|
+| `schemaVersion` sobe para `2` em ambos os eventos | criação de cada evento | `schemaVersion 2, orcamentoId, tenantId e detailType "..." (ADR-005)` (describe.each) | PASS |
+| `tenantId: string` obrigatório no envelope, propagado ao payload | criação de cada evento com `tenantId` | mesmo teste acima | PASS |
+| `orcamentoId` e `detailType` preservados (contrato pré-existente, T013) | criação de cada evento | mesmo teste acima | PASS |
+| `ocorreuEm` continua ISO-8601 válido | `new Date(evento.ocorreuEm)` | mesmo teste acima | PASS |
+| `OrcamentoIndexado.modeloEmbedding` preservado (não afetado pelo retrofit) | criação com modelo de embedding | `carrega o modeloEmbedding usado na geração do vetor persistido` | PASS |
+| `FalhaIndexacaoDetectada.motivoFalha`/`tentativaNumero` preservados | criação com motivo e tentativa | `carrega motivoFalha legível e o número da tentativa que falhou` | PASS |
+
+Cobertura dos 3 arquivos alterados (`domain-event.ts`, `orcamento-indexado.event.ts`, `falha-indexacao-detectada.event.ts`), via `coverage-final.json`: 100% statements/branches/functions em ambos os `.event.ts` (8/8 e 7/7 stmts); `domain-event.ts` é somente `interface` (0 statement executável, nada a cobrir).
+
+Nenhum consumidor de produção publica ou lê esses eventos ainda (`registrarTentativaIndexacao`/publicação fica para T029, ainda `[ ]`) — sem risco de quebra de contrato em código existente.
