@@ -242,6 +242,50 @@ describe('IndiceOrcamento', () => {
       }),
     ).toThrow(IndiceOrcamentoInconsistenteError);
   });
+
+  it('invariante "nunca omitir por relevância": único método de transição de estado é registrarTentativaIndexacao — nenhum método de exclusão de negócio exposto', () => {
+    const metodosPublicos = Object.getOwnPropertyNames(IndiceOrcamento.prototype).filter((nome) => {
+      if (nome === 'constructor') return false;
+      const descritor = Object.getOwnPropertyDescriptor(IndiceOrcamento.prototype, nome);
+      return typeof descritor?.value === 'function';
+    });
+
+    expect(metodosPublicos.sort()).toEqual(['registrarTentativaIndexacao'].sort());
+  });
+
+  it('registrarTentativaIndexacao ignora qualquer valor de "resultado" além de INDEXADO e sempre normaliza para FALHA_TECNICA — não existe via de exclusão por relevância', () => {
+    const indice = criarIndice();
+
+    // "EXCLUIDO_POR_RELEVANCIA" simula uma tentativa de forçar um motivo de
+    // negócio (relevância) via `resultado`. O agregado nem valida nem
+    // preserva esse valor: qualquer coisa diferente de 'INDEXADO' colapsa
+    // em FALHA_TECNICA (ver `registrarTentativaIndexacao`), então não há
+    // como um chamador registrar "excluído por relevância" como outcome —
+    // só INDEXADO (com embedding) ou FALHA_TECNICA (com motivoFalha).
+    indice.registrarTentativaIndexacao({
+      resultado: 'EXCLUIDO_POR_RELEVANCIA',
+      timestamp,
+      motivoFalha: 'tentativa de exclusão por relevância de negócio',
+    } as never);
+
+    expect(indice.estado).toBe('FALHA_INDEXACAO');
+    expect(indice.historico).toHaveLength(1);
+    expect(indice.historico[0]?.resultado).toBe('FALHA_TECNICA');
+  });
+
+  it('registrarTentativaIndexacao rejeita FALHA_TECNICA sem motivoFalha — nenhuma omissão silenciosa, mesmo com resultado de negócio forjado', () => {
+    const indice = criarIndice();
+
+    expect(() =>
+      indice.registrarTentativaIndexacao({
+        resultado: 'EXCLUIDO_POR_RELEVANCIA',
+        timestamp,
+      } as never),
+    ).toThrow(TentativaIndexacaoInvalidaError);
+
+    expect(indice.estado).toBe('PENDENTE');
+    expect(indice.historico).toHaveLength(0);
+  });
 });
 
 type TentativaIndexacaoArrayMutavel = unknown[];

@@ -76,3 +76,15 @@ Cobertura de `drizzle-pgvector-indice-orcamento.repository.ts` isolando a suíte
 Cobertura de `eventbridge.publisher.ts` isolando a suíte alvo: 100% statements (7/7), 100% branches (4/4), 100% functions (2/2), 100% lines (7/7) — os 2 ramos do guard `FailedEntryCount` (com e sem `ErrorMessage`) e o caminho de sucesso estão cobertos.
 
 Fora do escopo desta task (cobertas por tasks futuras): consumo do `EventPublisher` por caso de uso/handler e composition-root (wiring) — T018/T019; nenhuma implementação nesta PR depende deles.
+
+## T022 (PR #545) — Unit test invariante "nunca omitir por relevância"
+
+| Requisito / critério (tasks.md T022) | Cenário | Teste | Resultado |
+|---|---|---|---|
+| Nenhum método do agregado aceita parâmetro de exclusão de negócio (ex.: "excluído por relevância") | inspeção do conjunto de métodos públicos do prototype | `único método de transição de estado é registrarTentativaIndexacao — nenhum método de exclusão de negócio exposto` | PASS |
+| Única via para não indexar é falha técnica registrada — qualquer `resultado` diferente de `INDEXADO` (incl. valor forjado de negócio) colapsa em `FALHA_TECNICA` | `resultado: 'EXCLUIDO_POR_RELEVANCIA'` com `motivoFalha` | `registrarTentativaIndexacao ignora qualquer valor de "resultado" além de INDEXADO e sempre normaliza para FALHA_TECNICA — não existe via de exclusão por relevância` | PASS |
+| Mesmo com `resultado` forjado, `FALHA_TECNICA` sem `motivoFalha` continua rejeitado (nenhuma omissão silenciosa) | `resultado: 'EXCLUIDO_POR_RELEVANCIA'` sem `motivoFalha` | `registrarTentativaIndexacao rejeita FALHA_TECNICA sem motivoFalha — nenhuma omissão silenciosa, mesmo com resultado de negócio forjado` | PASS |
+
+Nenhum arquivo de produção alterado nesta task — a invariante já existia no agregado (união fechada `RegistrarTentativaIndexacaoParams`, normalização hardcoded de qualquer `resultado` não-`INDEXADO` para `FALHA_TECNICA`); os 2 testes novos apenas comprovam explicitamente que não existe via estrutural para "excluir por relevância". `backend-reviewer` aprovou na 2ª rodada (achado MAJOR da 1ª rodada, sobre isolamento de causa em um dos testes, corrigido no commit 80a43f7).
+
+Cobertura de `indice-orcamento.aggregate.ts` isolando a suíte alvo (19 testes do arquivo, incluindo os 2 novos de T022): 100% statements (39/39), 100% branches (8/8), 100% functions (16/16), 100% lines (39/39) — sem regressão em relação à baseline de T012b/T021.
