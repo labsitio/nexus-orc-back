@@ -63,7 +63,7 @@
 - [x] T024 [US1] Application: caso de uso `ValidarOrcamento` (consome `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, traduz via ACL, aplica `avaliarRegrasDeConsistencia`, persiste, publica `OrcamentoValidado` ou `OrcamentoInconsistenciaDetectada`) — caminho feliz sem categorização de item ainda (item já vem com `categoria` conhecida ou regra de preço não se aplica).
 - [x] T025 [US1] Interface: handler Lambda consumidor SQS de `validador-queue`, invocando `ValidarOrcamento`.
 - [x] T026 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/validacao/status` (query, Zod schema de response, Problem Details para erro).
-- [ ] T027 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema das specs 001/002.
+- [x] T027 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema das specs 001/002.
 - [ ] T028 [US1] IAM: role dedicada `ValidarOrcamentoLambdaRole` (least privilege: leitura da tabela `faixas_preco_categoria`, sem qualquer permissão sobre `nexo-orcamentos-raw`).
 
 **Checkpoint**: US1 funcional e testável isoladamente — orçamento consistente é validado com sucesso, sem intervenção manual.
