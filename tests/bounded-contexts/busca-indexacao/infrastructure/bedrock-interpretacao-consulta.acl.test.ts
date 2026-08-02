@@ -4,6 +4,7 @@ import {
   BedrockInterpretacaoConsultaACLInvalidaError,
   ehInterpretacaoConsultaBruta,
 } from '../../../../src/bounded-contexts/busca-indexacao/infrastructure/bedrock-interpretacao-consulta.acl.js';
+import { CriterioBuscaInvalidoError } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/criterio-busca.vo.js';
 
 const CATALOGO_CATEGORIAS = ['ferragens', 'eletrica', 'hidraulica'] as const;
 
@@ -129,6 +130,6 @@ describe('BedrockInterpretacaoConsultaACL', () => {
         },
         CATALOGO_CATEGORIAS,
       ),
-    ).toThrow();
+    ).toThrow(CriterioBuscaInvalidoError);
   });
 });
