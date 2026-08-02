@@ -78,7 +78,7 @@
 
 ### Tests (US2)
 
-- [ ] T029 [P] [US2] Unit test `OrcamentoValidacao.avaliarRegrasDeConsistencia` com 1+ regra falhando → transita direto para `PENDENTE_REVISAO_HUMANA` (nunca uma segunda tentativa automática, conforme ADR-001), `inconsistencias` populado com a(s) regra(s) específica(s).
+- [x] T029 [P] [US2] Unit test `OrcamentoValidacao.avaliarRegrasDeConsistencia` com 1+ regra falhando → transita direto para `PENDENTE_REVISAO_HUMANA` (nunca uma segunda tentativa automática, conforme ADR-001), `inconsistencias` populado com a(s) regra(s) específica(s).
 - [ ] T030 [P] [US2] Unit test `OrcamentoValidacao.registrarDecisaoHumana` — só válido a partir de `PENDENTE_REVISAO_HUMANA`; `CORRECAO_APLICADA` reavalia regras (→ `VALIDADO` se todas passarem, ou permanece `PENDENTE_REVISAO_HUMANA` com nova tentativa se ainda falhar, nunca autoaprova); `ACEITE_COM_RESSALVA` → `VALIDADO_COM_RESSALVA` (terminal); histórico nunca sobrescrito.
 - [ ] T031 [P] [US2] Unit test da decisão de negócio "campo com pendência confirmada pela Extração ainda gera inconsistência aqui" (ver `plan.md`, seção Domain) — item com `extraido: false` de origem `OrcamentoExtraidoComPendenciaConfirmada` MUST ainda reprovar a regra "campos obrigatórios preenchidos" quando o campo é obrigatório para validação.
 - [ ] T032 [P] [US2] Contract test `POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana` (aceito em `PENDENTE_REVISAO_HUMANA`; 409 Problem Details em qualquer outro status).
