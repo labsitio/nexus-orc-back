@@ -60,7 +60,7 @@
 
 - [x] T022 [US1] Infrastructure: `FornecedorCadastradoHttpGateway` + `FornecedorCadastradoACL` (timeout curto, retry limitado, nunca bloqueia processamento de outros orçamentos na fila caso indisponível — ver Segurança do `plan.md`).
 - [x] T023 [US1] Infrastructure: `DrizzleFaixaPrecoRepository` implementando `ParametroFaixaPrecoGateway` (leitura da tabela `faixas_preco_categoria`).
-- [ ] T024 [US1] Application: caso de uso `ValidarOrcamento` (consome `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, traduz via ACL, aplica `avaliarRegrasDeConsistencia`, persiste, publica `OrcamentoValidado` ou `OrcamentoInconsistenciaDetectada`) — caminho feliz sem categorização de item ainda (item já vem com `categoria` conhecida ou regra de preço não se aplica).
+- [x] T024 [US1] Application: caso de uso `ValidarOrcamento` (consome `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, traduz via ACL, aplica `avaliarRegrasDeConsistencia`, persiste, publica `OrcamentoValidado` ou `OrcamentoInconsistenciaDetectada`) — caminho feliz sem categorização de item ainda (item já vem com `categoria` conhecida ou regra de preço não se aplica).
 - [ ] T025 [US1] Interface: handler Lambda consumidor SQS de `validador-queue`, invocando `ValidarOrcamento`.
 - [ ] T026 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/validacao/status` (query, Zod schema de response, Problem Details para erro).
 - [ ] T027 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema das specs 001/002.
