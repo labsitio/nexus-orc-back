@@ -36,6 +36,10 @@ export const indicesOrcamento = buscaIndexacaoSchema.table(
   'indices_orcamento',
   {
     id: uuid('id').primaryKey(),
+    // ADR-005 (retrofit, T015b): isolamento multi-tenant estrutural via RLS
+    // (ver migração 0016), mesmo padrão de `orcamentos`/`orcamentos_historico`
+    // (spec 007, T007/0013).
+    tenantId: uuid('tenant_id').notNull(),
     estado: text('estado').notNull(),
     // ConteudoIndexavel — cópia traduzida via OrcamentoValidadoEventACL
     // (T018), JSONB porque não há invariante de negócio sobre linha isolada
@@ -54,6 +58,7 @@ export const indicesOrcamento = buscaIndexacaoSchema.table(
       'hnsw',
       table.embedding.op('vector_cosine_ops'),
     ),
+    index('indices_orcamento_tenant_id_idx').on(table.tenantId),
     check('indices_orcamento_estado_valido', emValoresValidos('estado', ESTADOS_INDEXACAO)),
     check(
       'indices_orcamento_origem_validacao_valida',
@@ -73,6 +78,8 @@ export const indicesOrcamentoHistorico = buscaIndexacaoSchema.table(
   'indices_orcamento_historico',
   {
     id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    // ADR-005 (retrofit, T015b) — mesma justificativa de `indicesOrcamento.tenantId`.
+    tenantId: uuid('tenant_id').notNull(),
     indiceOrcamentoId: uuid('indice_orcamento_id').notNull(),
     resultado: text('resultado').notNull(),
     modeloEmbedding: text('modelo_embedding'),
@@ -81,6 +88,7 @@ export const indicesOrcamentoHistorico = buscaIndexacaoSchema.table(
   },
   (table) => [
     index('indices_orcamento_historico_indice_orcamento_id_idx').on(table.indiceOrcamentoId),
+    index('indices_orcamento_historico_tenant_id_idx').on(table.tenantId),
     check(
       'indices_orcamento_historico_resultado_valido',
       emValoresValidos('resultado', RESULTADOS_TENTATIVA_INDEXACAO),
