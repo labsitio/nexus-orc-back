@@ -1,10 +1,6 @@
-import { ErroDominio } from '../domain/errors/erro-dominio.js';
+import { FornecedorCadastradoACLInvalidaError } from '../domain/errors/fornecedor-cadastrado.errors.js';
 
-export class FornecedorCadastradoACLInvalidaError extends ErroDominio {
-  constructor(mensagem: string) {
-    super(`FornecedorCadastradoACL: resposta do sistema externo inválida — ${mensagem}`);
-  }
-}
+export { FornecedorCadastradoACLInvalidaError };
 
 /**
  * Shape esperado da resposta do sistema externo de cadastro de fornecedores

@@ -1,21 +1,10 @@
 import { ErroDominio } from '../domain/errors/erro-dominio.js';
+import { FornecedorCadastradoIndisponivelError } from '../domain/errors/fornecedor-cadastrado.errors.js';
 import type { CNPJ } from '../domain/value-objects/cnpj.vo.js';
 import type { FornecedorCadastradoGateway } from '../domain/gateways/fornecedor-cadastrado.gateway.js';
 import { FornecedorCadastradoACL } from './fornecedor-cadastrado.acl.js';
 
-/**
- * Sinaliza que o sistema externo de cadastro de fornecedores está
- * indisponível (timeout, erro de rede ou 5xx) após esgotar as tentativas
- * configuradas. `ValidarOrcamento` (T024) decide o que fazer com isto —
- * este gateway nunca decide sozinho (Princípio II: nunca bloquear o
- * processamento de outros orçamentos na fila por causa de uma dependência
- * externa indisponível).
- */
-export class FornecedorCadastradoIndisponivelError extends ErroDominio {
-  constructor(mensagem: string) {
-    super(`FornecedorCadastradoHttpGateway: sistema externo indisponível — ${mensagem}`);
-  }
-}
+export { FornecedorCadastradoIndisponivelError };
 
 /** Timeout curto e retry limitado — plan.md, seção Segurança (T022). */
 const TIMEOUT_MS_PADRAO = 2000;
@@ -48,6 +37,13 @@ class FalhaNaoRetentavel extends Error {
  *
  * A resposta é sempre traduzida por `FornecedorCadastradoACL` antes de
  * cruzar para o Domain — nunca o JSON externo cru.
+ *
+ * Arquivo direto em `infrastructure/`, não em `infrastructure/external/`
+ * como a árvore ilustrativa do plan.md sugere — mesmo padrão já
+ * estabelecido neste BC por `eventbridge.publisher.ts` (que também não
+ * está em `infrastructure/aws/`); divergência de organização em
+ * subpastas, não de camada, mantida por consistência com o código já
+ * mergeado.
  */
 export class FornecedorCadastradoHttpGateway implements FornecedorCadastradoGateway {
   constructor(
