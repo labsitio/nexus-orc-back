@@ -59,3 +59,18 @@ Nenhum consumidor de produção publica ou lê esses eventos ainda (`registrarTe
 Cobertura de `drizzle-pgvector-indice-orcamento.repository.ts` isolando a suíte alvo: 98% statements, 88.46% branches, 100% functions, 98% lines — única linha não coberta é o guard defensivo de dado inconsistente em `embeddingDaLinha` (linha persistida com `embedding` mas sem `TentativaIndexacao` `INDEXADO` correspondente no histórico, estado que `upsert` desta própria classe nunca produz; equivalente ao padrão já aceito em `IndiceOrcamentoInconsistenteError` de `agregadoDaLinha`/`reconstituir`, T012). Lacuna classificada como "código inviável de testar sem inserir dado inconsistente diretamente via SQL bruto, contornando o próprio repositório" — risco residual aceitável, não bloqueia o gate.
 
 `precoMinimo`/`precoMaximo`/`periodoRecebimento` de `CriterioBusca` permanecem fora do escopo de T016 (documentado no próprio arquivo de produção, JSDoc) — dependem do enriquecimento de payload da spec 003 (T006/T045), ainda bloqueado. Não é lacuna de T016; será risco residual de T037/T038 (US2).
+
+## T017 (PR #537) — `EventBridgePublisher` implementando `EventPublisher` (instância própria do BC, bus `nexo-dominio-bus`)
+
+| Requisito / critério (tasks.md T017) | Cenário | Teste | Resultado |
+|---|---|---|---|
+| Publica no bus informado, com `source` fixo `nexo.busca-indexacao` e `DetailType` = `detailType` do evento | envio bem-sucedido | `publica no bus informado com source fixo 'nexo.busca-indexacao' e detail-type do evento` | PASS |
+| `Detail` serializado inclui payload do evento (`orcamentoId`, `tenantId`, ADR-005) | inspeção do `Detail` JSON enviado | mesmo teste acima | PASS |
+| Falha reportada pelo EventBridge (`FailedEntryCount`) lança erro descritivo com `ErrorMessage` | `FailedEntryCount: 1` com `ErrorMessage: 'rate exceeded'` | `lança erro descritivo se o EventBridge reportar falha na entrada` | PASS |
+| Fallback de mensagem quando `ErrorMessage` ausente | `FailedEntryCount: 1`, `Entries: [{}]` | `usa mensagem de fallback quando o EventBridge não informa ErrorMessage` | PASS |
+| Instância própria do BC (não reutiliza client/config de outro BC) | leitura de código — classe própria, sem import cruzado de outro bounded-context | comparação byte-a-byte com `validacao/infrastructure/eventbridge.publisher.ts` (só difere `SOURCE` e comentários) | PASS |
+| Contrato `EventPublisher` (domain) desacoplado do SDK AWS | leitura de código — `publicar(evento): Promise<void>`, sem tipo AWS no domain | `src/bounded-contexts/busca-indexacao/domain/gateways/event-publisher.ts` | PASS |
+
+Cobertura de `eventbridge.publisher.ts` isolando a suíte alvo: 100% statements (7/7), 100% branches (4/4), 100% functions (2/2), 100% lines (7/7) — os 2 ramos do guard `FailedEntryCount` (com e sem `ErrorMessage`) e o caminho de sucesso estão cobertos.
+
+Fora do escopo desta task (cobertas por tasks futuras): consumo do `EventPublisher` por caso de uso/handler e composition-root (wiring) — T018/T019; nenhuma implementação nesta PR depende deles.
