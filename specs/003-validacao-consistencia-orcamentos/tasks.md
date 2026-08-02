@@ -54,7 +54,7 @@
 - [x] T018 [P] [US1] Unit test do agregado `OrcamentoValidacao.criar(dadosExtraidos)` + `avaliarRegrasDeConsistencia` com todas as 4 regras passando → transita para `VALIDADO`.
 - [x] T019 [P] [US1] Unit test de cada uma das 4 regras determinísticas (T010) isoladamente, com casos de sucesso e falha, sem mock de IA.
 - [x] T020 [P] [US1] Contract test `GET /v1/orcamentos/{orcamentoId}/validacao/status` em `tests/bounded-contexts/validacao/contract/`.
-- [ ] T021 [P] [US1] Integration test: `OrcamentoExtraido` (documento de teste consistente) publicado → `OrcamentoValidado` publicado, p95 medido em ambiente de teste local (LocalStack).
+- [x] T021 [P] [US1] Integration test: `OrcamentoExtraido` (documento de teste consistente) publicado → `OrcamentoValidado` publicado, p95 medido em ambiente de teste local (LocalStack).
 
 ### Implementation (US1)
 
