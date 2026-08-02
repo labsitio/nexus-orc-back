@@ -88,3 +88,18 @@ Fora do escopo desta task (cobertas por tasks futuras): consumo do `EventPublish
 Nenhum arquivo de produção alterado nesta task — a invariante já existia no agregado (união fechada `RegistrarTentativaIndexacaoParams`, normalização hardcoded de qualquer `resultado` não-`INDEXADO` para `FALHA_TECNICA`); os 2 testes novos apenas comprovam explicitamente que não existe via estrutural para "excluir por relevância". `backend-reviewer` aprovou na 2ª rodada (achado MAJOR da 1ª rodada, sobre isolamento de causa em um dos testes, corrigido no commit 80a43f7).
 
 Cobertura de `indice-orcamento.aggregate.ts` isolando a suíte alvo (19 testes do arquivo, incluindo os 2 novos de T022): 100% statements (39/39), 100% branches (8/8), 100% functions (16/16), 100% lines (39/39) — sem regressão em relação à baseline de T012b/T021.
+
+## T028 (PR #550) — `BedrockEmbeddingGateway` + `BedrockEmbeddingACL` (Titan Text Embeddings V2)
+
+| Requisito / critério (tasks.md T028, plan.md Infrastructure) | Cenário | Teste | Resultado |
+|---|---|---|---|
+| Gateway invoca Bedrock InvokeModel (não Converse/tool-use) com `inputText`/`dimensions=1024`/`normalize=true` e devolve VO `Embedding` | caso feliz, vetor de 1024 dimensões | `gerarEmbedding invoca o InvokeModel API com inputText/dimensions/normalize e devolve o VO Embedding` | PASS |
+| Resposta sem corpo é tratada como erro explícito, nunca silenciosa | `resposta.body` ausente | `lança erro se a resposta não tiver corpo` | PASS |
+| Shape de resposta inválido (sem campo `embedding` array de números) é rejeitado pelo type guard `ehEmbeddingBruto` | `{ mensagem: 'erro qualquer' }` | `lança erro se o corpo da resposta não contiver um vetor de embedding válido` | PASS |
+| Dimensão do vetor devolvida pelo modelo diferente de 1024 é rejeitada por `BedrockEmbeddingACL` (`BedrockEmbeddingACLInvalidaError`) | vetor de 256 dimensões | `propaga BedrockEmbeddingACLInvalidaError quando a dimensão devolvida não bate com a esperada` | PASS |
+| `ehEmbeddingBruto` aceita/rejeita shapes estruturais (nunca confia cegamente no shape do modelo) | objeto vazio, `null`, array com elemento não numérico | `ehEmbeddingBruto` (3 casos) | PASS |
+| `BedrockEmbeddingACL.converter` produz `Embedding` válido (1024 dim, `modeloId`, `geradoEm`) a partir de bruto correto | vetor de 1024 dimensões | `converte embedding bruto de 1024 dimensões em VO Embedding válido` | PASS |
+
+Assinatura de `BedrockEmbeddingGateway.gerarEmbedding` confere exatamente com a interface de domínio `AgenteEmbeddingGateway`. Cobertura (lida de `coverage-summary.json` por caminho absoluto — a tabela ASCII do terminal não exibe as linhas individuais destes 2 arquivos): `bedrock-embedding.acl.ts` 100%/100%/100%/100% (statements/branches/functions/lines); `bedrock-embedding.gateway.ts` 100%/100%/100%/100%.
+
+**Lacuna não bloqueante identificada**: `JSON.parse` do corpo da resposta no gateway não está em `try/catch` (diferente do padrão já usado em `markitdown-conversao.acl.ts`/`markitdown-conversao-extracao.acl.ts`, specs 001/002, que traduzem JSON malformado em mensagem de erro legível) — um corpo malformado propagaria `SyntaxError` nativo em vez de erro no padrão do gateway. Nenhum teste cobre JSON sintaticamente inválido (distinto do caso já testado de "shape inválido"). Mesmo NIT já apontado pelo `backend-reviewer` como não bloqueante; QA concorda com a classificação e recomenda endereçar junto de T029. Nenhum defeito de produção aberto (BUG) para esta lacuna.

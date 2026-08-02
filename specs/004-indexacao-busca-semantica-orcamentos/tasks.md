@@ -68,7 +68,7 @@
 
 ### Implementation (US1)
 
-- [ ] T028 [US1] Infrastructure: `BedrockEmbeddingGateway` + `BedrockEmbeddingACL` usando Amazon Titan Text Embeddings V2 (`amazon.titan-embed-text-v2:0`, 1024 dimensões) — Ricardo MUST reconfirmar o model ID vigente no console Bedrock da região de deploy antes de codificar o ARN fixo na role IAM (T032).
+- [x] T028 [US1] Infrastructure: `BedrockEmbeddingGateway` + `BedrockEmbeddingACL` usando Amazon Titan Text Embeddings V2 (`amazon.titan-embed-text-v2:0`, 1024 dimensões) — Ricardo MUST reconfirmar o model ID vigente no console Bedrock da região de deploy antes de codificar o ARN fixo na role IAM (T032).
 - [ ] T029 [US1] Application: caso de uso `IndexarOrcamento(tenantId, ...)` (consome `OrcamentoValidado`/`OrcamentoValidadoComRessalva`, traduz via ACL, invoca `AgenteEmbeddingGateway`, aplica `registrarTentativaIndexacao`, persiste via upsert idempotente, publica `OrcamentoIndexado` ou `FalhaIndexacaoDetectada` — ambos `schemaVersion: 2` com `tenantId`, ver T013b).
 - [ ] T030 [US1] Interface: handler Lambda consumidor SQS de `indexador-queue`, invocando `IndexarOrcamento`.
 - [ ] T031 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/indexacao/status` (query, Zod schema de response, Problem Details para erro) + autenticação Cognito (JWT) atrás do `TenantContextMiddleware` compartilhado (spec 007) — `tenantId` do JWT comparado ao `tenantId` do agregado antes de retornar dado, 404 em divergência.
