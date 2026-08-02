@@ -39,6 +39,27 @@ Fora do escopo desta task (cobertos por outras tasks/specs): `TentativaIndexacao
 
 Cobertura dos 3 arquivos alterados (`domain-event.ts`, `orcamento-indexado.event.ts`, `falha-indexacao-detectada.event.ts`), via `coverage-final.json`: 100% statements/branches/functions em ambos os `.event.ts` (8/8 e 7/7 stmts); `domain-event.ts` é somente `interface` (0 statement executável, nada a cobrir).
 
+## T033 (PR #552) — `BedrockInterpretacaoConsultaACL` (ACL de tradução pura, sem chamada AWS/Bedrock real)
+
+| Requisito / critério (tasks.md T033) | Cenário | Teste | Resultado |
+|---|---|---|---|
+| `ehInterpretacaoConsultaBruta` aceita shape mínimo válido | apenas `textoLivreResidual` string | `aceita shape com textoLivreResidual string` | PASS |
+| Rejeita `textoLivreResidual` ausente/`null`/tipo incorreto | shape vazio, `null`, tipo numérico | `rejeita ausência de textoLivreResidual, null, ou tipo incorreto` | PASS |
+| Rejeita `categoria` com tipo incorreto | `categoria: 42` | `rejeita categoria com tipo incorreto` | PASS |
+| Rejeita `precoMinimo`/`precoMaximo` com campo aninhado de tipo incorreto | `moeda` numérica, `valorCentavos` string | `rejeita precoMinimo/precoMaximo com campo aninhado de tipo incorreto` | PASS |
+| Rejeita `periodoRecebimento` com campo aninhado de tipo incorreto | `inicio`/`fim` com tipo incorreto | `rejeita periodoRecebimento com campo aninhado de tipo incorreto` | PASS |
+| Rejeita `precoMinimo`/`precoMaximo`/`periodoRecebimento` quando o próprio campo não é objeto (string/null) | campo raiz não-objeto | `rejeita precoMinimo/precoMaximo quando o próprio campo não é um objeto` / `rejeita periodoRecebimento quando o próprio campo não é um objeto` | PASS (adicionado pelo QA) |
+| Converte saída completa (categoria do catálogo + faixa de preço + período) em `CriterioBusca` válido | caso feliz completo | `converte saída estruturada com categoria pertencente ao catálogo em CriterioBusca válido` | PASS |
+| Converte saída somente com texto livre (sem nenhum filtro estruturado) | shape mínimo | `converte saída sem nenhum filtro estruturado (apenas texto livre) em CriterioBusca válido` | PASS |
+| **Núcleo do requisito**: rejeita (nunca corrige/aproxima) `categoria` fora do `catalogoCategorias` configurado | categoria inventada pelo modelo | `lança BedrockInterpretacaoConsultaACLInvalidaError quando categoria não pertence ao catálogo configurado` | PASS |
+| Rejeita mesmo com grafia parecida a categoria válida (nunca aproxima) | `'Ferragens'` vs. catálogo `'ferragens'` | `nunca aceita categoria fora do catálogo mesmo com grafia parecida a uma categoria válida` | PASS |
+| Propaga erro de domínio do VO em moeda divergente entre `precoMinimo`/`precoMaximo` | `BRL` vs. `USD` | `propaga erro de domínio quando precoMinimo/precoMaximo estruturado é inválido (ex.: moeda divergente)` | PASS |
+| Propaga `CriterioBuscaInvalidoError` explícito em data inválida de `periodoRecebimento` (nunca exceção não controlada) | `inicio: 'data-invalida'` | `propaga erro de domínio quando periodoRecebimento estruturado tem data inválida` | PASS |
+
+Cobertura de `bedrock-interpretacao-consulta.acl.ts`: baseline do dev-back-end (11 testes) já em 92.3% stmts/100% funcs/100% lines, 93.18% branch — gap de branch nas linhas 37/43 (`typeof valor !== 'object'` nos type guards `ehFaixaPrecoBruta`/`ehPeriodoRecebimentoBruto`), nunca exercitado com o campo raiz sendo não-objeto (ex.: `precoMinimo: 'gratis'`). QA adicionou 2 cenários (3 asserções) fechando essa lacuna: 100% statements/branches/functions/lines (13/13 testes). Nenhuma linha de produção alterada.
+
+Fora do escopo desta task (cobertos por outra task): `BedrockInterpretadorConsultaGateway` (chamada Bedrock real, IAM) é T037/#197.
+
 Nenhum consumidor de produção publica ou lê esses eventos ainda (`registrarTentativaIndexacao`/publicação fica para T029, ainda `[ ]`) — sem risco de quebra de contrato em código existente.
 
 ## T016 (PR #536) — `DrizzlePgvectorIndiceOrcamentoRepository`, retrofit ADR-005 (`DrizzleTenantScopedRepositoryBase`)

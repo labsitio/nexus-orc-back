@@ -86,7 +86,7 @@
 
 ### Tests (US2)
 
-- [ ] T033 [P] [US2] Unit test `BedrockInterpretacaoConsultaACL` (mock de saída do Bedrock) — saída estruturada restrita ao catálogo de categorias configurado, nunca uma categoria/filtro inventado fora do catálogo.
+- [x] T033 [P] [US2] Unit test `BedrockInterpretacaoConsultaACL` (mock de saída do Bedrock) — saída estruturada restrita ao catálogo de categorias configurado, nunca uma categoria/filtro inventado fora do catálogo. Implementada em `src/bounded-contexts/busca-indexacao/infrastructure/bedrock-interpretacao-consulta.acl.ts` (apenas a ACL de tradução, pura, sem chamada AWS) + `tests/bounded-contexts/busca-indexacao/infrastructure/bedrock-interpretacao-consulta.acl.test.ts`; `BedrockInterpretadorConsultaGateway` (chamada Bedrock real) permanece escopo de T037/#197.
 - [ ] T034 [P] [US2] Unit test do caso de uso `BuscarOrcamentos` — filtro explícito enviado na requisição nunca é sobrescrito pela interpretação da IA, apenas complementado (mock de `AgenteInterpretadorConsultaGateway` e `AgenteEmbeddingGateway`); `tenantId` sempre presente e nunca sobrescrevível por parâmetro de busca.
 - [ ] T035 [P] [US2] Contract test `POST /v1/orcamentos/busca` (body com consulta em linguagem natural + filtros explícitos; resposta paginada com `ResultadoBusca[]`; Problem Details para erro de validação Zod).
 - [ ] T036 [P] [US2] Integration test: consulta combinando categoria + faixa de preço + período contra orçamentos indexados de teste de dois tenants (LocalStack + Postgres/pgvector) → resultado relevante ordenado por distância vetorial + filtro determinístico, restrito ao tenant do JWT, sem exigir correspondência exata de texto na descrição do item.
