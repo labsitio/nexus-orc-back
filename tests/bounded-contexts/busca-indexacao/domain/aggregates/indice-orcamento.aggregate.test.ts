@@ -3,6 +3,7 @@ import {
   IndiceOrcamento,
   IndiceOrcamentoInconsistenteError,
   OrigemValidacaoImutavelError,
+  TenantIdImutavelError,
 } from '../../../../../src/bounded-contexts/busca-indexacao/domain/aggregates/indice-orcamento.aggregate.js';
 import {
   TentativaIndexacao,
@@ -12,8 +13,11 @@ import { ConteudoIndexavel } from '../../../../../src/bounded-contexts/busca-ind
 import { Embedding } from '../../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/embedding.vo.js';
 import { OrcamentoId } from '../../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/orcamento-id.vo.js';
 import { OrigemValidacao } from '../../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/origem-validacao.vo.js';
+import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const orcamentoId = OrcamentoId.de('018f5b3a-1234-7abc-89ab-0123456789ab');
+const tenantId = TenantId.de('018f5b3a-9999-7abc-89ab-0123456789ab');
+const outroTenantId = TenantId.de('018f5b3a-8888-7abc-89ab-0123456789ab');
 const conteudoIndexavel = ConteudoIndexavel.de({
   resumoFornecedor: 'Fornecedor XPTO',
   itensDescricao: ['Item A', 'Item B'],
@@ -30,7 +34,7 @@ const embedding = Embedding.de({
 });
 
 function criarIndice(): IndiceOrcamento {
-  return IndiceOrcamento.criar({ orcamentoId, conteudoIndexavel, origemValidacao });
+  return IndiceOrcamento.criar({ orcamentoId, tenantId, conteudoIndexavel, origemValidacao });
 }
 
 describe('IndiceOrcamento', () => {
@@ -150,6 +154,7 @@ describe('IndiceOrcamento', () => {
 
     const indice = IndiceOrcamento.reconstituir({
       orcamentoId,
+      tenantId,
       conteudoIndexavel,
       origemValidacao,
       estado: 'FALHA_INDEXACAO',
@@ -172,6 +177,7 @@ describe('IndiceOrcamento', () => {
 
     const indice = IndiceOrcamento.reconstituir({
       orcamentoId,
+      tenantId,
       conteudoIndexavel,
       origemValidacao,
       estado: 'FALHA_INDEXACAO',
@@ -187,6 +193,7 @@ describe('IndiceOrcamento', () => {
   it('reconstitui agregado já indexado a partir de estado persistido', () => {
     const indice = IndiceOrcamento.reconstituir({
       orcamentoId,
+      tenantId,
       conteudoIndexavel,
       origemValidacao,
       estado: 'INDEXADO',
@@ -202,11 +209,36 @@ describe('IndiceOrcamento', () => {
     expect(() =>
       IndiceOrcamento.reconstituir({
         orcamentoId,
+        tenantId,
         conteudoIndexavel,
         origemValidacao,
         estado: 'INDEXADO',
         embedding: undefined,
         historico: [],
+      }),
+    ).toThrow(IndiceOrcamentoInconsistenteError);
+  });
+
+  it('rejeita sobrescrever tenantId fora do construtor', () => {
+    const indice = criarIndice();
+
+    expect(() => {
+      indice.tenantId = outroTenantId;
+    }).toThrow(TenantIdImutavelError);
+  });
+
+  it('expõe tenantId definido no construtor', () => {
+    const indice = criarIndice();
+    expect(indice.tenantId).toBe(tenantId);
+  });
+
+  it('rejeita criação sem tenantId — erro de domínio', () => {
+    expect(() =>
+      IndiceOrcamento.criar({
+        orcamentoId,
+        tenantId: undefined as never,
+        conteudoIndexavel,
+        origemValidacao,
       }),
     ).toThrow(IndiceOrcamentoInconsistenteError);
   });
