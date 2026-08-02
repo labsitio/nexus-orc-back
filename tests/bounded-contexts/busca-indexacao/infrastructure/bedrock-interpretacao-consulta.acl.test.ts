@@ -17,6 +17,34 @@ describe('ehInterpretacaoConsultaBruta', () => {
     expect(ehInterpretacaoConsultaBruta(null)).toBe(false);
     expect(ehInterpretacaoConsultaBruta({ textoLivreResidual: 123 })).toBe(false);
   });
+
+  it('rejeita categoria com tipo incorreto', () => {
+    expect(ehInterpretacaoConsultaBruta({ textoLivreResidual: '', categoria: 42 })).toBe(false);
+  });
+
+  it('rejeita precoMinimo/precoMaximo com campo aninhado de tipo incorreto (ex.: moeda numérica)', () => {
+    expect(
+      ehInterpretacaoConsultaBruta({
+        textoLivreResidual: '',
+        precoMinimo: { valorCentavos: 100, moeda: 123 },
+      }),
+    ).toBe(false);
+    expect(
+      ehInterpretacaoConsultaBruta({
+        textoLivreResidual: '',
+        precoMaximo: { valorCentavos: '100', moeda: 'BRL' },
+      }),
+    ).toBe(false);
+  });
+
+  it('rejeita periodoRecebimento com campo aninhado de tipo incorreto', () => {
+    expect(
+      ehInterpretacaoConsultaBruta({
+        textoLivreResidual: '',
+        periodoRecebimento: { inicio: 123, fim: '2026-01-31T00:00:00.000Z' },
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('BedrockInterpretacaoConsultaACL', () => {
@@ -83,6 +111,20 @@ describe('BedrockInterpretacaoConsultaACL', () => {
         {
           precoMinimo: { valorCentavos: 100, moeda: 'BRL' },
           precoMaximo: { valorCentavos: 200, moeda: 'USD' },
+          textoLivreResidual: '',
+        },
+        CATALOGO_CATEGORIAS,
+      ),
+    ).toThrow();
+  });
+
+  it('propaga erro de domínio quando periodoRecebimento estruturado tem data inválida', () => {
+    const acl = new BedrockInterpretacaoConsultaACL();
+
+    expect(() =>
+      acl.converter(
+        {
+          periodoRecebimento: { inicio: 'data-invalida', fim: '2026-01-31T00:00:00.000Z' },
           textoLivreResidual: '',
         },
         CATALOGO_CATEGORIAS,

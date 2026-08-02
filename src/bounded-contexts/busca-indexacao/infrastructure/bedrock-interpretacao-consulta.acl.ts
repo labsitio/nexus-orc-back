@@ -33,11 +33,42 @@ export interface InterpretacaoConsultaBruta {
   readonly textoLivreResidual: string;
 }
 
-/** Type guard estrutural — nunca confia cegamente no shape reportado pelo LLM. */
+function ehFaixaPrecoBruta(valor: unknown): valor is FaixaPrecoBruta {
+  if (typeof valor !== 'object' || valor === null) return false;
+  const registro = valor as Record<string, unknown>;
+  return typeof registro.valorCentavos === 'number' && typeof registro.moeda === 'string';
+}
+
+function ehPeriodoRecebimentoBruto(valor: unknown): valor is PeriodoRecebimentoBruto {
+  if (typeof valor !== 'object' || valor === null) return false;
+  const registro = valor as Record<string, unknown>;
+  return typeof registro.inicio === 'string' && typeof registro.fim === 'string';
+}
+
+/**
+ * Type guard estrutural — nunca confia cegamente no shape reportado pelo LLM.
+ * Valida cada campo opcional aninhado (`precoMinimo`/`precoMaximo`/`periodoRecebimento`)
+ * quando presente, para que `converter` nunca repasse tipo incorreto a
+ * `Dinheiro.de`/`new Date` e lance exceção não controlada em vez de erro de
+ * domínio explícito (mesma disciplina de `ehEmbeddingBruto`, T028, que valida
+ * cada elemento do array de embedding).
+ */
 export function ehInterpretacaoConsultaBruta(valor: unknown): valor is InterpretacaoConsultaBruta {
   if (typeof valor !== 'object' || valor === null) return false;
   const registro = valor as Record<string, unknown>;
-  return typeof registro.textoLivreResidual === 'string';
+
+  if (typeof registro.textoLivreResidual !== 'string') return false;
+  if (registro.categoria !== undefined && typeof registro.categoria !== 'string') return false;
+  if (registro.precoMinimo !== undefined && !ehFaixaPrecoBruta(registro.precoMinimo)) return false;
+  if (registro.precoMaximo !== undefined && !ehFaixaPrecoBruta(registro.precoMaximo)) return false;
+  if (
+    registro.periodoRecebimento !== undefined &&
+    !ehPeriodoRecebimentoBruto(registro.periodoRecebimento)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 /**
