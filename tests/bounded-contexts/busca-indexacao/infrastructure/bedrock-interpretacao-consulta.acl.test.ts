@@ -45,6 +45,25 @@ describe('ehInterpretacaoConsultaBruta', () => {
         periodoRecebimento: { inicio: 123, fim: '2026-01-31T00:00:00.000Z' },
       }),
     ).toBe(false);
+    expect(
+      ehInterpretacaoConsultaBruta({
+        textoLivreResidual: '',
+        periodoRecebimento: { inicio: '2026-01-01T00:00:00.000Z', fim: 456 },
+      }),
+    ).toBe(false);
+  });
+
+  it('rejeita precoMinimo/precoMaximo quando o próprio campo não é um objeto', () => {
+    expect(ehInterpretacaoConsultaBruta({ textoLivreResidual: '', precoMinimo: 'gratis' })).toBe(
+      false,
+    );
+    expect(ehInterpretacaoConsultaBruta({ textoLivreResidual: '', precoMaximo: null })).toBe(false);
+  });
+
+  it('rejeita periodoRecebimento quando o próprio campo não é um objeto', () => {
+    expect(
+      ehInterpretacaoConsultaBruta({ textoLivreResidual: '', periodoRecebimento: 'sempre' }),
+    ).toBe(false);
   });
 });
 
