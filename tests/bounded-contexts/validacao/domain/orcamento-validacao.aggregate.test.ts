@@ -98,6 +98,32 @@ describe('OrcamentoValidacao', () => {
     expect(agregado.historico[0]?.resultado).toBe('INCONSISTENTE');
   });
 
+  it('avaliarRegrasDeConsistencia com múltiplas regras falhando transita direto para PENDENTE_REVISAO_HUMANA (nunca segunda tentativa automática) e inconsistencias lista cada regra específica', () => {
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const cnpjInvalido = InconsistenciaDetectada.de(
+      'CNPJ_INVALIDO',
+      'dígito verificador incorreto',
+    );
+    const precoForaFaixa = InconsistenciaDetectada.de(
+      'PRECO_FORA_DE_FAIXA',
+      'preço unitário acima da faixa da categoria',
+    );
+
+    agregado.avaliarRegrasDeConsistencia([cnpjInvalido, precoForaFaixa]);
+
+    expect(agregado.status).toBe('PENDENTE_REVISAO_HUMANA');
+    expect(agregado.inconsistencias).toHaveLength(2);
+    expect(agregado.inconsistencias.map((i) => i.regra)).toEqual([
+      'CNPJ_INVALIDO',
+      'PRECO_FORA_DE_FAIXA',
+    ]);
+    expect(agregado.historico[0]?.resultado).toBe('INCONSISTENTE');
+
+    // ADR-001: nunca há uma segunda tentativa automática — só decisão humana reavalia.
+    expect(() => agregado.avaliarRegrasDeConsistencia([])).toThrow(TransicaoInvalidaValidacaoError);
+    expect(agregado.status).toBe('PENDENTE_REVISAO_HUMANA');
+  });
+
   it('nunca transita para VALIDADO com inconsistência pendente — força segunda avaliação e espera erro de domínio', () => {
     const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
     agregado.avaliarRegrasDeConsistencia([inconsistencia()]);
