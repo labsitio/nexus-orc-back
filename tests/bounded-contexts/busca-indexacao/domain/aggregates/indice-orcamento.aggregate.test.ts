@@ -242,6 +242,30 @@ describe('IndiceOrcamento', () => {
       }),
     ).toThrow(IndiceOrcamentoInconsistenteError);
   });
+
+  it('invariante "nunca omitir por relevância": único método de transição de estado é registrarTentativaIndexacao — nenhum método de exclusão de negócio exposto', () => {
+    const metodosPublicos = Object.getOwnPropertyNames(IndiceOrcamento.prototype).filter((nome) => {
+      if (nome === 'constructor') return false;
+      const descritor = Object.getOwnPropertyDescriptor(IndiceOrcamento.prototype, nome);
+      return typeof descritor?.value === 'function';
+    });
+
+    expect(metodosPublicos.sort()).toEqual(['registrarTentativaIndexacao'].sort());
+  });
+
+  it('registrarTentativaIndexacao rejeita resultado fora do conjunto fechado INDEXADO|FALHA_TECNICA — não existe via de exclusão por relevância', () => {
+    const indice = criarIndice();
+
+    expect(() =>
+      indice.registrarTentativaIndexacao({
+        resultado: 'EXCLUIDO_POR_RELEVANCIA',
+        timestamp,
+      } as never),
+    ).toThrow(TentativaIndexacaoInvalidaError);
+
+    expect(indice.estado).toBe('PENDENTE');
+    expect(indice.historico).toHaveLength(0);
+  });
 });
 
 type TentativaIndexacaoArrayMutavel = unknown[];
