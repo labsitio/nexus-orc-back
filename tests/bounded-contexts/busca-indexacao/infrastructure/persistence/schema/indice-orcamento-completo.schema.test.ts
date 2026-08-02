@@ -22,6 +22,10 @@ import {
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
+// ADR-005 (T015b): placeholder de teste, mesmo padrão de TENANT_ID_TESTE em
+// orcamento.schema.test.ts (spec 007, T007).
+const TENANT_ID_TESTE = '00000000-0000-7000-8000-000000000000';
+
 // drizzle-orm embrulha o erro do driver em `Failed query: ...`; o nome da
 // constraint Postgres violada só aparece em `error.cause.message`.
 async function esperarViolacaoDeConstraint(promise: Promise<unknown>, constraint: RegExp) {
@@ -32,7 +36,7 @@ async function esperarViolacaoDeConstraint(promise: Promise<unknown>, constraint
 }
 
 describe.skipIf(!DATABASE_URL)(
-  'schema busca_indexacao.indices_orcamento* completo (T015, Postgres real)',
+  'schema busca_indexacao.indices_orcamento* completo (T015/T015b, Postgres real)',
   () => {
     let client: Client;
     let db: NodePgDatabase;
@@ -51,6 +55,9 @@ describe.skipIf(!DATABASE_URL)(
     // linha sobrevive à suíte, banco compartilhado permanece limpo.
     beforeEach(async () => {
       await client.query('BEGIN');
+      // RLS (T015b): sem `app.current_tenant_id`, a política `tenant_isolation`
+      // nega toda linha destas tabelas.
+      await client.query(`select set_config('app.current_tenant_id', $1, true)`, [TENANT_ID_TESTE]);
     });
 
     afterEach(async () => {
@@ -86,9 +93,40 @@ describe.skipIf(!DATABASE_URL)(
       expect(triggers.rows).toHaveLength(2);
     });
 
+    it('RLS habilitada e política tenant_isolation presente em indices_orcamento / indices_orcamento_historico', async () => {
+      const rls = await client.query<{
+        relname: string;
+        relrowsecurity: boolean;
+        relforcerowsecurity: boolean;
+      }>(
+        `select c.relname, c.relrowsecurity, c.relforcerowsecurity
+         from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'busca_indexacao'
+           and c.relname in ('indices_orcamento', 'indices_orcamento_historico')`,
+      );
+      expect(rls.rows).toHaveLength(2);
+      for (const linha of rls.rows) {
+        expect(linha.relrowsecurity).toBe(true);
+        expect(linha.relforcerowsecurity).toBe(true);
+      }
+
+      const politicas = await client.query<{ tablename: string; policyname: string }>(
+        `select tablename, policyname from pg_policies
+         where schemaname = 'busca_indexacao'
+           and tablename in ('indices_orcamento', 'indices_orcamento_historico')
+           and policyname = 'tenant_isolation'`,
+      );
+      expect(politicas.rows.map((r) => r.tablename).sort()).toEqual([
+        'indices_orcamento',
+        'indices_orcamento_historico',
+      ]);
+    });
+
     async function inserirIndice(id: string) {
       await db.insert(indicesOrcamento).values({
         id,
+        tenantId: TENANT_ID_TESTE,
         estado: 'PENDENTE',
         conteudoIndexavel: { resumoFornecedor: 'Fornecedor X', itensDescricao: [] },
         origemValidacao: 'VALIDADO',
@@ -108,6 +146,7 @@ describe.skipIf(!DATABASE_URL)(
       await esperarViolacaoDeConstraint(
         db.insert(indicesOrcamento).values({
           id: randomUUID(),
+          tenantId: TENANT_ID_TESTE,
           estado: 'ESTADO_INEXISTENTE',
           conteudoIndexavel: {},
           origemValidacao: 'VALIDADO',
@@ -120,6 +159,7 @@ describe.skipIf(!DATABASE_URL)(
       await esperarViolacaoDeConstraint(
         db.insert(indicesOrcamento).values({
           id: randomUUID(),
+          tenantId: TENANT_ID_TESTE,
           estado: 'PENDENTE',
           conteudoIndexavel: {},
           origemValidacao: 'ORIGEM_INEXISTENTE',
@@ -134,6 +174,7 @@ describe.skipIf(!DATABASE_URL)(
 
       await esperarViolacaoDeConstraint(
         db.insert(indicesOrcamentoHistorico).values({
+          tenantId: TENANT_ID_TESTE,
           indiceOrcamentoId: id,
           resultado: 'RESULTADO_INEXISTENTE',
           ocorreuEm: new Date(),
@@ -145,6 +186,7 @@ describe.skipIf(!DATABASE_URL)(
     it('FK indice_orcamento_id rejeita histórico órfão (sem IndiceOrcamento correspondente)', async () => {
       await esperarViolacaoDeConstraint(
         db.insert(indicesOrcamentoHistorico).values({
+          tenantId: TENANT_ID_TESTE,
           indiceOrcamentoId: randomUUID(),
           resultado: 'INDEXADO',
           modeloEmbedding: 'amazon.titan-embed-text-v2:0',
@@ -158,6 +200,7 @@ describe.skipIf(!DATABASE_URL)(
       const id = randomUUID();
       await inserirIndice(id);
       await db.insert(indicesOrcamentoHistorico).values({
+        tenantId: TENANT_ID_TESTE,
         indiceOrcamentoId: id,
         resultado: 'FALHA_TECNICA',
         motivoFalha: 'timeout no gateway de embeddings',
@@ -178,6 +221,7 @@ describe.skipIf(!DATABASE_URL)(
       const id = randomUUID();
       await inserirIndice(id);
       await db.insert(indicesOrcamentoHistorico).values({
+        tenantId: TENANT_ID_TESTE,
         indiceOrcamentoId: id,
         resultado: 'FALHA_TECNICA',
         motivoFalha: 'timeout no gateway de embeddings',
