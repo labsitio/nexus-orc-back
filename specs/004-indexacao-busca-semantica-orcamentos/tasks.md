@@ -64,7 +64,7 @@
 - [ ] T025 [P] [US1] Integration test: `OrcamentoValidado` publicado → `OrcamentoIndexado` publicado, embedding persistido em `indices_orcamento` com `tenant_id` correto, p95 medido em ambiente de teste local (LocalStack + Postgres/pgvector).
 - [ ] T026 [P] [US1] Integration test: falha simulada do `AgenteEmbeddingGateway` → `FalhaIndexacaoDetectada` publicado; orçamento seguinte na fila (mesmo de outro tenant) processado normalmente (sem bloqueio) — critério de aceite spec.md "não impede o processamento dos demais orçamentos".
 - [ ] T027 [P] [US1] Integration test: retry automático via redrive da DLQ após falha transiente simulada → `OrcamentoIndexado` publicado na retentativa, histórico com as duas tentativas visível.
-- [ ] T027b [P] [US1] **(ADR-005)** Teste adversarial cross-tenant: repositório com `TenantContext` de Tenant A não retorna/atualiza linha de `indices_orcamento`/`indices_orcamento_historico` de Tenant B, mesmo sem `SET LOCAL` (deve retornar zero linhas) — mesmo padrão de T010 da spec 007, em `tests/security/isolamento-multitenant/busca-indexacao.test.ts`.
+- [x] T027b [P] [US1] **(ADR-005)** Teste adversarial cross-tenant: repositório com `TenantContext` de Tenant A não retorna/atualiza linha de `indices_orcamento`/`indices_orcamento_historico` de Tenant B, mesmo sem `SET LOCAL` (deve retornar zero linhas) — mesmo padrão de T010 da spec 007, em `tests/security/isolamento-multitenant/busca-indexacao.test.ts`.
 
 ### Implementation (US1)
 
