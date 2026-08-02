@@ -56,7 +56,7 @@
 
 ### Tests (US1)
 
-- [ ] T020 [P] [US1] Unit test do agregado `IndiceOrcamento.criar(tenantId, conteudoIndexavel, origemValidacao)` + `registrarTentativaIndexacao` com sucesso → transita para `INDEXADO`, embedding persistido.
+- [x] T020 [P] [US1] Unit test do agregado `IndiceOrcamento.criar(tenantId, conteudoIndexavel, origemValidacao)` + `registrarTentativaIndexacao` com sucesso → transita para `INDEXADO`, embedding persistido. Coberto por `tests/bounded-contexts/busca-indexacao/domain/aggregates/indice-orcamento.aggregate.test.ts` (casos "transita para INDEXADO quando embedding é fornecido na mesma tentativa" e "reconstitui agregado já indexado a partir de estado persistido"), já implementado junto de T012/T012b (PRs #501, #532).
 - [ ] T021 [P] [US1] Unit test `registrarTentativaIndexacao` com falha técnica → transita para `FALHA_INDEXACAO`, histórico anexado (nunca sobrescrito), nenhum limite estrutural de tentativas no Domain.
 - [ ] T022 [P] [US1] Unit test de invariante "nunca omitir por relevância" — nenhum método do agregado aceita parâmetro de exclusão de negócio; única via para não indexar é falha técnica registrada.
 - [ ] T023 [P] [US1] Unit test `OrcamentoValidadoEventACL` (mock de payload enriquecido de `OrcamentoValidado`/`OrcamentoValidadoComRessalva`, incluindo `tenantId`) → produz `ConteudoIndexavel` + `OrigemValidacao` + `TenantId` corretos, preservando ambas as origens (ver ADR-004).
