@@ -24,6 +24,8 @@ Cobertura de branch/statement/function do arquivo `indice-orcamento.aggregate.ts
 
 Fora do escopo desta task (cobertos por outras tasks/specs): `TentativaIndexacao.de` (VO, testado em `tentativa-indexacao.vo.test.ts`), persistência com `tenant_id`/RLS e `DrizzleTenantScopedRepositoryBase` (T015b/T016), ACL (T018), isolamento cross-tenant ponta a ponta (T027b).
 
+**T021 (PR #543) — marcação de conclusão, sem código novo**: critério de T021 ("`registrarTentativaIndexacao` com falha técnica → transita para `FALHA_INDEXACAO`, histórico anexado, nenhum limite estrutural de tentativas") já integralmente coberto pelas linhas 8–10 acima (testes de T012/T012b, PRs #501/#532). QA reverificou nesta rodada: 16/16 testes do arquivo passando (`vitest run`), ausência de limite estrutural confirmada em código (`indice-orcamento.aggregate.ts`, comentário ADR-002: retry sem limite no Domain, limite é responsabilidade de infraestrutura). Nenhum arquivo de produção alterado nesta task.
+
 ## T013b (PR #533) — Domain Events `OrcamentoIndexado`/`FalhaIndexacaoDetectada`, `schemaVersion: 2` + `tenantId`
 
 | Requisito / critério (tasks.md T013b, ADR-005 retrofit) | Cenário | Teste | Resultado |
