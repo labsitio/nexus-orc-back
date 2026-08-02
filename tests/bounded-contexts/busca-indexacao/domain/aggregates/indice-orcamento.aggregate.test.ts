@@ -253,7 +253,27 @@ describe('IndiceOrcamento', () => {
     expect(metodosPublicos.sort()).toEqual(['registrarTentativaIndexacao'].sort());
   });
 
-  it('registrarTentativaIndexacao rejeita resultado fora do conjunto fechado INDEXADO|FALHA_TECNICA — não existe via de exclusão por relevância', () => {
+  it('registrarTentativaIndexacao ignora qualquer valor de "resultado" além de INDEXADO e sempre normaliza para FALHA_TECNICA — não existe via de exclusão por relevância', () => {
+    const indice = criarIndice();
+
+    // "EXCLUIDO_POR_RELEVANCIA" simula uma tentativa de forçar um motivo de
+    // negócio (relevância) via `resultado`. O agregado nem valida nem
+    // preserva esse valor: qualquer coisa diferente de 'INDEXADO' colapsa
+    // em FALHA_TECNICA (ver `registrarTentativaIndexacao`), então não há
+    // como um chamador registrar "excluído por relevância" como outcome —
+    // só INDEXADO (com embedding) ou FALHA_TECNICA (com motivoFalha).
+    indice.registrarTentativaIndexacao({
+      resultado: 'EXCLUIDO_POR_RELEVANCIA',
+      timestamp,
+      motivoFalha: 'tentativa de exclusão por relevância de negócio',
+    } as never);
+
+    expect(indice.estado).toBe('FALHA_INDEXACAO');
+    expect(indice.historico).toHaveLength(1);
+    expect(indice.historico[0]?.resultado).toBe('FALHA_TECNICA');
+  });
+
+  it('registrarTentativaIndexacao rejeita FALHA_TECNICA sem motivoFalha — nenhuma omissão silenciosa, mesmo com resultado de negócio forjado', () => {
     const indice = criarIndice();
 
     expect(() =>
