@@ -1,3 +1,4 @@
+import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import { ErroDominio } from '../errors/erro-dominio.js';
 import { ConteudoIndexavel } from '../value-objects/conteudo-indexavel.vo.js';
 import { Embedding } from '../value-objects/embedding.vo.js';
@@ -8,6 +9,16 @@ import { TentativaIndexacao } from '../value-objects/tentativa-indexacao.vo.js';
 export class OrigemValidacaoImutavelError extends ErroDominio {
   constructor(campo: string) {
     super(`IndiceOrcamento: campo '${campo}' é imutável fora do construtor de criação`);
+  }
+}
+
+/**
+ * (ADR-005, plan.md — retrofit) `tenantId` é imutável fora do construtor de
+ * criação, mesmo padrão de `OrigemValidacaoImutavelError`.
+ */
+export class TenantIdImutavelError extends ErroDominio {
+  constructor() {
+    super("IndiceOrcamento: campo 'tenantId' é imutável fora do construtor de criação");
   }
 }
 
@@ -23,6 +34,7 @@ export type EstadoIndexacao = (typeof ESTADOS_INDEXACAO)[number];
 
 export interface IndiceOrcamentoProps {
   readonly orcamentoId: OrcamentoId;
+  readonly tenantId: TenantId;
   readonly conteudoIndexavel: ConteudoIndexavel;
   readonly origemValidacao: OrigemValidacao;
 }
@@ -58,13 +70,23 @@ export class IndiceOrcamento {
 
   private constructor(
     readonly orcamentoId: OrcamentoId,
+    private readonly _tenantId: TenantId,
     private readonly _conteudoIndexavel: ConteudoIndexavel,
     private readonly _origemValidacao: OrigemValidacao,
   ) {}
 
   /** Cria um novo agregado a partir do payload traduzido pelo `OrcamentoValidadoEventACL`. */
   static criar(props: IndiceOrcamentoProps): IndiceOrcamento {
-    return new IndiceOrcamento(props.orcamentoId, props.conteudoIndexavel, props.origemValidacao);
+    if (!props.tenantId) {
+      throw new IndiceOrcamentoInconsistenteError('tenantId é obrigatório na criação');
+    }
+
+    return new IndiceOrcamento(
+      props.orcamentoId,
+      props.tenantId,
+      props.conteudoIndexavel,
+      props.origemValidacao,
+    );
   }
 
   /** Reidrata o agregado a partir de estado já persistido (Infrastructure) — revalida a invariante crítica antes de aceitar a reidratação. */
@@ -75,6 +97,7 @@ export class IndiceOrcamento {
 
     const indice = new IndiceOrcamento(
       props.orcamentoId,
+      props.tenantId,
       props.conteudoIndexavel,
       props.origemValidacao,
     );
@@ -82,6 +105,14 @@ export class IndiceOrcamento {
     indice._embedding = props.embedding;
     indice._historico = [...props.historico];
     return indice;
+  }
+
+  get tenantId(): TenantId {
+    return this._tenantId;
+  }
+
+  set tenantId(_valor: TenantId) {
+    throw new TenantIdImutavelError();
   }
 
   get conteudoIndexavel(): ConteudoIndexavel {

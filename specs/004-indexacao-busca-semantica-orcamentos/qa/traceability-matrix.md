@@ -1,4 +1,4 @@
-# Matriz de rastreabilidade — T012 (agregado IndiceOrcamento)
+# Matriz de rastreabilidade — T012/T012b (agregado IndiceOrcamento)
 
 | Requisito / critério (tasks.md T012) | Cenário | Teste | Resultado |
 |---|---|---|---|
@@ -16,7 +16,10 @@
 | Reidratação rejeita dado inconsistente (INDEXADO sem embedding) | reconstituir sem embedding | `rejeita reidratar estado INDEXADO sem embedding — dado persistido inconsistente` | PASS |
 | Reidratação de FALHA_INDEXACAO com histórico prévio, sem exigir embedding | reconstituir com histórico | `reconstitui agregado em FALHA_INDEXACAO com histórico prévio, sem exigir embedding` | PASS (adicionado pelo QA) |
 | Reidratação faz cópia defensiva do histórico recebido | mutação do array de origem pós-reconstituir | `reconstitui com cópia defensiva do histórico — array de origem não afeta o agregado` | PASS (adicionado pelo QA) |
+| (T012b, ADR-005) `tenantId` obrigatório na criação | `criar` sem `tenantId` | `rejeita criação sem tenantId — erro de domínio` | PASS |
+| (T012b, ADR-005) `TenantIdImutavelError` ao sobrescrever `tenantId` pós-criação | set fora do construtor | `rejeita sobrescrever tenantId fora do construtor` | PASS |
+| (T012b, ADR-005) getter expõe `tenantId` definido no construtor | leitura direta | `expõe tenantId definido no construtor` | PASS |
 
-Cobertura de branch/statement/function do arquivo `indice-orcamento.aggregate.ts`: 100% após os 3 testes adicionados pelo QA (baseline do dev-back-end: 93.75% stmts/lines, 84.61% funcs, 100% branch — lacuna nos getters `conteudoIndexavel`/`origemValidacao` e no caminho `reconstituir` com `FALHA_INDEXACAO`).
+Cobertura de branch/statement/function do arquivo `indice-orcamento.aggregate.ts`: 100% após os 3 testes adicionados pelo QA em T012 (baseline do dev-back-end: 93.75% stmts/lines, 84.61% funcs, 100% branch — lacuna nos getters `conteudoIndexavel`/`origemValidacao` e no caminho `reconstituir` com `FALHA_INDEXACAO`); mantida em 100% (39/39 stmts, 8/8 branches) após o retrofit de T012b (3 novos testes cobrindo o novo campo `tenantId`, sem linha nova descoberta).
 
-Fora do escopo desta task (cobertos por outras tasks/specs): `TentativaIndexacao.de` (VO, testado em `tentativa-indexacao.vo.test.ts`), persistência (T015/T016), eventos de domínio (T013), ACL (T018).
+Fora do escopo desta task (cobertos por outras tasks/specs): `TentativaIndexacao.de` (VO, testado em `tentativa-indexacao.vo.test.ts`), persistência com `tenant_id`/RLS e `DrizzleTenantScopedRepositoryBase` (T015b/T016), eventos de domínio com `tenantId` no payload (T013b), ACL (T018), isolamento cross-tenant ponta a ponta (T027b).
