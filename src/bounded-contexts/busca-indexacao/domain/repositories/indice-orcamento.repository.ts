@@ -9,6 +9,14 @@ import type { ResultadoBusca } from '../value-objects/resultado-busca.vo.js';
  * (`DrizzlePgvectorIndiceOrcamentoRepository`, T016) sobre Aurora Serverless
  * v2 Postgres + extensão `pgvector`. Traduz linha↔agregado, nunca vaza o tipo
  * `vector` bruto para fora da Infra (plan.md).
+ *
+ * **ADR-005 (retrofit, T016)**: toda implementação concreta é tenant-scoped
+ * — `tenantId` nunca é parâmetro solto destes métodos; vem do `TenantContext`
+ * fixado na instância do repositório (`DrizzleTenantScopedRepositoryBase`,
+ * spec 007/T008), a mesma instância por requisição/transação, nunca um
+ * singleton reaproveitado entre tenants. `upsert` valida que
+ * `indiceOrcamento.tenantId` bate com o `TenantContext` da instância antes de
+ * persistir — nunca confia apenas no valor já presente no agregado.
  */
 export interface IndiceOrcamentoRepository {
   /**
