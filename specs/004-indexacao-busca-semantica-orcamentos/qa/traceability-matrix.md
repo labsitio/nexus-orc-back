@@ -38,3 +38,24 @@ Fora do escopo desta task (cobertos por outras tasks/specs): `TentativaIndexacao
 Cobertura dos 3 arquivos alterados (`domain-event.ts`, `orcamento-indexado.event.ts`, `falha-indexacao-detectada.event.ts`), via `coverage-final.json`: 100% statements/branches/functions em ambos os `.event.ts` (8/8 e 7/7 stmts); `domain-event.ts` é somente `interface` (0 statement executável, nada a cobrir).
 
 Nenhum consumidor de produção publica ou lê esses eventos ainda (`registrarTentativaIndexacao`/publicação fica para T029, ainda `[ ]`) — sem risco de quebra de contrato em código existente.
+
+## T016 (PR #536) — `DrizzlePgvectorIndiceOrcamentoRepository`, retrofit ADR-005 (`DrizzleTenantScopedRepositoryBase`)
+
+| Requisito / critério (tasks.md T016) | Cenário | Teste | Resultado |
+|---|---|---|---|
+| Tradução linha↔agregado (PENDENTE, sem embedding) | `upsert` inicial + `buscarPorOrcamentoId` | `upsert idempotente: PENDENTE inicial, depois INDEXADO com embedding e 1 entrada de histórico` | PASS |
+| Tradução linha↔agregado (INDEXADO, embedding + modeloId reidratados do histórico) | mesmo teste, 2ª fase | idem | PASS |
+| `buscarPorOrcamentoId` retorna `undefined` para id inexistente | busca de id nunca persistido | `buscarPorOrcamentoId retorna undefined para orcamentoId inexistente` | PASS |
+| Falha técnica seguida de retry: histórico com 2 entradas, sem sobrescrever a 1ª | 2 tentativas via `upsert` | `falha técnica seguida de retry bem-sucedido produz 2 entradas de histórico, sem sobrescrever a primeira` | PASS |
+| Re-upsert sem transição nova não duplica histórico | `upsert` 2x sem nova `registrarTentativaIndexacao` | `re-upsert do mesmo agregado sem transição nova não duplica histórico` | PASS |
+| `upsert` concorrente (retry de handler Lambda) produz exatamente 1 entrada de histórico (lock `FOR UPDATE`) | 2 conexões, `Promise.all` | `duas chamadas concorrentes de upsert() para o mesmo orcamentoId (retry) produzem exatamente 1 entrada de histórico` | PASS |
+| `upsert` rejeita agregado com `tenantId` divergente do `TenantContext` da instância (guard aplicativo, não RLS) | agregado Tenant B em repo construído com Tenant A | `upsert rejeita agregado com tenantId diferente do TenantContext da instância` | PASS |
+| Coluna `tenant_id` persistida corretamente | leitura direta via SQL após `upsert` | `upsert persiste o tenantId correto na coluna tenant_id` | PASS |
+| `buscarPorCriterioEVetor`: filtro determinístico por categoria (JSONB) + ordenação por distância vetorial + exclusão de itens não `INDEXADO` | 4 índices (próximo/distante/outra categoria/pendente) | `filtra por categoria (JSONB) e ordena por distância vetorial, ignorando itens não INDEXADOS` | PASS |
+| `buscarPorCriterioEVetor` sem vetor de consulta aplica só o filtro determinístico | busca sem `vetorConsulta` | `sem vetor de consulta, aplica apenas o filtro determinístico (categoria + estado INDEXADO)` | PASS |
+| Retrofit ADR-005: classe estende `DrizzleTenantScopedRepositoryBase`, usa `transacaoTenantScoped` em toda transação (`upsert`, `buscarPorOrcamentoId`, `buscarPorCriterioEVetor`) | inspeção de código + execução de todos os testes acima contra Postgres real com RLS ativa (T015b) | leitura de `drizzle-pgvector-indice-orcamento.repository.ts` (linhas 138–300) | PASS |
+| Isolamento cross-tenant real (RLS, role sem `BYPASSRLS`) — fora do escopo direto de T016, mas pré-requisito já validado por T027b | Tenant A não vê linha de Tenant B mesmo sem `SET LOCAL` | `tests/security/isolamento-multitenant/busca-indexacao.test.ts` (4 testes) + `rls-enforcement-busca-indexacao.test.ts` (5 testes) | PASS (16/16, já validados em T015b/T027b; regressão confirmada nesta rodada) |
+
+Cobertura de `drizzle-pgvector-indice-orcamento.repository.ts` isolando a suíte alvo: 98% statements, 88.46% branches, 100% functions, 98% lines — única linha não coberta é o guard defensivo de dado inconsistente em `embeddingDaLinha` (linha persistida com `embedding` mas sem `TentativaIndexacao` `INDEXADO` correspondente no histórico, estado que `upsert` desta própria classe nunca produz; equivalente ao padrão já aceito em `IndiceOrcamentoInconsistenteError` de `agregadoDaLinha`/`reconstituir`, T012). Lacuna classificada como "código inviável de testar sem inserir dado inconsistente diretamente via SQL bruto, contornando o próprio repositório" — risco residual aceitável, não bloqueia o gate.
+
+`precoMinimo`/`precoMaximo`/`periodoRecebimento` de `CriterioBusca` permanecem fora do escopo de T016 (documentado no próprio arquivo de produção, JSDoc) — dependem do enriquecimento de payload da spec 003 (T006/T045), ainda bloqueado. Não é lacuna de T016; será risco residual de T037/T038 (US2).
