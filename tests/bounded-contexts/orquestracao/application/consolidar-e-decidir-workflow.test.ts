@@ -7,6 +7,7 @@ import {
 import { DecisaoWorkflowEscalonadaParaComprador } from '../../../../src/bounded-contexts/orquestracao/domain/events/decisao-workflow-escalonada-para-comprador.event.js';
 import { IntegracaoExternaSolicitada } from '../../../../src/bounded-contexts/orquestracao/domain/events/integracao-externa-solicitada.event.js';
 import { OrcamentoAprovadoParaProcessamento } from '../../../../src/bounded-contexts/orquestracao/domain/events/orcamento-aprovado-para-processamento.event.js';
+import { OrcamentoEncaminhadoParaComprador } from '../../../../src/bounded-contexts/orquestracao/domain/events/orcamento-encaminhado-para-comprador.event.js';
 import { OrcamentoReenvioSolicitado } from '../../../../src/bounded-contexts/orquestracao/domain/events/orcamento-reenvio-solicitado.event.js';
 import type { AgenteOrquestradorGateway } from '../../../../src/bounded-contexts/orquestracao/domain/gateways/agente-orquestrador.gateway.js';
 import type { DomainEventEnvelope } from '../../../../src/bounded-contexts/orquestracao/domain/events/domain-event.js';
@@ -133,6 +134,29 @@ describe('ConsolidarEDecidirWorkflow', () => {
     expect(existente.status).toBe('PENDENTE_REVISAO_HUMANA');
     expect(publisher.publicados).toHaveLength(1);
     expect(publisher.publicados[0]).toBeInstanceOf(DecisaoWorkflowEscalonadaParaComprador);
+  });
+
+  it('confiança suficiente: publica evento de desfecho (ENCAMINHAR_COMPRADOR)', async () => {
+    const existente = agregadoComContextoConsolidado();
+    const repositorio = new DecisaoWorkflowRepositoryFake(existente);
+    const publisher = new EventPublisherFake();
+    const useCase = new ConsolidarEDecidirWorkflow(
+      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      repositorio,
+      new AgenteOrquestradorGatewayFake({
+        acao: 'ENCAMINHAR_COMPRADOR',
+        nivelConfianca: NivelConfianca.de(85),
+        criterio: 'Itens fora do padrão histórico do fornecedor, revisão recomendada',
+        requerIntegracaoExterna: false,
+      }),
+      publisher,
+    );
+
+    await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+    expect(existente.status).toBe('DECIDIDO');
+    expect(publisher.publicados).toHaveLength(1);
+    expect(publisher.publicados[0]).toBeInstanceOf(OrcamentoEncaminhadoParaComprador);
   });
 
   it('publica IntegracaoExternaSolicitada junto do desfecho quando requerIntegracaoExterna', async () => {
