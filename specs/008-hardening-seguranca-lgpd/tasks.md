@@ -79,7 +79,7 @@ Conforme `plan.md` desta spec e convenção herdada de 001: `src/platform/confor
 ### Tests for User Story 2
 
 - [x] T018 [P] [US2] Teste unit do agregado `SolicitacaoEsquecimento`: transição para `CONCLUIDA` só com 100% de `contextosEsperados` confirmados; rejeição de confirmação duplicada do mesmo contexto; nunca autoconclui por tempo. (#319)
-- [ ] T019 [P] [US2] Teste unit do agregado: transição para `PRAZO_EXCEDIDO` quando `prazoLimite` expira sem cobertura total.
+- [x] T019 [P] [US2] Teste unit do agregado: transição para `PRAZO_EXCEDIDO` quando `prazoLimite` expira sem cobertura total. (#320, PR #561)
 - [ ] T020 [P] [US2] Teste de contrato para `POST /v1/conformidade/solicitacoes-esquecimento` e `GET /v1/conformidade/solicitacoes-esquecimento/{id}` (Zod schema + Problem Details em erro).
 - [ ] T021 [P] [US2] Teste unit do caso de uso `AnonimizarDadoPessoalDoOrcamento` do BC `ingestao-identificacao`: gera nova versão do dado (nunca sobrescreve o bruto — Princípio III), publica `DadoPessoalAnonimizadoNoContexto` mesmo quando não há dado pessoal daquele titular (`camposAnonimizados: []`).
 
