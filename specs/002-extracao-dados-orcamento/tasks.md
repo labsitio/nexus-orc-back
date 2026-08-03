@@ -101,7 +101,7 @@
 
 - [x] T038 [US3] Application: caso de uso `ConfirmarRevisaoHumanaExtracao` (valida status, aplica `registrarConfirmacaoHumana`, publica `OrcamentoExtraido` ou `OrcamentoExtraidoComPendenciaConfirmada`). #103
 - [x] T039 [US3] Interface: controller `POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana`, Zod schema (campos confirmados: valor real OU marcação explícita "indisponível"), Problem Details para 409. #104
-- [ ] T040 [US3] IAM: role dedicada `ConfirmarRevisaoHumanaExtracaoLambdaRole`, least privilege.
+- [x] T040 [US3] IAM: role dedicada `ConfirmarRevisaoHumanaExtracaoLambdaRole`, least privilege. #105
 
 **Checkpoint**: todas as user stories funcionais e testáveis independentemente; nenhum dado bruto ou de classificação sobrescrito em nenhum fluxo.
 

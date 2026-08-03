@@ -1,6 +1,7 @@
 import { App } from 'aws-cdk-lib';
 import { ClassificadorLambdaRoleStack } from '../lib/classificador-lambda-role-stack.ts';
 import { ClassificadorQueueStack } from '../lib/classificador-queue-stack.ts';
+import { ConfirmarRevisaoHumanaExtracaoLambdaRoleStack } from '../lib/confirmar-revisao-humana-extracao-lambda-role-stack.ts';
 import { ConfirmarRevisaoHumanaLambdaRoleStack } from '../lib/confirmar-revisao-humana-lambda-role-stack.ts';
 import { ContextoClassificacaoQueueStack } from '../lib/contexto-classificacao-queue-stack.ts';
 import { ContextoExtracaoQueueStack } from '../lib/contexto-extracao-queue-stack.ts';
@@ -60,6 +61,15 @@ new ExtratorLambdaRoleStack(app, 'ExtratorLambdaRoleStack', {
   orcamentosRawBucket: storageStack.orcamentosRawBucket,
   extratorQueue: extratorQueueStack.extratorQueue,
 });
+
+new ConfirmarRevisaoHumanaExtracaoLambdaRoleStack(
+  app,
+  'ConfirmarRevisaoHumanaExtracaoLambdaRoleStack',
+  {
+    description:
+      'Role IAM least-privilege da Lambda de confirmação humana da Extração (sem Bedrock/S3 raw) — spec 002, T040.',
+  },
+);
 
 const validadorQueueStack = new ValidadorQueueStack(app, 'ValidadorQueueStack', {
   description:
