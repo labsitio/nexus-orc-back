@@ -14,14 +14,23 @@ import { OrcamentoId } from '../domain/value-objects/orcamento-id.vo.js';
  * acessa o documento bruto). Contrato JSON local, não tipo de domínio
  * importado do BC Ingestão & Identificação (fronteira de Bounded Context).
  */
+const DETAIL_TYPE_ORCAMENTO_CLASSIFICADO = 'OrcamentoClassificado' as const;
+
 interface OrcamentoClassificadoPayloadBruto {
   readonly orcamentoId: string;
+  readonly detailType: typeof DETAIL_TYPE_ORCAMENTO_CLASSIFICADO;
   readonly resultado: {
     readonly fornecedorIdentificado: string;
     readonly formatoIdentificado: string;
   };
 }
 
+/**
+ * Valida também `detailType` (mesmo rigor de `OrcamentoExtraidoEventACL`/
+ * `OrcamentoValidadoEventACL`, achado do `backend-reviewer`, PR #558) — um
+ * payload roteado por engano de outro evento nunca deve passar só porque
+ * coincide de ter `orcamentoId`/`resultado` com o shape esperado.
+ */
 function ehOrcamentoClassificadoPayloadBruto(
   valor: unknown,
 ): valor is OrcamentoClassificadoPayloadBruto {
@@ -30,6 +39,9 @@ function ehOrcamentoClassificadoPayloadBruto(
   }
   const objeto = valor as Record<string, unknown>;
   if (typeof objeto.orcamentoId !== 'string') {
+    return false;
+  }
+  if (objeto.detailType !== DETAIL_TYPE_ORCAMENTO_CLASSIFICADO) {
     return false;
   }
   const resultado = objeto.resultado;
@@ -55,7 +67,7 @@ export class OrcamentoClassificadoEventACL implements OrcamentoClassificadoEvent
   traduzir(payloadBruto: unknown): OrcamentoClassificadoEventACLResultado {
     if (!ehOrcamentoClassificadoPayloadBruto(payloadBruto)) {
       throw new OrcamentoClassificadoEventACLInvalidoError(
-        'esperado objeto com "orcamentoId" (string) e "resultado.fornecedorIdentificado"/"resultado.formatoIdentificado" (string)',
+        'esperado objeto com "orcamentoId" (string), "detailType" ("OrcamentoClassificado") e "resultado.fornecedorIdentificado"/"resultado.formatoIdentificado" (string)',
       );
     }
     return {

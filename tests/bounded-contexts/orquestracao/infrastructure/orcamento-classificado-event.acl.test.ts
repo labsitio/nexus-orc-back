@@ -34,6 +34,7 @@ describe('OrcamentoClassificadoEventACL', () => {
     expect(() =>
       acl.traduzir({
         orcamentoId: ORCAMENTO_ID_VALIDO,
+        detailType: 'OrcamentoClassificado',
         resultado: { fornecedorIdentificado: 'Fornecedor ABC', formatoIdentificado: 'XML' },
         referenciaBruta: { qualquer: 'coisa' },
         campoDesconhecido: true,
@@ -48,9 +49,26 @@ describe('OrcamentoClassificadoEventACL', () => {
     42,
     {},
     { orcamentoId: ORCAMENTO_ID_VALIDO },
-    { orcamentoId: ORCAMENTO_ID_VALIDO, resultado: {} },
-    { orcamentoId: ORCAMENTO_ID_VALIDO, resultado: { fornecedorIdentificado: 'X' } },
-    { orcamentoId: 42, resultado: { fornecedorIdentificado: 'X', formatoIdentificado: 'PDF' } },
+    { orcamentoId: ORCAMENTO_ID_VALIDO, detailType: 'OrcamentoClassificado', resultado: {} },
+    {
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      detailType: 'OrcamentoClassificado',
+      resultado: { fornecedorIdentificado: 'X' },
+    },
+    {
+      orcamentoId: 42,
+      detailType: 'OrcamentoClassificado',
+      resultado: { fornecedorIdentificado: 'X', formatoIdentificado: 'PDF' },
+    },
+    {
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      detailType: 'OrcamentoExtraido',
+      resultado: { fornecedorIdentificado: 'X', formatoIdentificado: 'PDF' },
+    },
+    {
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      resultado: { fornecedorIdentificado: 'X', formatoIdentificado: 'PDF' },
+    },
   ])('lança OrcamentoClassificadoEventACLInvalidoError para payload malformado: %j', (bruto) => {
     expect(() => new OrcamentoClassificadoEventACL().traduzir(bruto)).toThrow(
       OrcamentoClassificadoEventACLInvalidoError,
@@ -63,6 +81,7 @@ describe('OrcamentoClassificadoEventACL', () => {
     expect(() =>
       acl.traduzir({
         orcamentoId: 'nao-eh-um-uuid',
+        detailType: 'OrcamentoClassificado',
         resultado: { fornecedorIdentificado: 'Fornecedor XPTO', formatoIdentificado: 'PDF' },
       }),
     ).toThrow();

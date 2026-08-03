@@ -126,6 +126,31 @@ describe('OrcamentoExtraidoEventACL', () => {
       itens: [ITEM_COMPLETO],
       condicoesComerciais: {},
     },
+    // `valor` presente mas com shape interno malformado (não só ausência da
+    // chave "valor") — achado do backend-reviewer, PR #558: nunca deve virar
+    // resumo textual corrompido silencioso ("undefined (qtd: ..., preço
+    // unit.: NaN undefined)").
+    {
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      detailType: 'OrcamentoExtraido',
+      itens: [
+        {
+          descricao: ITEM_COMPLETO.descricao,
+          quantidade: ITEM_COMPLETO.quantidade,
+          precoUnitario: { valor: {}, confianca: 95, extraido: true, agenteOrigem: 'EXTRATOR' },
+        },
+      ],
+      condicoesComerciais: CONDICOES_COMERCIAIS_COMPLETAS,
+    },
+    {
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      detailType: 'OrcamentoExtraido',
+      itens: [ITEM_COMPLETO],
+      condicoesComerciais: {
+        ...CONDICOES_COMERCIAIS_COMPLETAS,
+        condicoesEntrega: { valor: 42, confianca: 90, extraido: true, agenteOrigem: 'EXTRATOR' },
+      },
+    },
   ])('lança OrcamentoExtraidoEventACLInvalidoError para payload malformado: %j', (bruto) => {
     expect(() => new OrcamentoExtraidoEventACL().traduzir(bruto)).toThrow(
       OrcamentoExtraidoEventACLInvalidoError,

@@ -45,8 +45,45 @@ interface OrcamentoExtraidoPayloadBruto {
   readonly condicoesComerciais: CondicoesComerciaisBruto;
 }
 
-function ehCampoExtraidoBruto(valor: unknown): valor is CampoExtraidoBruto<unknown> {
-  return typeof valor === 'object' && valor !== null && 'valor' in valor;
+/**
+ * Valida `{ valor }`, aceitando `valor: null` (campo não extraído) ou
+ * `valor` validado por `ehValorNaoNulo` — nunca só a presença da chave
+ * `valor`: um `valor` não-nulo com shape interno malformado (ex.:
+ * `precoUnitario.valor = {}`) precisa reprovar aqui, não vazar para
+ * `formatarItem`/`formatarCondicoesComerciais` como resumo corrompido
+ * silencioso (achado do `backend-reviewer`, PR #558).
+ */
+function ehCampoExtraidoBruto<T>(
+  valor: unknown,
+  ehValorNaoNulo: (valor: unknown) => valor is T,
+): valor is CampoExtraidoBruto<T> {
+  if (typeof valor !== 'object' || valor === null || !('valor' in valor)) {
+    return false;
+  }
+  const bruto = (valor as Record<string, unknown>).valor;
+  return bruto === null || ehValorNaoNulo(bruto);
+}
+
+function ehString(valor: unknown): valor is string {
+  return typeof valor === 'string';
+}
+
+function ehDescricaoProdutoBruta(valor: unknown): valor is { readonly descricao: string } {
+  return (
+    typeof valor === 'object' &&
+    valor !== null &&
+    typeof (valor as Record<string, unknown>).descricao === 'string'
+  );
+}
+
+function ehDinheiroBruto(
+  valor: unknown,
+): valor is { readonly valorCentavos: number; readonly moeda: string } {
+  if (typeof valor !== 'object' || valor === null) {
+    return false;
+  }
+  const objeto = valor as Record<string, unknown>;
+  return typeof objeto.valorCentavos === 'number' && typeof objeto.moeda === 'string';
 }
 
 function ehItemOrcamentoBruto(valor: unknown): valor is ItemOrcamentoBruto {
@@ -55,9 +92,9 @@ function ehItemOrcamentoBruto(valor: unknown): valor is ItemOrcamentoBruto {
   }
   const objeto = valor as Record<string, unknown>;
   return (
-    ehCampoExtraidoBruto(objeto.descricao) &&
-    ehCampoExtraidoBruto(objeto.quantidade) &&
-    ehCampoExtraidoBruto(objeto.precoUnitario)
+    ehCampoExtraidoBruto(objeto.descricao, ehDescricaoProdutoBruta) &&
+    ehCampoExtraidoBruto(objeto.quantidade, (v): v is number => typeof v === 'number') &&
+    ehCampoExtraidoBruto(objeto.precoUnitario, ehDinheiroBruto)
   );
 }
 
@@ -67,9 +104,9 @@ function ehCondicoesComerciaisBruto(valor: unknown): valor is CondicoesComerciai
   }
   const objeto = valor as Record<string, unknown>;
   return (
-    ehCampoExtraidoBruto(objeto.condicoesPagamento) &&
-    ehCampoExtraidoBruto(objeto.prazoValidade) &&
-    ehCampoExtraidoBruto(objeto.condicoesEntrega)
+    ehCampoExtraidoBruto(objeto.condicoesPagamento, ehString) &&
+    ehCampoExtraidoBruto(objeto.prazoValidade, ehString) &&
+    ehCampoExtraidoBruto(objeto.condicoesEntrega, ehString)
   );
 }
 
