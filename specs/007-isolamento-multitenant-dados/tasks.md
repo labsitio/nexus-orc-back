@@ -61,7 +61,7 @@ Monorepo único, conforme `plan.md` desta spec — `src/shared-kernel/`, `src/bo
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Teste de contrato: `GET /v1/orcamentos/{id}/status` com JWT de Tenant A e `orcamentoId` de Tenant B retorna 404, não 200/403, em `tests/bounded-contexts/ingestao-identificacao/contract/tenant-isolation.test.ts`.
+- [x] T011 [P] [US1] Teste de contrato: `GET /v1/orcamentos/{id}/status` com JWT de Tenant A e `orcamentoId` de Tenant B retorna 404, não 200/403, em `tests/bounded-contexts/ingestao-identificacao/contract/tenant-isolation.test.ts`. Escrito em RED (`it.fails`, documentado): agregado `Orcamento` ainda não carrega `tenantId` (T014-T018 pendentes) — hoje o endpoint retorna 200 para qualquer tenant. (#274)
 - [ ] T012 [P] [US1] Teste unit: `Orcamento.aggregate` lança `TenantIdImutavelError` em tentativa de sobrescrever `tenantId` pós-criação, em `tests/bounded-contexts/ingestao-identificacao/domain/orcamento-tenant.test.ts`.
 - [ ] T013 [P] [US1] Teste unit: `TenantId` VO rejeita formato inválido, em `tests/shared-kernel/tenant/tenant-id.test.ts`.
 
