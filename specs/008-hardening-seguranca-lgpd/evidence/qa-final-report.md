@@ -452,6 +452,101 @@ APROVADO PELO QA
 
 ---
 
+# QA Final Report — T022 (rastreamento tasks.md, código pré-existente)
+
+## SPEC_ID e versão testada
+`008-hardening-seguranca-lgpd`. PR #601, branch
+`feat/008-f-conformidade-solicitacao-esquecimento`, commit `aeaa068`.
+Primeira validação (não é reteste; sem BUG anterior).
+
+## Resumo executivo
+T022 pedia implementar o agregado `SolicitacaoEsquecimento` +
+VOs `StatusSolicitacao`/`ConfirmacaoAnonimizacao` em
+`src/platform/conformidade/domain/**`. Esse código já existia em `main`,
+entregue junto de T018/T019 (PRs #557/#561), com 16 testes unitários
+já passando em `tests/platform/conformidade/solicitacao-esquecimento.aggregate.test.ts`.
+Este PR **não altera nenhum arquivo de código de produção** — confirmado
+por `git diff main...pr-601` (worktree isolado, `aeaa068`): único arquivo
+no diff é `specs/008-hardening-seguranca-lgpd/tasks.md`, com o checkbox de
+T022 marcado `[x]` e uma nota registrando o achado (código coberto por T018/T019,
+gap era só o rastreamento em `tasks.md`). NIT do backend-reviewer (referência
+de PR incorreta na nota) já corrigido no mesmo commit.
+
+## Requisitos cobertos e não cobertos
+- Transição para `CONCLUIDA` somente com 100% de `contextosEsperados`
+  confirmados (nunca com cobertura parcial): coberto, PASS — testes
+  "transita para EM_ANDAMENTO ao receber confirmação parcial" e "transita
+  para CONCLUIDA somente quando confirmacoes cobre 100%".
+- Rejeição de confirmação duplicada do mesmo contexto (sem sobrescrever
+  nem somar): coberto, PASS — teste "rejeita confirmação duplicada do
+  mesmo contexto", lança `ConfirmacaoDuplicadaError`.
+- Rejeição de confirmação de contexto fora de `contextosEsperados`:
+  coberto, PASS — `ContextoNaoEsperadoError`.
+- `PRAZO_EXCEDIDO` só ocorre por transição explícita (`marcarPrazoExcedido()`),
+  nunca automaticamente por decurso de tempo: coberto, PASS — teste dedicado
+  confirma que `prazoLimite` já expirado não altera o status por si só, e
+  que a superfície pública do agregado se limita a
+  `['registrarConfirmacao', 'marcarPrazoExcedido']` (nenhum método sensível
+  ao relógio).
+- Idempotência/rejeição de transição a partir de estado terminal
+  (`CONCLUIDA`/`PRAZO_EXCEDIDO`): coberto, PASS — `SolicitacaoJaFinalizadaError`
+  em 3 cenários (nova confirmação após CONCLUIDA, `marcarPrazoExcedido` após
+  CONCLUIDA, `marcarPrazoExcedido` chamado duas vezes).
+- Validações de criação (`contextosEsperados` vazio ou com duplicados,
+  `prazoLimite` inválido): coberto, PASS.
+- Cópia defensiva de `confirmacoes` exposto e reconstituição a partir de
+  estado persistido: coberto, PASS.
+- Nenhum outro RF/RN/RNF de `spec.md` (US1-US4) é exigível por este PR —
+  não há código de produção no diff.
+
+## Suítes executadas e comandos
+- `git fetch origin pull/601/head:pr-601` + `git diff main...pr-601 --stat`
+  e `git diff main...pr-601` (worktree isolado em `/c/pr601wt`, evitando
+  qualquer alteração no worktree de trabalho corrente) — confirma diff
+  restrito a `specs/008-hardening-seguranca-lgpd/tasks.md`.
+- `npx vitest run tests/platform/conformidade/solicitacao-esquecimento.aggregate.test.ts`
+  — executado a partir do repositório principal, já que o código de
+  produção do teste é idêntico em `main` e no PR (nenhuma alteração de
+  produção no diff).
+
+## Quantidade de testes por tipo
+0 testes novos criados por este PR (nenhum código de produção no diff).
+16 testes unitários pré-existentes (entregues em T018/T019, PRs #557/#561)
+revalidados nesta rodada.
+
+## Resultado: aprovados, falhos, ignorados e instáveis
+`solicitacao-esquecimento.aggregate.test.ts`: 16/16 aprovados (4 cópias do
+mesmo arquivo presentes em worktrees paralelos do repositório, 64/64 no
+total — todas idênticas, sem instabilidade).
+
+## Cobertura inicial e final
+Não aplicável — sem alteração de código de produção neste PR. Cobertura do
+agregado já registrada nas validações de T018/T019 (fora do escopo desta
+entrada).
+
+## Allure
+Não gerado nesta rodada — não aplicável a uma alteração puramente
+documental (`tasks.md`), sem código de produção/teste novo a instrumentar.
+
+## Bugs por severidade e status
+Nenhum bug de produção encontrado nesta validação.
+
+## Riscos residuais
+Nenhum risco residual identificado para esta task — o código já estava
+coberto e validado; o único gap (rastreamento em `tasks.md`) foi corrigido
+pelo próprio PR.
+
+## Limitações do ambiente
+Nenhuma limitação bloqueante. Worktree isolado usado para inspecionar o
+diff do PR sem alterar o worktree de trabalho corrente (branch
+`feat/005-d-orquestracao-contexto-classificacao`), removido ao final da
+validação.
+
+## Parecer final
+APROVADO PELO QA
+
+---
+
 # QA Final Report — T011 (Phase 3, US1: Segregação de Ambientes)
 
 ## SPEC_ID e versão testada
