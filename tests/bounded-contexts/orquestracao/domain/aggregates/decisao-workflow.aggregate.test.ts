@@ -241,7 +241,7 @@ describe('DecisaoWorkflow', () => {
     });
 
     it('confiança suficiente com resultado VALIDADO decide APROVAR e registra o desfecho correspondente', () => {
-      const decisao = criarComContextoConsolidado(contextoValidacaoAprovavel);
+      const decisao = criarComContextoConsolidado();
 
       decisao.registrarTentativaOrquestrador({
         acao: 'APROVAR',
@@ -257,8 +257,8 @@ describe('DecisaoWorkflow', () => {
       expect(decisao.historico[0]?.resultado).toBe(decisao.decisaoAtual);
     });
 
-    it('confiança suficiente com resultado VALIDADO decide SOLICITAR_REENVIO e registra o desfecho correspondente', () => {
-      const decisao = criarComContextoConsolidado(contextoValidacaoAprovavel);
+    it('confiança suficiente decide SOLICITAR_REENVIO (happy path, contextoValidacao não influencia esta ação) e registra o desfecho correspondente', () => {
+      const decisao = criarComContextoConsolidado();
 
       decisao.registrarTentativaOrquestrador({
         acao: 'SOLICITAR_REENVIO',
