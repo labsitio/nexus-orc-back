@@ -54,7 +54,7 @@ describe('EventBridgePublisher (extracao)', () => {
     const [dados, mensagem] = logger.warn.mock.calls[0] as [Record<string, unknown>, string];
     expect(dados.orcamentoId).toBe('orc-grande');
     expect(dados.tamanhoBytes).toBeGreaterThanOrEqual(256 * 1024 * 0.8);
-    expect(mensagem).toMatch(/256KB/);
+    expect(mensagem).toMatch(/262144B/);
   });
 
   it('publica no bus informado com source fixo `nexo.extracao` e detail-type do evento', async () => {

@@ -111,7 +111,14 @@
 
 - [x] T041 [P] Documentação OpenAPI gerada a partir dos schemas Zod dos 2 endpoints REST deste BC. #106
 - [ ] T042 Medir p95 real end-to-end (classificação disponível → extração disponível) em ambiente de teste; decidir Provisioned Concurrency para `ExtratorLambdaRole` se meta de 5 minutos não for atingida (ver Constraints do `plan.md`).
-- [x] T043 [P] Monitorar tamanho de payload de `OrcamentoExtraido` contra limite de 256KB do EventBridge (risco registrado no `plan.md`) — alarme se aproximar do limite. #108
+- [ ] T043 [P] Monitorar tamanho de payload de `OrcamentoExtraido` contra limite de 256KB do EventBridge (risco registrado no `plan.md`) — alarme se aproximar do limite. #108
+
+### Alarme CloudWatch de T043 pendente de stack IaC (gap de Infrastructure — achado 2026-08-03)
+
+`EventBridgePublisher` (T043/#108, código mergeável) já mede `Buffer.byteLength` do `Detail` de todo evento publicado e loga `logger.warn` estruturado quando >= 80% do limite de 256KB do EventBridge. Isso cobre a detecção em tempo de execução, mas **não é o alarme CloudWatch real** que o texto da task pede — falta a stack CDK do Lambda Function consumidor de `extrator-queue` (log group) à qual um `MetricFilter`/`Alarm` precisaria se anexar; essa stack de Lambda Function ainda não existe no repositório (mesma lacuna de IaC do gap T046 abaixo, achado no mesmo dia).
+
+- [ ] T043a Infrastructure: quando a stack CDK do Lambda Function consumidor de `extrator-queue` existir, adicionar `logs.MetricFilter` sobre o log group desse Lambda casando a mensagem de warn de `EventBridgePublisher` ("Payload de domain event próximo do limite de 256KB do EventBridge") + `cloudwatch.Alarm` (mesmo padrão de `ExtratorQueueDlqAlarm` em `infra/lib/extrator-queue-stack.ts`) — sem essa stack, o `MetricFilter` não tem log group real para se anexar.
+
 - [ ] T044 Security review: `npm audit`/`pnpm audit`, Semgrep, revisão de prompt injection no prompt do Extrator (mesmo checklist da spec 001).
 - [ ] T045 [P] Métrica de observabilidade: taxa de campos marcados "não extraído" e taxa de uso de serviço pago como exceção (MarkItDown vs. exceção) — conforme "Métricas de Avaliação Contínua" do spec.md.
 

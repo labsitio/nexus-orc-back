@@ -36,7 +36,7 @@ export class EventBridgePublisher implements EventPublisher {
           tamanhoBytes,
           limiteBytes: LIMITE_PAYLOAD_EVENTBRIDGE_BYTES,
         },
-        'Payload de domain event próximo do limite de 256KB do EventBridge',
+        `Payload de domain event próximo do limite de ${LIMITE_PAYLOAD_EVENTBRIDGE_BYTES}B do EventBridge`,
       );
     }
 
