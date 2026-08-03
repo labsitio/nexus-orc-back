@@ -15,7 +15,10 @@ import { Dinheiro } from '../../../../src/bounded-contexts/validacao/domain/valu
 import { InconsistenciaDetectada } from '../../../../src/bounded-contexts/validacao/domain/value-objects/inconsistencia-detectada.vo.js';
 import { ItemParaValidacao } from '../../../../src/bounded-contexts/validacao/domain/value-objects/item-para-validacao.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/validacao/domain/value-objects/orcamento-id.vo.js';
-import { PeriodoValidade } from '../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
+import {
+  PeriodoValidade,
+  PeriodoValidadeInvalidoError,
+} from '../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
 
 /**
  * T035 (#145) — Application: `RegistrarDecisaoHumanaValidacao`. Unit test
@@ -141,5 +144,145 @@ describe('RegistrarDecisaoHumanaValidacao', () => {
     await expect(
       useCase.executar(ORCAMENTO_ID.toString(), { tipo: 'ACEITE_COM_RESSALVA' }),
     ).rejects.toThrow(OrcamentoValidacaoNaoEncontradoError);
+  });
+});
+
+/**
+ * T036 (#146) — `construirDecisao`: tradução do body HTTP para
+ * `DecisaoHumanaValidacao`, movida do controller para a Application após
+ * achado do `backend-reviewer` (orquestração de regra de negócio nunca é
+ * responsabilidade da Interface).
+ */
+describe('RegistrarDecisaoHumanaValidacao.construirDecisao', () => {
+  function orcamentoComCnpjInvalido(): OrcamentoValidacao {
+    const dados = DadosExtraidosParaValidacao.de({
+      cnpjFornecedor: '11111111111111',
+      itens: [
+        ItemParaValidacao.de({
+          descricao: 'Caixa de papelão ondulado 40x30x20',
+          quantidade: 500,
+          precoUnitario: Dinheiro.de(320, 'BRL'),
+          extraido: true,
+        }),
+      ],
+      condicoesComerciais: '30/60/90 dias',
+      dataEmissaoProposta: new Date('2026-01-10T00:00:00.000Z'),
+      periodoValidade: PeriodoValidade.de(new Date('2026-02-10T00:00:00.000Z')),
+    });
+    const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dados);
+    validacao.avaliarRegrasDeConsistencia([
+      InconsistenciaDetectada.de('CNPJ_INVALIDO', 'dígito verificador incorreto'),
+    ]);
+    return validacao;
+  }
+
+  it('ACEITE_COM_RESSALVA carrega a justificativa, sem tocar dadosExtraidos', () => {
+    const useCase = new RegistrarDecisaoHumanaValidacao(
+      new OrcamentoValidacaoRepositoryFake(),
+      new EventPublisherFake(),
+    );
+
+    const decisao = useCase.construirDecisao(orcamentoComCnpjInvalido(), {
+      decisao: 'ACEITE_COM_RESSALVA',
+      justificativa: 'Comprador aceita apesar do CNPJ divergente.',
+    });
+
+    expect(decisao).toEqual({
+      tipo: 'ACEITE_COM_RESSALVA',
+      justificativa: 'Comprador aceita apesar do CNPJ divergente.',
+    });
+  });
+
+  it('CORRECAO_APLICADA com cnpjFornecedor corrigido limpa CNPJ_INVALIDO', () => {
+    const useCase = new RegistrarDecisaoHumanaValidacao(
+      new OrcamentoValidacaoRepositoryFake(),
+      new EventPublisherFake(),
+    );
+
+    const decisao = useCase.construirDecisao(orcamentoComCnpjInvalido(), {
+      decisao: 'CORRECAO_APLICADA',
+      justificativa: 'CNPJ corrigido após contato com o fornecedor.',
+      dadosCorrigidos: { cnpjFornecedor: '11222333000181' },
+    });
+
+    expect(decisao).toEqual({
+      tipo: 'CORRECAO_APLICADA',
+      justificativa: 'CNPJ corrigido após contato com o fornecedor.',
+      inconsistencias: [],
+    });
+  });
+
+  it('CORRECAO_APLICADA sem corrigir o campo relevante mantém a mesma inconsistência (nunca autoaprova)', () => {
+    const useCase = new RegistrarDecisaoHumanaValidacao(
+      new OrcamentoValidacaoRepositoryFake(),
+      new EventPublisherFake(),
+    );
+
+    const decisao = useCase.construirDecisao(orcamentoComCnpjInvalido(), {
+      decisao: 'CORRECAO_APLICADA',
+      justificativa: 'Correção informada, mas não altera o CNPJ.',
+      dadosCorrigidos: { condicoesComerciais: '30 dias' },
+    });
+
+    expect(decisao.tipo).toBe('CORRECAO_APLICADA');
+    const inconsistenciasRecalculadas =
+      decisao.tipo === 'CORRECAO_APLICADA' && decisao.inconsistencias;
+    expect(inconsistenciasRecalculadas).toHaveLength(1);
+    expect((inconsistenciasRecalculadas as InconsistenciaDetectada[])[0]?.regra).toBe(
+      'CNPJ_INVALIDO',
+    );
+  });
+
+  it('CORRECAO_APLICADA nunca descarta PRECO_FORA_DE_FAIXA/CNPJ_DIVERGENTE_CADASTRO (dependem de gateway, não recalculadas aqui)', () => {
+    const dados = DadosExtraidosParaValidacao.de({
+      cnpjFornecedor: '11222333000181',
+      itens: [
+        ItemParaValidacao.de({
+          descricao: 'Item',
+          quantidade: 1,
+          precoUnitario: Dinheiro.de(1000, 'BRL'),
+          extraido: true,
+        }),
+      ],
+      condicoesComerciais: 'à vista',
+      dataEmissaoProposta: new Date('2026-01-10T00:00:00.000Z'),
+      periodoValidade: PeriodoValidade.de(new Date('2026-02-10T00:00:00.000Z')),
+    });
+    const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dados);
+    const precoForaFaixa = InconsistenciaDetectada.de(
+      'PRECO_FORA_DE_FAIXA',
+      'preço unitário fora da faixa esperada',
+    );
+    validacao.avaliarRegrasDeConsistencia([precoForaFaixa]);
+
+    const useCase = new RegistrarDecisaoHumanaValidacao(
+      new OrcamentoValidacaoRepositoryFake(),
+      new EventPublisherFake(),
+    );
+
+    const decisao = useCase.construirDecisao(validacao, {
+      decisao: 'CORRECAO_APLICADA',
+      justificativa: 'Corrigindo outro campo, não o preço.',
+      dadosCorrigidos: { condicoesComerciais: '30 dias' },
+    });
+
+    expect(decisao.tipo === 'CORRECAO_APLICADA' && decisao.inconsistencias).toEqual([
+      precoForaFaixa,
+    ]);
+  });
+
+  it('CORRECAO_APLICADA com dadosCorrigidos.periodoValidade inválido lança PeriodoValidadeInvalidoError', () => {
+    const useCase = new RegistrarDecisaoHumanaValidacao(
+      new OrcamentoValidacaoRepositoryFake(),
+      new EventPublisherFake(),
+    );
+
+    expect(() =>
+      useCase.construirDecisao(orcamentoComCnpjInvalido(), {
+        decisao: 'CORRECAO_APLICADA',
+        justificativa: 'irrelevante',
+        dadosCorrigidos: { periodoValidade: 'nao-e-data' },
+      }),
+    ).toThrow(PeriodoValidadeInvalidoError);
   });
 });

@@ -36,6 +36,7 @@ export const tentativaValidacaoResponseSchema = z.object({
   resultado: z.enum(RESULTADOS_TENTATIVA_VALIDACAO),
   inconsistencias: z.array(inconsistenciaDetectadaResponseSchema),
   timestamp: z.string().datetime(),
+  justificativa: z.string().optional(),
 });
 
 export const statusValidacaoResponseSchema = z.object({
