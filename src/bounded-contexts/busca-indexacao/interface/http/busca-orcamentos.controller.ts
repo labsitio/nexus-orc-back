@@ -124,7 +124,17 @@ export function registrarRotaBuscaOrcamentos(
       });
 
       const inicio = (dados.pagina - 1) * dados.tamanhoPagina;
-      const pagina = todosResultados.slice(inicio, inicio + dados.tamanhoPagina);
+      const fim = inicio + dados.tamanhoPagina;
+      const pagina = todosResultados.slice(inicio, fim);
+
+      // A janela de sobre-busca veio saturada (`length === limiteSobreBusca`)
+      // significa que o repositório pode ter mais matches além do que foi
+      // pedido — não dá para provar que não há mais só pelo tamanho da
+      // janela. Nesse caso, `temProximaPagina` é conservadoramente `true`;
+      // só quando a janela veio incompleta (repositório já esgotou os
+      // matches) o `false` é uma garantia real (achado do backend-reviewer).
+      const janelaSaturada = todosResultados.length === limiteSobreBusca;
+      const temProximaPagina = janelaSaturada ? true : fim < todosResultados.length;
 
       const resposta: BuscaOrcamentosResponse = {
         resultados: pagina.map((r) => ({
@@ -135,6 +145,7 @@ export function registrarRotaBuscaOrcamentos(
         pagina: dados.pagina,
         tamanhoPagina: dados.tamanhoPagina,
         totalAproximado: todosResultados.length,
+        temProximaPagina,
       };
 
       await reply.status(200).send(resposta);

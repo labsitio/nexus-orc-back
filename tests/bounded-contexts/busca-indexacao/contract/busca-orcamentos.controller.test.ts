@@ -7,7 +7,10 @@ import type { IndiceOrcamentoRepository } from '../../../../src/bounded-contexts
 import { CriterioBusca } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/criterio-busca.vo.js';
 import { Embedding } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/embedding.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/orcamento-id.vo.js';
-import { ResultadoBusca } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/resultado-busca.vo.js';
+import {
+  ResultadoBusca,
+  ResultadoBuscaInvalidoError,
+} from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/resultado-busca.vo.js';
 import { criarTenantContext } from '../../../../src/shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
@@ -56,6 +59,21 @@ class IndiceOrcamentoRepositoryFake implements IndiceOrcamentoRepository {
   }
 }
 
+/** Simula um dado corrompido vindo da Infrastructure (score fora de [0,1]). */
+class IndiceOrcamentoRepositoryQuebradoFake implements IndiceOrcamentoRepository {
+  async upsert(): Promise<void> {
+    throw new Error('não usado neste teste');
+  }
+
+  async buscarPorOrcamentoId(): Promise<undefined> {
+    return undefined;
+  }
+
+  async buscarPorCriterioEVetor(): Promise<never> {
+    throw new ResultadoBuscaInvalidoError('scoreRelevancia deve estar entre 0 e 1, recebido 1.5');
+  }
+}
+
 describe('POST /v1/orcamentos/busca — controller', () => {
   let app: ReturnType<typeof Fastify>;
   let repositorio: IndiceOrcamentoRepositoryFake;
@@ -90,7 +108,7 @@ describe('POST /v1/orcamentos/busca — controller', () => {
     await app.close();
   });
 
-  it('200 com resultados ordenados e metadados de paginação', async () => {
+  it('200 com resultados ordenados, metadados de paginação e temProximaPagina=false quando a janela veio incompleta', async () => {
     const resposta = await app.inject({
       method: 'POST',
       url: '/v1/orcamentos/busca',
@@ -112,10 +130,11 @@ describe('POST /v1/orcamentos/busca — controller', () => {
       pagina: 1,
       tamanhoPagina: 20,
       totalAproximado: 2,
+      temProximaPagina: false,
     });
   });
 
-  it('aplica pagina/tamanhoPagina fatiando o resultado sobre-buscado', async () => {
+  it('aplica pagina/tamanhoPagina fatiando o resultado sobre-buscado e sinaliza temProximaPagina=true quando a janela veio saturada', async () => {
     const resposta = await app.inject({
       method: 'POST',
       url: '/v1/orcamentos/busca',
@@ -129,6 +148,9 @@ describe('POST /v1/orcamentos/busca — controller', () => {
     ]);
     expect(corpo.pagina).toBe(2);
     expect(corpo.tamanhoPagina).toBe(1);
+    // limiteSobreBusca = pagina(2)*tamanhoPagina(1) = 2, repositório tem 2 resultados
+    // disponíveis -> janela saturada -> não dá para provar que não há mais.
+    expect(corpo.temProximaPagina).toBe(true);
   });
 
   it('401 Problem Details quando TenantContextMiddleware não popula request.tenantContext', async () => {
@@ -185,6 +207,48 @@ describe('POST /v1/orcamentos/busca — controller', () => {
 
     expect(resposta.statusCode).toBe(400);
     expect(resposta.headers['content-type']).toContain('application/problem+json');
+  });
+
+  it('400 Problem Details quando moeda é só espaços em branco — passa no Zod (min(1)) mas falha em Dinheiro.de (DinheiroInvalidoError)', async () => {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/v1/orcamentos/busca',
+      payload: {
+        consulta: 'x',
+        precoMinimo: { valorCentavos: 100, moeda: '   ' },
+      },
+    });
+
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
+  });
+
+  it('400 Problem Details quando o repositório propaga ResultadoBuscaInvalidoError (dado corrompido da Infra, nunca 500)', async () => {
+    const appComRepositorioQuebrado = Fastify();
+    registrarRotaBuscaOrcamentos(
+      appComRepositorioQuebrado,
+      {
+        interpretador: new InterpretadorConsultaFake(),
+        embeddingGateway: new EmbeddingGatewayFake(),
+        criarRepositorio: () => new IndiceOrcamentoRepositoryQuebradoFake(),
+        catalogoCategorias: [],
+      },
+      {
+        preHandler: async (request) => {
+          request.tenantContext = criarTenantContext(TenantId.novo());
+        },
+      },
+    );
+
+    const resposta = await appComRepositorioQuebrado.inject({
+      method: 'POST',
+      url: '/v1/orcamentos/busca',
+      payload: { consulta: 'x' },
+    });
+
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
+    await appComRepositorioQuebrado.close();
   });
 
   it('nunca mistura resultado de outro tenant — repositório é reconstruído por requisição via criarRepositorio(tenantContext)', async () => {

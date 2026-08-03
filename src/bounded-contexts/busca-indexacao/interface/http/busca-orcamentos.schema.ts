@@ -47,7 +47,16 @@ export const buscaOrcamentosResponseSchema = z.object({
   resultados: z.array(resultadoBuscaResponseSchema),
   pagina: z.number().int().min(1),
   tamanhoPagina: z.number().int().min(1),
+  /**
+   * Contagem de itens dentro da janela de sobre-busca já buscada (ver
+   * `LIMITE_MAXIMO_SOBRE_BUSCA`/`registrarRotaBuscaOrcamentos`), **não** o
+   * total real de matches no banco — quando a janela está cheia
+   * (`temProximaPagina === true`), este número é um piso, não o total exato
+   * (achado do `backend-reviewer`: nunca usar este campo para decidir "tem
+   * próxima página?", usar `temProximaPagina`).
+   */
   totalAproximado: z.number().int().min(0),
+  temProximaPagina: z.boolean(),
 });
 
 export type BuscaOrcamentosResponse = z.infer<typeof buscaOrcamentosResponseSchema>;
