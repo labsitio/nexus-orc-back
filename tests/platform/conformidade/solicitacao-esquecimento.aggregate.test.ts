@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ConfirmacaoDuplicadaError,
   ContextoNaoEsperadoError,
+  ContextosEsperadosInvalidosError,
+  PrazoLimiteInvalidoError,
   SolicitacaoEsquecimento,
   SolicitacaoJaFinalizadaError,
 } from '../../../src/platform/conformidade/domain/solicitacao-esquecimento.aggregate.js';
@@ -119,6 +121,36 @@ describe('SolicitacaoEsquecimento', () => {
     confirmacoesExpostas.push(confirmacaoDe('extracao'));
 
     expect(solicitacao.confirmacoes).toHaveLength(1);
+  });
+
+  it('rejeita criação com contextosEsperados vazio — nunca fica permanentemente REGISTRADA sem chance de confirmação', () => {
+    expect(() =>
+      SolicitacaoEsquecimento.criar({
+        titularReferencia,
+        contextosEsperados: [],
+        prazoLimite: new Date('2099-01-01T00:00:00Z'),
+      }),
+    ).toThrow(ContextosEsperadosInvalidosError);
+  });
+
+  it('rejeita criação com contextosEsperados duplicados', () => {
+    expect(() =>
+      SolicitacaoEsquecimento.criar({
+        titularReferencia,
+        contextosEsperados: ['ingestao-identificacao', 'ingestao-identificacao'],
+        prazoLimite: new Date('2099-01-01T00:00:00Z'),
+      }),
+    ).toThrow(ContextosEsperadosInvalidosError);
+  });
+
+  it('rejeita criação com prazoLimite inválido', () => {
+    expect(() =>
+      SolicitacaoEsquecimento.criar({
+        titularReferencia,
+        contextosEsperados,
+        prazoLimite: new Date('data-invalida'),
+      }),
+    ).toThrow(PrazoLimiteInvalidoError);
   });
 
   it('reconstitui agregado a partir de estado persistido (EM_ANDAMENTO com confirmação prévia)', () => {

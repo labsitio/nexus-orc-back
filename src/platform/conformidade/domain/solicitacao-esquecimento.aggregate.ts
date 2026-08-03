@@ -28,6 +28,20 @@ export class SolicitacaoJaFinalizadaError extends ErroDominio {
   }
 }
 
+export class ContextosEsperadosInvalidosError extends ErroDominio {
+  constructor() {
+    super(
+      'SolicitacaoEsquecimento: contextosEsperados inválido — esperada lista não vazia, sem duplicatas',
+    );
+  }
+}
+
+export class PrazoLimiteInvalidoError extends ErroDominio {
+  constructor() {
+    super('SolicitacaoEsquecimento: prazoLimite inválido — esperada uma data válida');
+  }
+}
+
 export interface SolicitacaoEsquecimentoProps {
   readonly titularReferencia: ReferenciaTitular;
   readonly contextosEsperados: readonly string[];
@@ -76,6 +90,14 @@ export class SolicitacaoEsquecimento {
   }
 
   static criar(props: SolicitacaoEsquecimentoProps): SolicitacaoEsquecimento {
+    const contextosUnicos = new Set(props.contextosEsperados);
+    if (contextosUnicos.size === 0 || contextosUnicos.size !== props.contextosEsperados.length) {
+      throw new ContextosEsperadosInvalidosError();
+    }
+    if (Number.isNaN(props.prazoLimite.getTime())) {
+      throw new PrazoLimiteInvalidoError();
+    }
+
     return new SolicitacaoEsquecimento(
       SolicitacaoEsquecimentoId.novo(),
       props.titularReferencia,
