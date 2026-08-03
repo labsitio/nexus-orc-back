@@ -6,9 +6,12 @@
 ## Commit/versão testada
 `c6fc440` (branch `feat/004-t029-indexar-orcamento`)
 
-## Bugs abertos por severidade
+## Status atual (reteste de 2026-08-03)
+Todos os bugs abertos foram corrigidos e validados. Nenhum defeito crítico ou alto em aberto. Commit validado: `de033a3`.
 
-### ALTA
+## Bugs (histórico)
+
+### ALTA — VALIDADO
 - **BUG-001** — Falha de infraestrutura no `upsert`/`publicar` do caminho de sucesso é engolida e reclassificada como `FALHA_TECNICA`.
   Relatório: `specs/004-indexacao-busca-semantica-orcamentos/bugs/BUG-001.md`
   Comando que reproduz:
