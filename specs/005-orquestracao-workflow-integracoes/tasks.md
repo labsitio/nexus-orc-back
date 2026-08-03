@@ -42,7 +42,7 @@
 - [x] T016 Infrastructure: `DrizzleDecisaoWorkflowRepository` implementando `DecisaoWorkflowRepository`, traduzindo linha↔agregado.
 - [x] T017 [P] Infrastructure: `OrcamentoClassificadoEventACL`, `OrcamentoExtraidoEventACL`, `OrcamentoValidadoEventACL` traduzindo os 3 payloads de evento upstream — nunca importam tipos de domínio dos BCs de origem.
 - [x] T018 Infrastructure: `EventBridgePublisher` implementando `EventPublisher` (instância própria deste BC, mesmo bus `nexo-dominio-bus`).
-- [ ] T019 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta das specs 001–003).
+- [x] T019 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta das specs 001–003).
 
 **Checkpoint**: Domain testável isoladamente (sem infra, sem IA), repositório e publisher funcionais contra ambiente local (LocalStack).
 
