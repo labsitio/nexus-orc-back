@@ -76,12 +76,22 @@ class EmbeddingGatewayFake implements AgenteEmbeddingGateway {
 class RepositorioFake implements IndiceOrcamentoRepository {
   chamadasUpsert: IndiceOrcamento[] = [];
   private armazenado: IndiceOrcamento | undefined;
+  private erroNaProximaChamada: Error | undefined;
 
   definirExistente(indice: IndiceOrcamento | undefined): void {
     this.armazenado = indice;
   }
 
+  falharNaProximaChamada(erro: Error): void {
+    this.erroNaProximaChamada = erro;
+  }
+
   async upsert(indiceOrcamento: IndiceOrcamento): Promise<void> {
+    if (this.erroNaProximaChamada) {
+      const erro = this.erroNaProximaChamada;
+      this.erroNaProximaChamada = undefined;
+      throw erro;
+    }
     this.chamadasUpsert.push(indiceOrcamento);
     this.armazenado = indiceOrcamento;
   }
@@ -238,6 +248,19 @@ describe('IndexarOrcamento', () => {
 
     const evento = eventPublisher.eventos[0]! as FalhaIndexacaoDetectada;
     expect(evento.tentativaNumero).toBe(2);
+  });
+
+  it('falha de infraestrutura no upsert do caminho de sucesso propaga (não é reclassificada como FALHA_TECNICA)', async () => {
+    const { embeddingGateway, repositorio, eventPublisher, useCase } = montarCaso();
+    embeddingGateway.configurarSucesso(embeddingFixture());
+    const erroInfra = new Error('conexão com Postgres recusada');
+    repositorio.falharNaProximaChamada(erroInfra);
+
+    await expect(
+      useCase.executar(TENANT_ID, 'OrcamentoValidado', { qualquer: 'coisa' }),
+    ).rejects.toThrow(erroInfra);
+
+    expect(eventPublisher.eventos).toHaveLength(0);
   });
 
   it('traduz o payload upstream via ACL, nunca acessando o payload bruto diretamente', async () => {

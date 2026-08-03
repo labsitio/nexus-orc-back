@@ -76,25 +76,14 @@ export class IndexarOrcamento {
         origemValidacao: traduzido.origemValidacao,
       });
 
+    let embedding;
     try {
-      const embedding = await this.embeddingGateway.gerarEmbedding(
-        indice.conteudoIndexavel.paraTexto(),
-      );
-      indice.registrarTentativaIndexacao({
-        resultado: 'INDEXADO',
-        timestamp: new Date(),
-        embedding,
-      });
-      await this.repositorio.upsert(indice);
-      await this.eventPublisher.publicar(
-        new OrcamentoIndexado(
-          traduzido.orcamentoId.toString(),
-          tenantId.toString(),
-          embedding.modeloId,
-        ),
-      );
-      return;
+      embedding = await this.embeddingGateway.gerarEmbedding(indice.conteudoIndexavel.paraTexto());
     } catch (erro) {
+      // Falha capturada apenas aqui: exclusivamente do AgenteEmbeddingGateway.
+      // upsert/publicar abaixo NUNCA entram neste catch — erro de
+      // infraestrutura (Postgres/EventBridge) propaga sem ser mascarado como
+      // FALHA_TECNICA (BUG-001).
       const motivoFalha = erro instanceof Error ? erro.message : String(erro);
       indice.registrarTentativaIndexacao({
         resultado: 'FALHA_TECNICA',
@@ -110,6 +99,21 @@ export class IndexarOrcamento {
           indice.historico.length,
         ),
       );
+      return;
     }
+
+    indice.registrarTentativaIndexacao({
+      resultado: 'INDEXADO',
+      timestamp: new Date(),
+      embedding,
+    });
+    await this.repositorio.upsert(indice);
+    await this.eventPublisher.publicar(
+      new OrcamentoIndexado(
+        traduzido.orcamentoId.toString(),
+        tenantId.toString(),
+        embedding.modeloId,
+      ),
+    );
   }
 }
