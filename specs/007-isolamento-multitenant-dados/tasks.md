@@ -133,6 +133,24 @@ Monorepo único, conforme `plan.md` desta spec — `src/shared-kernel/`, `src/bo
 
 ---
 
+## Phase 7: Retrofit real de `tenantId` em 002/003/004/005 (ADR-008)
+
+**Purpose**: T033 só deixou nota de referência cruzada nos `spec.md` de 002–005 assumindo que ainda seriam planejadas — premissa quebrada, essas specs já existem sem `tenantId` em nenhum Domain Event. Esta fase é o retrofit de código real, gate explícito de `#190` (004 T030).
+
+**⚠️ CRITICAL**: nenhuma task desta fase roda em paralelo com a seguinte — cada uma consome o `schemaVersion: 2` publicado pela anterior. Ver ADR-008.
+
+- [x] T039 [P] Adicionar nota de amendment (ADR-008 desta spec) em `specs/002-extracao-dados-orcamento/plan.md`, `specs/003-validacao-consistencia-orcamentos/plan.md`, `specs/004-indexacao-busca-semantica-orcamentos/plan.md`, `specs/005-orquestracao-workflow-integracoes/plan.md` — mesma mecânica de T032, apontando para T040–T044 como o retrofit real (sem reabrir o Constitution Check original de cada spec).
+- [ ] T040 Atualizar os 2 Domain Events de 002 (`OrcamentoExtraido`, `OrcamentoExtraidoComPendenciaConfirmada`, `src/bounded-contexts/extracao/domain/events/domain-event.ts` + os 2 arquivos de evento) para incluir `tenantId: string` (extraído do envelope v2 de 001 pelo ACL já existente de 002, nunca inferido) e `schemaVersion: 2`. Depende de T015 mergeada (#278).
+- [ ] T041 Atualizar os 3 Domain Events de 003 (`src/bounded-contexts/validacao/domain/events/domain-event.ts` + `orcamento-validado.event.ts`, `orcamento-validado-com-ressalva.event.ts`, `orcamento-inconsistencia-detectada.event.ts`) para incluir `tenantId: string` **no mesmo bump** de `schemaVersion: 2` já exigido por ADR-003 de `specs/004-indexacao-busca-semantica-orcamentos/plan.md` (`itens`/`condicoesComerciais`, coordenação fechada em #166, código ainda não escrito) — um único PR, não dois. `tenantId` extraído do envelope v2 de 002 via `OrcamentoExtraidoEventACL` de 003. Depende de T040.
+- [ ] T042 Atualizar `OrcamentoValidadoEventACL` (spec 004 T018, `src/bounded-contexts/busca-indexacao/infrastructure/`) para extrair `tenantId` do envelope v2 de 003 (T041) e propagá-lo ao caso de uso `IndexarOrcamento` (já recebe `tenantId` como parâmetro dedicado, PR #574). Depende de T041.
+- [ ] T043 Gate de desbloqueio: spec 004 T030/#190 (handler Lambda SQS `indexador-queue`) só pode ser implementada e mergeada depois de T042 mergeada — sem essa ordem, o handler não tem de onde extrair `tenantId` do evento `OrcamentoValidado` recebido. Nenhuma alteração de código nesta task, apenas remoção do bloqueio (T030 já está desenhada corretamente em `specs/004-.../tasks.md`).
+- [ ] T044 [P] Atualizar os Domain Events publicados por 005 (Orquestração, `src/bounded-contexts/orquestracao/domain/events/`) e o contexto consolidado (ADR-001 de 005) para incluir `tenantId`, extraído dos 3 eventos upstream (001/002/003, já v2 após T040/T041). Depende de T040 e T041.
+- [ ] T045 Confirmar, antes de cada cutover (T040, T041, T044), se já existe tenant real em produção usando 002/003/004/005 (mesma checagem de T034, estendida) — se sim, leitura dual v1/v2 obrigatória para aquele BC específico; se não, cutover único como desenhado.
+
+**Checkpoint**: `tenantId` propagado de ponta a ponta em 001→002→003→(004|005); `#190` desbloqueada e implementável; nenhum ponto do pipeline aceita `tenantId` inventado, inferido do payload ou consultado de tabela de outro BC.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -143,6 +161,7 @@ Monorepo único, conforme `plan.md` desta spec — `src/shared-kernel/`, `src/bo
 - **US2 (Phase 4)**: depende de Phase 2; pode rodar em paralelo com US1 depois do checkpoint de Phase 2 (times diferentes), mas T025 depende de eventos v2 de US1 (T015) para consumir `tenantId` corretamente — portanto T025 em diante depende de T015.
 - **US3 (Phase 5)**: depende de US1 completa (T015, para T032) — é essencialmente documentação/rastreabilidade do que foi decidido, não implementação nova.
 - **Polish (Phase 6)**: depende de US1 e US2 completas.
+- **Retrofit 002–005 (Phase 7)**: depende de T015 (US1) mergeada. T040→T041→T042→T043 estritamente serial (cada uma consome o `schemaVersion: 2` publicado pela anterior); T044 depende de T040 e T041; T039 é documentação, pode rodar em paralelo a qualquer momento da fase.
 
 ### Parallel Opportunities
 
@@ -151,8 +170,10 @@ Monorepo único, conforme `plan.md` desta spec — `src/shared-kernel/`, `src/bo
 - T011–T013, T019–T021 (testes) em paralelo dentro de cada user story.
 - T022, T023 (US2, entidades de domínio) em paralelo.
 - T035, T036 (Polish) em paralelo.
+- T039 (Phase 7) em paralelo com T040–T044 (é só documentação).
 
 ### Riscos de sequenciamento a observar
 
 - T025 (regra EventBridge de Acompanhamento) só deve ser ativada em produção depois de T015 (eventos v2 com `tenantId`) estar implantado — ativar a regra antes geraria linhas de auditoria sem `tenantId`, violando o próprio guardrail desta spec.
 - T009 (checklist `BYPASSRLS`) é pré-requisito de aceite de T018 e T028 — nenhum repositório tenant-scoped MUST ser considerado "pronto" sem essa verificação de infraestrutura confirmada.
+- T040–T043 são a cadeia que trava `#190` (spec 004 T030) — nenhum agente `dev-back-end` deve implementar T030 antes de T042 estar mergeada (ver ADR-008).

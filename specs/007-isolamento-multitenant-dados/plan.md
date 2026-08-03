@@ -253,6 +253,8 @@ tests/
 
 **Impactos futuros**: specs 002–005, ao serem planejadas, MUST desenhar seus eventos já com `tenantId` desde a v1 (não herdam o problema de migração, só 001 herda, por ter sido planejada antes deste ADR).
 
+**Amendment 2026-08-03 (ADR-008)**: premissa quebrada — 002, 003, 004 e 005 já foram planejadas e parcialmente implementadas (004 T029/T030 em andamento) sem `tenantId` no envelope. T033 desta spec só deixou nota de referência cruzada, não corrigiu o código. ADR-008 trata o retrofit real.
+
 ### ADR-006 — Exportação de auditoria em JSON paginado, não em arquivo pré-gerado (CSV/PDF)
 
 **Contexto**: spec.md declara formato de exportação como decisão do `arquiteto-back`. Escopo é exclusivamente backend (sem UI que renderize o arquivo).
@@ -288,3 +290,40 @@ tests/
 **Trade-offs**: dupla execução de `verify()` em runtime quando ambos os middlewares coexistem na mesma rota — aceito; é CPU-bound leve, não I/O externo repetido (JWKS já cacheado pelo verifier).
 
 **Impactos futuros**: qualquer novo middleware de autenticação (002–006) MUST consumir este helper, nunca instanciar `CognitoJwtVerifier.create` diretamente. Se no futuro `TenantContextMiddleware` passar a ser o único preHandler de autenticação de toda rota (linha 131 — "todos os endpoints de 001 e futuros passam a rodar atrás do mesmo `TenantContextMiddleware`"), `auth-cognito.middleware.ts` pode ser aposentado — decisão fora do escopo de T005, requer ADR próprio quando essa migração for planejada.
+
+### ADR-008 — Retrofit de `tenantId` em 002/003/004/005: envelope replicado (não Shared Kernel), bump fundido com ADR-003 de 004 em 003, cutover único, ordem serializada pelo pipeline
+
+**Contexto**: achado do `backend-reviewer` (2026-08-03): nenhum Domain Event de 002, 003, 004 ou 005 carrega `tenantId` — `grep -rl tenantId src/bounded-contexts/*/domain/events/` não retorna nada. ADR-005 desta spec previu isso ("specs 002–005 MUST desenhar seus eventos já com `tenantId` desde a v1") e T033 tentou garantir isso via nota de referência cruzada nos `spec.md` — mas 002–005 já foram planejadas e parcialmente implementadas (004 T029 `IndexarOrcamento`, PR #574, já exige `tenantId` como parâmetro; T030/#190 está bloqueada porque não há de onde extraí-lo do evento upstream). Gap sistêmico de isolamento multitenant, não dívida de estilo — mesma classificação de severidade de ADR-005.
+
+Concorrentemente, ADR-003 de `specs/004-indexacao-busca-semantica-orcamentos/plan.md` já exige que 003 suba `OrcamentoValidado`/`OrcamentoValidadoComRessalva` para `schemaVersion: 2` incluindo `itens`/`condicoesComerciais` (coordenação fechada em #166, código ainda não implementado — nenhuma task de 003 `tasks.md` cobre isso hoje).
+
+**Problema**: (1) `tenantId` deve entrar em um envelope compartilhado ou replicado por BC; (2) o bump de `tenantId` em 003 deve ser fundido com o bump de ADR-003/004 ou feito em separado; (3) qual a ordem de execução entre 001 (#278), 004 T006/#166 e o retrofit novo, e o que trava T030/#190; (4) `tenantId` obrigatório (breaking) ou opcional (aditivo), e o que fazer com evento v1 em voo.
+
+**Alternativas consideradas (questão 1)**: (a) `DomainEventEnvelope` como tipo compartilhado importado de `shared-kernel/` por todos os BCs; (b) `tenantId: string` replicado no envelope próprio de cada BC (mesma disciplina de "sem import cruzado" já aplicada a `OrcamentoId`/`Dinheiro`), usando o VO `TenantId` do Shared Kernel (ADR-004) só no ponto de parsing/validação (ACL, publisher), nunca no tipo do envelope em si.
+
+**Vantagens (b)**: nenhuma segunda exceção ao Shared Kernel — ADR-004 já declara "qualquer proposta de adicionar um segundo Shared Kernel exige ADR próprio, não é precedente automático"; `tenantId` no envelope é dado de transporte (string serializada, igual `orcamentoId`), não uma regra de negócio partilhada — não atende ao critério que justificou a exceção de `TenantId` (validação de formato byte-idêntica); mantém o padrão já usado por `orcamentoId`/`schemaVersion` em todos os `domain-event.ts` existentes.
+
+**Desvantagens (b)**: replicação textual do campo em 5 arquivos `domain-event.ts` — aceito, é o mesmo custo já pago por `OrcamentoId`/`Dinheiro` em cada BC.
+
+**Decisão (1)**: alternativa (b). `tenantId: string` no envelope de cada BC, replicado; validação/parsing via `TenantId.de()` (Shared Kernel, ADR-004 de 007) só na fronteira (Infrastructure — publisher ao emitir, ACL ao consumir), nunca no tipo do envelope. Nenhum novo Shared Kernel criado.
+
+**Alternativas consideradas (questão 2)**: (a) dois bumps separados para `schemaVersion: 2` de 003 (um para `tenantId`, outro para `itens`/`condicoesComerciais`); (b) um único bump fundido.
+
+**Decisão (2)**: fundir. Os dois bumps tocam exatamente os mesmos 4 arquivos (`domain-event.ts` + 3 eventos) e têm o mesmo conjunto de consumidores a migrar (004 `OrcamentoValidadoEventACL`, 005, 007 `Acompanhamento`) — dois bumps separados forçariam dois ciclos de coordenação de consumidor para o mesmo BC sem nenhum ganho de isolamento entre as mudanças (nenhuma das duas depende logicamente da outra). A regra "quem quebra vai primeiro, o aditivo rebaseia depois" (plano de paralelismo #278×#355) não se aplica aqui porque nenhuma das duas é breaking (ambas só adicionam campos) — não há ordem obrigatória entre elas dentro do mesmo PR.
+
+**Decisão (3) — ordem e gate explícito**: cadeia serializada pelo próprio pipeline de dados, porque `tenantId` só existe a jusante depois de existir a montante:
+
+1. `#278` (007 T015) — 001: 5 eventos ganham `tenantId`, `schemaVersion: 2`. Raiz da cadeia, sem dependência.
+2. Nova task (007 T040) — 002: `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada` ganham `tenantId` (extraído do v2 de 001 via ACL já existente), `schemaVersion: 2`. Depende de (1) mergeado.
+3. Nova task (007 T041) — 003: `OrcamentoValidado`/`OrcamentoValidadoComRessalva`/`OrcamentoInconsistenciaDetectada` ganham `tenantId` (extraído do v2 de 002) **no mesmo bump** que `itens`/`condicoesComerciais` (ADR-003 de 004, #166). Depende de (2) mergeado.
+4. Atualizar `OrcamentoValidadoEventACL` (004 T018) para também extrair `tenantId` do v2 de 003, propagando a `IndexarOrcamento` (007 T042). Depende de (3) mergeado.
+5. `#190` (004 T030, handler Lambda `indexador-queue`) — desbloqueada (007 T043). Depende de (4) mergeado.
+6. 005 (Orquestração) — retrofit de `tenantId` no contexto consolidado e eventos publicados (007 T044), extraído de 001/002/003 já v2. Depende de (2)/(3).
+
+`#166` (004 T006) já está fechada como coordenação — não trava nada além de confirmar que o conteúdo de `itens`/`condicoesComerciais` está acordado; a implementação de código em si é a task nova (3). `#278` é o bloqueador raiz de toda a cadeia — trava (2), que trava (3), que trava (4), que trava `#190`. Nenhuma das etapas pode ser paralelizada com a anterior (cada uma consome o output serializado da anterior), mas dentro de cada etapa o BC receptor segue o mesmo padrão de PR único já usado por 001 T015.
+
+**Decisão (4)**: obrigatório, cutover único, sem leitura dual v1/v2 — mesma decisão e mesma justificativa de ADR-005 (baseline "0 tenants reais em produção ainda" continua válida, porque nenhuma spec 001–005 está em produção multitenant hoje). Se qualquer uma das specs 002–005 já tiver tenant real em produção no momento da implementação, a leitura dual (mesmo mecanismo levantado por T034/#297 para 001) passa a ser obrigatória para aquele BC especificamente — replicando o guardrail de T034 (007 T045, nova task, estende a mesma checagem a 002–005).
+
+**Trade-offs**: acoplamento textual entre 5 BCs no formato do campo `tenantId` (mitigado por ser dado de transporte, sem lógica); cadeia de 4 PRs serializados antes de `#190` poder ser mergeada, ao invés de paralelismo total — aceito porque a alternativa (permitir T030 inferir/inventar `tenantId`) é a violação de isolamento que esta spec inteira existe para prevenir.
+
+**Impactos futuros**: qualquer spec nova (009+) que publique Domain Event MUST incluir `tenantId` desde a v1 do seu `plan.md`, sem exceção — este ADR é o segundo caso (depois de ADR-005) de retrofit reativo, e um terceiro caso indicaria falha de processo de `speckit-plan`, não apenas de código.

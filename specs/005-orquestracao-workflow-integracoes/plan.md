@@ -6,6 +6,8 @@
 
 **Nota de convenção**: este plano herda, sem redefinir, as convenções vinculantes estabelecidas em `specs/001-ingestao-classificacao-orcamentos/plan.md`, `specs/002-extracao-dados-orcamento/plan.md` e `specs/003-validacao-consistencia-orcamentos/plan.md` (nomenclatura de Bounded Context, convenção de Domain Event `<Agregado><ParticípioPassado>`/português/`schemaVersion`+`orcamentoId`, bus único `nexo-dominio-bus`, layout de pastas por BC, `OrcamentoId` gerado só pelo Gateway de Ingestão, ADR-001 Drizzle da spec 001, ADR-003 "padrão replicado, nunca componente físico compartilhado entre BCs" da spec 002). Todo desvio dessas convenções é registrado explicitamente como ADR nesta spec. Nenhum plano de `research.md`/`data-model.md`/`contracts/` separado é gerado — mesma convenção de artefato único (`plan.md` autocontido) já adotada em 001/002/003.
 
+**Amendment 2026-08-03 (ADR-008 de `specs/007-isolamento-multitenant-dados/plan.md`)**: os Domain Events desta spec e o contexto consolidado (ADR-001 desta spec) foram planejados sem `tenantId`. Retrofit extrai `tenantId` dos 3 eventos upstream (001/002/003, já v2). Ver `specs/007-isolamento-multitenant-dados/tasks.md` T044.
+
 **Nota de ferramenta**: a etapa `speckit-plan` desta sessão não pôde executar `.specify/scripts/powershell/setup-plan.ps1` (esta sessão do agente arquiteto não tem ferramenta Bash/shell) — plano elaborado manualmente, seguindo a mesma estrutura que as specs 001–003 já materializam no repositório. Registrado como condição de ambiente, não bloqueia a entrega.
 
 ## Summary
