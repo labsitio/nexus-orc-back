@@ -85,7 +85,7 @@ Conforme `plan.md` desta spec e convenção herdada de 001: `src/platform/confor
 
 ### Implementation for User Story 2
 
-- [ ] T022 [US2] Implementar agregado `SolicitacaoEsquecimento` em `src/platform/conformidade/domain/solicitacao-esquecimento.aggregate.ts` + VOs `StatusSolicitacao`, `ConfirmacaoAnonimizacao` em `src/platform/conformidade/domain/value-objects/`. Depende de T007, T008.
+- [x] T022 [US2] Implementar agregado `SolicitacaoEsquecimento` em `src/platform/conformidade/domain/solicitacao-esquecimento.aggregate.ts` + VOs `StatusSolicitacao`, `ConfirmacaoAnonimizacao` em `src/platform/conformidade/domain/value-objects/`. Depende de T007, T008. (#323 — já implementado junto de T018/T019/PR #319/#320/#561; gap era só o checkbox de tasks.md, código coberto por 16 testes em `tests/platform/conformidade/solicitacao-esquecimento.aggregate.test.ts`.)
 - [ ] T023 [US2] Implementar interface `SolicitacaoEsquecimentoRepository` (domain) + `DrizzleSolicitacaoEsquecimentoRepository` (infra) em `src/platform/conformidade/infrastructure/persistence/`.
 - [ ] T024 [US2] [P] Implementar caso de uso `RegistrarSolicitacaoEsquecimento` em `src/platform/conformidade/application/use-cases/registrar-solicitacao-esquecimento.ts` — resolve `contextosEsperados` a partir de `platform.contextos_com_dado_pessoal` (T010), publica `SolicitacaoEsquecimentoRegistrada`.
 - [ ] T025 [US2] [P] Implementar caso de uso `AcompanharConfirmacoesDeAnonimizacao` (consumidor SQS de `DadoPessoalAnonimizadoNoContexto`) em `src/platform/conformidade/application/use-cases/acompanhar-confirmacoes-de-anonimizacao.ts`.
