@@ -161,4 +161,19 @@ export class SolicitacaoEsquecimento {
       ? StatusSolicitacao.concluida()
       : StatusSolicitacao.emAndamento();
   }
+
+  /**
+   * Transição explícita para `PRAZO_EXCEDIDO`. Nunca invocada pelo próprio
+   * agregado — existe apenas para ser chamada por um processo externo
+   * (Application/job agendado, T026) que já decidiu, fora do Domain, que
+   * `prazoLimite` expirou sem cobertura total de `contextosEsperados`. O
+   * agregado não lê relógio nem `prazoLimite` aqui; apenas aplica a
+   * transição e preserva o invariante de status terminal.
+   */
+  marcarPrazoExcedido(): void {
+    if (this._status.valor === 'CONCLUIDA' || this._status.valor === 'PRAZO_EXCEDIDO') {
+      throw new SolicitacaoJaFinalizadaError(this._status.valor);
+    }
+    this._status = StatusSolicitacao.prazoExcedido();
+  }
 }

@@ -110,7 +110,44 @@ describe('SolicitacaoEsquecimento', () => {
       },
     );
 
-    expect(metodosPublicos).toEqual(['registrarConfirmacao']);
+    expect(metodosPublicos).toEqual(['registrarConfirmacao', 'marcarPrazoExcedido']);
+  });
+
+  it('marcarPrazoExcedido transita para PRAZO_EXCEDIDO quando invocado explicitamente sem cobertura total', () => {
+    const prazoJaExpirado = new Date('2020-01-01T00:00:00Z');
+    const solicitacao = criarSolicitacao(prazoJaExpirado);
+    solicitacao.registrarConfirmacao(confirmacaoDe('ingestao-identificacao'));
+    expect(solicitacao.status.valor).toBe('EM_ANDAMENTO');
+
+    solicitacao.marcarPrazoExcedido();
+
+    expect(solicitacao.status.valor).toBe('PRAZO_EXCEDIDO');
+  });
+
+  it('marcarPrazoExcedido funciona a partir de REGISTRADA (nenhuma confirmação recebida)', () => {
+    const solicitacao = criarSolicitacao(new Date('2020-01-01T00:00:00Z'));
+
+    solicitacao.marcarPrazoExcedido();
+
+    expect(solicitacao.status.valor).toBe('PRAZO_EXCEDIDO');
+  });
+
+  it('rejeita marcarPrazoExcedido se a solicitação já estiver CONCLUIDA', () => {
+    const solicitacao = criarSolicitacao();
+    solicitacao.registrarConfirmacao(confirmacaoDe('ingestao-identificacao'));
+    solicitacao.registrarConfirmacao(confirmacaoDe('extracao'));
+    expect(solicitacao.status.valor).toBe('CONCLUIDA');
+
+    expect(() => solicitacao.marcarPrazoExcedido()).toThrow(SolicitacaoJaFinalizadaError);
+    expect(solicitacao.status.valor).toBe('CONCLUIDA');
+  });
+
+  it('rejeita marcarPrazoExcedido chamado duas vezes (idempotência de transição terminal)', () => {
+    const solicitacao = criarSolicitacao(new Date('2020-01-01T00:00:00Z'));
+    solicitacao.marcarPrazoExcedido();
+
+    expect(() => solicitacao.marcarPrazoExcedido()).toThrow(SolicitacaoJaFinalizadaError);
+    expect(solicitacao.status.valor).toBe('PRAZO_EXCEDIDO');
   });
 
   it('confirmacoes exposto é cópia defensiva — não permite mutar o array interno', () => {
