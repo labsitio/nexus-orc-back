@@ -32,6 +32,8 @@ import {
  * `FaixaPrecoInvalidaError` é exatamente o que o controller (T044) mapeará
  * para 400 Problem Details. Quando T043/T044 existirem, este teste deve ser
  * reescrito para `app.inject` real, reusando estes mesmos schemas.
+ * `problemDetailsSchema` é reexportado de `status.schema.ts` (mesmo padrão
+ * de reuso já usado em `decisao-humana.schema.ts`), não redefinido aqui.
  */
 
 describe('POST / GET /v1/configuracoes/faixas-preco-categoria — contrato', () => {

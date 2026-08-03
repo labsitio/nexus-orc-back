@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { problemDetailsSchema } from './status.schema.js';
+
+export { problemDetailsSchema };
+export type { ProblemDetails } from './status.schema.js';
 
 /**
  * Contrato de borda (Zod) de `POST`/`GET /v1/configuracoes/faixas-preco-categoria`
@@ -31,15 +35,3 @@ export const faixaPrecoCategoriaResponseSchema = faixaPrecoCategoriaRequestSchem
 export type FaixaPrecoCategoriaResponse = z.infer<typeof faixaPrecoCategoriaResponseSchema>;
 
 export const listaFaixasPrecoCategoriaResponseSchema = z.array(faixaPrecoCategoriaResponseSchema);
-
-// ponytail: ProblemDetails duplicado localmente (RFC 7807), mesma decisão já
-// tomada em `status.schema.ts`/`decisao-humana.schema.ts` deste BC.
-export const problemDetailsSchema = z.object({
-  type: z.string().url().optional(),
-  title: z.string(),
-  status: z.number().int(),
-  detail: z.string().optional(),
-  instance: z.string().optional(),
-});
-
-export type ProblemDetails = z.infer<typeof problemDetailsSchema>;
