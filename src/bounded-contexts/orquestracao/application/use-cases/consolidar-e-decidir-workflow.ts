@@ -1,4 +1,5 @@
 import { DecisaoWorkflow } from '../../domain/aggregates/decisao-workflow.aggregate.js';
+import type { StatusDecisaoWorkflow } from '../../domain/aggregates/decisao-workflow.aggregate.js';
 import { DecisaoWorkflowEscalonadaParaComprador } from '../../domain/events/decisao-workflow-escalonada-para-comprador.event.js';
 import type { DomainEventEnvelope } from '../../domain/events/domain-event.js';
 import { IntegracaoExternaSolicitada } from '../../domain/events/integracao-externa-solicitada.event.js';
@@ -56,6 +57,16 @@ export class ConsolidarEDecidirWorkflow {
       // Persiste mesmo em caso de ContextoIncompletoError: o contexto de
       // validação já registrado não pode se perder à espera dos demais.
       await this.repositorio.salvar(decisaoWorkflow);
+    }
+
+    const statusAposConsolidar: StatusDecisaoWorkflow = decisaoWorkflow.status;
+    if (statusAposConsolidar !== 'CONTEXTO_CONSOLIDADO') {
+      // Reentrega da fila SQS (at-least-once) depois que uma execução
+      // anterior já decidiu (DECIDIDO) ou escalonou (PENDENTE_REVISAO_HUMANA)
+      // — nunca reinvoca o Orquestrador nem republica o desfecho (mesma
+      // disciplina de "já avaliado — nunca reavalia nem republica" do BC
+      // Validação, `validar-orcamento.ts`).
+      return;
     }
 
     const resultado = await this.agenteOrquestrador.decidir({

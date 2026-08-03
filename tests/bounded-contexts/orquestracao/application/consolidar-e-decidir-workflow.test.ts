@@ -183,4 +183,66 @@ describe('ConsolidarEDecidirWorkflow', () => {
     expect(repositorio.salvos[0]!.status).toBe('AGUARDANDO_CONTEXTO');
     expect(publisher.publicados).toHaveLength(0);
   });
+
+  it('reentrega SQS pós-decisão (DECIDIDO): nunca reinvoca o Orquestrador nem republica o desfecho', async () => {
+    const existente = agregadoComContextoConsolidado();
+    existente.registrarContextoValidacao(CONTEXTO_VALIDACAO);
+    existente.consolidarContexto();
+    existente.registrarTentativaOrquestrador({
+      acao: 'APROVAR',
+      nivelConfianca: NivelConfianca.de(90),
+      criterio: 'Decisão já tomada em execução anterior',
+      requerIntegracaoExterna: false,
+    });
+    expect(existente.status).toBe('DECIDIDO');
+
+    const repositorio = new DecisaoWorkflowRepositoryFake(existente);
+    const publisher = new EventPublisherFake();
+    const agenteOrquestrador: AgenteOrquestradorGateway = {
+      decidir: () => {
+        throw new Error('nunca deveria ser chamado — decisão já registrada');
+      },
+    };
+    const useCase = new ConsolidarEDecidirWorkflow(
+      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      repositorio,
+      agenteOrquestrador,
+      publisher,
+    );
+
+    await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).resolves.toBeUndefined();
+
+    expect(publisher.publicados).toHaveLength(0);
+  });
+
+  it('reentrega SQS pós-escalonamento (PENDENTE_REVISAO_HUMANA): nunca reinvoca o Orquestrador', async () => {
+    const existente = agregadoComContextoConsolidado();
+    existente.registrarContextoValidacao(CONTEXTO_VALIDACAO);
+    existente.consolidarContexto();
+    existente.registrarTentativaOrquestrador({
+      acao: 'APROVAR',
+      nivelConfianca: NivelConfianca.de(40),
+      criterio: 'Confiança baixa',
+      requerIntegracaoExterna: false,
+    });
+    expect(existente.status).toBe('PENDENTE_REVISAO_HUMANA');
+
+    const repositorio = new DecisaoWorkflowRepositoryFake(existente);
+    const publisher = new EventPublisherFake();
+    const agenteOrquestrador: AgenteOrquestradorGateway = {
+      decidir: () => {
+        throw new Error('nunca deveria ser chamado — já escalonado para o comprador');
+      },
+    };
+    const useCase = new ConsolidarEDecidirWorkflow(
+      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      repositorio,
+      agenteOrquestrador,
+      publisher,
+    );
+
+    await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).resolves.toBeUndefined();
+
+    expect(publisher.publicados).toHaveLength(0);
+  });
 });
