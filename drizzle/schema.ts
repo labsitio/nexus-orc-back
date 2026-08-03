@@ -7,3 +7,4 @@ export * from '../src/platform/conformidade/infrastructure/persistence/schema/pl
 export * from '../src/bounded-contexts/extracao/infrastructure/persistence/schema/extracao-orcamento.schema.js';
 export * from '../src/bounded-contexts/validacao/infrastructure/persistence/schema/validacao-orcamento.schema.js';
 export * from '../src/bounded-contexts/busca-indexacao/infrastructure/persistence/schema/indice-orcamento.schema.js';
+export * from '../src/bounded-contexts/orquestracao/infrastructure/persistence/schema/decisao-workflow.schema.js';

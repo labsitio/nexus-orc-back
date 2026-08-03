@@ -15,6 +15,7 @@ import type {
   ResultadoAgenteClassificador,
 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/agente-classificador.gateway.js';
 import type { EventPublisher } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/event-publisher.js';
+import type { CacheIdentificacaoGateway } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.js';
 import type { DomainEventEnvelope } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/events/domain-event.js';
 import { OrcamentoClassificado } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/events/orcamento-classificado.event.js';
 import { OrcamentoEscalonadoParaRevisaoHumana } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/events/orcamento-escalonado-revisao-humana.event.js';
@@ -78,6 +79,15 @@ class EventPublisherFake implements EventPublisher {
   eventosPublicados: DomainEventEnvelope[] = [];
   async publicar(evento: DomainEventEnvelope): Promise<void> {
     this.eventosPublicados.push(evento);
+  }
+}
+
+class CacheIdentificacaoGatewayFalhaFake implements CacheIdentificacaoGateway {
+  async buscar(): Promise<never> {
+    throw new Error('DynamoDB timeout');
+  }
+  async registrar(): Promise<void> {
+    throw new Error('não usado neste teste');
   }
 }
 
@@ -177,5 +187,30 @@ describe('ClassificarOrcamento', () => {
 
     await expect(useCase.executar(orcamento.id.toString())).rejects.toThrow();
     expect(publisher.eventosPublicados).toHaveLength(0);
+  });
+
+  it('T012: cache-miss por erro/timeout em CacheIdentificacaoGateway.buscar não bloqueia nem falha a classificação', async () => {
+    const orcamento = novoOrcamentoRecebido();
+    const repositorio = new RepositorioFake(orcamento);
+    const publisher = new EventPublisherFake();
+    const useCase = new ClassificarOrcamento(
+      repositorio,
+      new ArmazenamentoBrutoFake(),
+      new ConversorFake(),
+      new AgenteClassificadorFake({
+        fornecedorIdentificado: 'Acme Ltda',
+        formatoIdentificado: 'PDF',
+        nivelConfianca: 90,
+      }),
+      publisher,
+      new CacheIdentificacaoGatewayFalhaFake(),
+    );
+
+    await useCase.executar(orcamento.id.toString());
+
+    expect(orcamento.status).toBe('CLASSIFICADO');
+    expect(repositorio.salvos).toHaveLength(1);
+    expect(publisher.eventosPublicados).toHaveLength(1);
+    expect(publisher.eventosPublicados[0]?.detailType).toBe(OrcamentoClassificado.detailType);
   });
 });

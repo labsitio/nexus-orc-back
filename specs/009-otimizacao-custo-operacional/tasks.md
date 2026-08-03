@@ -47,7 +47,7 @@
 
 ### Tests (US1)
 
-- [ ] T012 [P] [US1] Unit test: cache miss não bloqueia nem falha `ClassificarOrcamento` — simula `CacheIdentificacaoGateway.buscar` lançando erro/timeout e verifica que o caso de uso segue o caminho de custo total normalmente.
+- [x] T012 [P] [US1] Unit test: cache miss não bloqueia nem falha `ClassificarOrcamento` — simula `CacheIdentificacaoGateway.buscar` lançando erro/timeout e verifica que o caso de uso segue o caminho de custo total normalmente.
 - [ ] T013 [P] [US1] Unit test: escrita no cache só ocorre quando `nivelConfianca >= 80` (limiar de 001) — simula resultado de baixa confiança e verifica que `CacheIdentificacaoGateway.registrar` NÃO é chamado.
 - [ ] T014 [P] [US1] Unit test: uma correção humana com resultado diferente do sinal cacheado sobrescreve a entrada de cache (nunca acumula/funde com a anterior) — critério de aceite spec.md "nenhuma alavanca... reduz a rastreabilidade".
 - [ ] T015 [P] [US1] Integration test: consumidor `classificador-queue` com cache hit simulado ainda produz exatamente um dos dois eventos de saída (`OrcamentoClassificado` ou `OrcamentoEscalonadoParaRevisaoHumana`) — mesmo contrato de evento de 001/US2, inalterado.

@@ -12,6 +12,7 @@ import { IndexadorQueueStack } from '../lib/indexador-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
 import { ReceberOrcamentoLambdaRoleStack } from '../lib/receber-orcamento-lambda-role-stack.ts';
 import { ValidadorQueueStack } from '../lib/validador-queue-stack.ts';
+import { ValidarOrcamentoLambdaRoleStack } from '../lib/validar-orcamento-lambda-role-stack.ts';
 
 const app = new App();
 
@@ -60,10 +61,16 @@ new ExtratorLambdaRoleStack(app, 'ExtratorLambdaRoleStack', {
   extratorQueue: extratorQueueStack.extratorQueue,
 });
 
-new ValidadorQueueStack(app, 'ValidadorQueueStack', {
+const validadorQueueStack = new ValidadorQueueStack(app, 'ValidadorQueueStack', {
   description:
     'Fila validador-queue + DLQ + alarme, roteada por regra EventBridge — spec 003, T003/T004.',
   dominioBus: dominioEventBusStack.dominioBus,
+});
+
+new ValidarOrcamentoLambdaRoleStack(app, 'ValidarOrcamentoLambdaRoleStack', {
+  description:
+    'Role IAM least-privilege da Lambda ValidarOrcamento (sem Bedrock/S3 raw) — spec 003, T028.',
+  validadorQueue: validadorQueueStack.validadorQueue,
 });
 
 new ContextoClassificacaoQueueStack(app, 'ContextoClassificacaoQueueStack', {

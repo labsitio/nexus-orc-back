@@ -613,3 +613,98 @@ BUG-XXX formal por ter sido corrigido antes do fechamento do gate.
 
 ## 12. Parecer final
 APROVADO PELO QA
+
+---
+
+# Validação — T017 (issue #127), primeira validação
+
+## 1. SPEC_ID e versão testada
+- SPEC_ID: `003-validacao-consistencia-orcamentos`
+- PR #496, branch `feat/003-t017-observabilidade-validacao`, commit `0437040`
+- Worktree isolado: `/home/victor1090/Documentos/Labs/wt-003-t017`
+
+## 2. Resumo executivo
+Réplica mecânica confirmada por diff literal contra o padrão já aprovado
+e em produção em spec-001 (`ingestao-identificacao/infrastructure/observability/`)
+e spec-002 (`extracao/infrastructure/observability/`): `logger.ts` e
+`tracing.ts` diferem do original apenas no comentário de proveniência e no
+valor default `nomeServico`/`orcamentoId`/nome do describe — nenhuma linha
+de lógica nova. `backend-reviewer` já aprovou (APPROVE) com 1 NIT não
+bloqueante (cobertura do binding de correlação ponta a ponta), lacuna
+pré-existente idêntica em 001/002, não introduzida por esta PR. Não há
+handler Lambda de interface no BC Validação ainda
+(`src/bounded-contexts/validacao/interface/` só tem `.gitkeep`) — escopo
+desta task é estritamente a infraestrutura transversal, análogo a T015
+(spec-001) e T016 (spec-002).
+
+## 3. Requisitos cobertos e não cobertos
+- Coberto: nível de log configurável via `LOG_LEVEL` (default `info`,
+  respeita override) — `logger.test.ts` casos 1 e 2; binding fixo de
+  `orcamentoId` para correlação — `logger.test.ts` caso 3; redact de
+  `req.headers.authorization` — presente em `logger.ts:19`, herdado
+  literalmente do padrão 001/002 (não há teste dedicado a redact em
+  nenhum dos três BCs — mesma lacuna pré-existente, não nova); bootstrap
+  do `NodeSDK` sem lançar exceção e shutdown limpo — `tracing.test.ts`.
+- Não coberto (fora de escopo desta task, não é regressão): correlação
+  end-to-end log+trace dentro de um handler real do BC Validação — não
+  há handler ainda; será exercitado quando a primeira interface Lambda
+  deste BC for implementada, mesmo padrão do NIT do backend-reviewer.
+
+## 4. Suítes executadas e comandos
+```
+nvm use 24
+npx tsc --noEmit
+→ sem erros
+
+npx eslint src/bounded-contexts/validacao/infrastructure/observability \
+  tests/bounded-contexts/validacao/infrastructure/observability
+→ sem erros
+
+npx vitest run
+→ 466 passed | 45 skipped (511 testes), 95 passed | 9 skipped (104 arquivos)
+  (skips pré-existentes: testes de integração Drizzle dependentes de
+  Postgres local, não relacionados a esta PR)
+```
+
+## 5. Quantidade de testes por tipo
+2 arquivos de teste novos, unitários: `logger.test.ts` (3 casos),
+`tracing.test.ts` (1 caso). Total 4 testes novos.
+
+## 6. Resultado
+- Aprovados: 4/4 (novos) + 462 pré-existentes = 466
+- Falhos: 0
+- Ignorados: 45 (pré-existentes, dependentes de banco local)
+- Instáveis: 0
+
+## 7. Cobertura inicial e final
+Escopo isolado (`--coverage.include='src/bounded-contexts/validacao/infrastructure/observability/**'`):
+- Statements: 100% (4/4)
+- Branches: 100% (4/4)
+- Functions: 100% (2/2)
+- Lines: 100% (4/4)
+
+Sem threshold de cobertura configurado no repositório (`vitest.config.ts`
+não define `coverage.thresholds`); nenhum threshold alterado.
+
+## 8. Allure
+Não gerado nesta validação — mesma lacuna de tooling de publicação já
+registrada nas validações anteriores desta spec.
+
+## 9. Bugs por severidade e status
+Nenhum bug de produção encontrado.
+
+## 10. Riscos residuais
+- Nenhum novo. A lacuna de teste do binding de correlação log+trace
+  ponta a ponta (apontada pelo backend-reviewer como NIT) permanece
+  idêntica ao estado de 001/002 — só pode ser fechada quando existir um
+  handler Lambda real neste BC para exercitar o fluxo completo.
+
+## 11. Limitações do ambiente
+- Node do sistema é v16; suíte só roda com `nvm use 24` (ou equivalente),
+  conforme instruído — sem impacto no resultado.
+- Docker/Postgres local indisponível nesta worktree; 8 testes de
+  integração Drizzle do BC Validação continuam skip local (pré-existente,
+  não relacionado a esta PR).
+
+## 12. Parecer final
+APROVADO PELO QA

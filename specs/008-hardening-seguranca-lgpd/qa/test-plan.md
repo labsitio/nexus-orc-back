@@ -62,3 +62,59 @@ erro `Vitest failed to find the runner` na inicialização do reporter
 `allure-vitest`, **também no baseline pré-008** (`cb343f5`) — falha de
 infraestrutura de testes preexistente, não introduzida por este PR. Ver
 `test-execution-report.md`.
+
+## T011 -- Teste de infraestrutura SCP segregacao de ambientes (PR #508, commit `8baa2ee`)
+
+### Escopo
+Validacao estatica/logica de um script bash de infraestrutura que valida
+SCP em AWS. Sem suite de dominio/aplicacao a estender.
+
+### Fora de escopo
+Execucao real contra contas AWS dev/hml/prod -- depende de T013/T014/T015,
+nao provisionadas neste ambiente. Fica sob responsabilidade de
+Ricardo/DevOps quando os pre-requisitos estiverem prontos.
+
+### Riscos
+- Guarda de conta de producao falhar e o script rodar contra prod --
+  mitigado por verificacao de codigo + mock isolado.
+- Falso-positivo/negativo na deteccao de explicit-deny de SCP -- mitigado
+  por regex especifica, validada com mock contra mensagem generica de erro.
+- Workflow disparar automaticamente (push/PR) por engano -- mitigado por
+  inspecao do YAML confirmando apenas `workflow_dispatch`.
+
+### Niveis e tipos de teste
+Estatico (leitura, permissao de arquivo, sintaxe bash, parse YAML) + mock
+logico isolado da funcao `assert_bloqueado` e da guarda de producao (sem
+depender de AWS real).
+
+### Ambientes e dependencias
+Nenhuma credencial AWS necessaria para a validacao de QA realizada. Execucao
+real do script (fora deste QA) depende de T013 (contas), T014 (SCP),
+T015 (role OIDC).
+
+### Estrategia de mocks/fakes
+Comandos `aws rds`/`aws s3api` substituidos por comandos fake (`bash -c`)
+retornando exit code e stdout controlados, para exercitar os 3 desfechos
+possiveis de `assert_bloqueado` sem chamar AWS.
+
+### Criterios de entrada
+Backend-reviewer ja aprovou (APPROVE WITH NITS) apos correcao dos 2 MAJOR.
+
+### Criterios de saida
+Todas as verificacoes estaticas/logicas PASS; nenhum defeito de producao
+encontrado; limitacao de ambiente (execucao real) registrada explicitamente.
+
+### Allure
+Nao aplicavel -- script fora do runner vitest do monorepo.
+
+### Ordem de execucao
+1. Permissao do arquivo (`git ls-files -s`).
+2. Sintaxe bash (`bash -n`).
+3. Parse do workflow YAML (`js-yaml`) + inspecao de `on`.
+4. Mock isolado de `assert_bloqueado` (3 desfechos) + guarda de producao.
+5. Leitura comparativa do README.
+
+### Limitacoes
+Sem credenciais AWS reais nem contas dev/hml/prod neste ambiente --
+execucao fim-a-fim do script nao pode ser validada por este QA. `shellcheck`
+e `python3`/`pyyaml` tambem indisponiveis; contornado com `bash -n`/`js-yaml`.

@@ -34,6 +34,7 @@ export const orcamentos = pgTable(
   'orcamentos',
   {
     id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
     canal: canalEnum('canal').notNull(),
     recebidoEm: timestamp('recebido_em', { withTimezone: true }).notNull(),
     bucket: text('bucket').notNull(),
@@ -47,6 +48,7 @@ export const orcamentos = pgTable(
     resultadoAgenteOrigem: agenteOrigemEnum('resultado_agente_origem'),
   },
   (table) => [
+    index('orcamentos_tenant_id_idx').on(table.tenantId),
     check(
       'orcamentos_nivel_confianca_em_faixa',
       nivelConfiancaEmFaixa(table.resultadoNivelConfianca),
@@ -84,6 +86,7 @@ export const orcamentosHistorico = pgTable(
   'orcamentos_historico',
   {
     id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
     orcamentoId: uuid('orcamento_id')
       .notNull()
       .references(() => orcamentos.id),
@@ -96,6 +99,7 @@ export const orcamentosHistorico = pgTable(
   },
   (table) => [
     index('orcamentos_historico_orcamento_id_idx').on(table.orcamentoId),
+    index('orcamentos_historico_tenant_id_idx').on(table.tenantId),
     check(
       'orcamentos_historico_nivel_confianca_em_faixa',
       nivelConfiancaEmFaixa(table.resultadoNivelConfianca),

@@ -36,8 +36,8 @@
 - [x] T013 Infrastructure: schema Drizzle das tabelas `validacoes_orcamento` (estado atual, `dados_extraidos`/`inconsistencias` JSONB), `validacoes_orcamento_historico` (append-only, sem UPDATE/DELETE) e `faixas_preco_categoria` (configuração) + migração.
 - [x] T014 Infrastructure: `DrizzleOrcamentoValidacaoRepository` implementando `OrcamentoValidacaoRepository`, traduzindo linha↔agregado, nunca vazando tipo JSONB bruto para fora da Infra.
 - [ ] T015 [P] Infrastructure: `OrcamentoExtraidoEventACL` traduzindo o payload dos eventos `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada` para `DadosExtraidosParaValidacao` — nunca importa tipos de domínio do BC Extração.
-- [ ] T016 Infrastructure: `EventBridgePublisher` implementando `EventPublisher` (instância própria deste BC, mesmo bus `nexo-dominio-bus`).
-- [ ] T017 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta das specs 001/002).
+- [x] T016 Infrastructure: `EventBridgePublisher` implementando `EventPublisher` (instância própria deste BC, mesmo bus `nexo-dominio-bus`).
+- [x] T017 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta das specs 001/002). #127
 
 **Checkpoint**: Domain testável isoladamente (sem infra, sem IA), repositório e publisher funcionais contra ambiente local (LocalStack).
 
@@ -51,20 +51,20 @@
 
 ### Tests (US1)
 
-- [ ] T018 [P] [US1] Unit test do agregado `OrcamentoValidacao.criar(dadosExtraidos)` + `avaliarRegrasDeConsistencia` com todas as 4 regras passando → transita para `VALIDADO`.
-- [ ] T019 [P] [US1] Unit test de cada uma das 4 regras determinísticas (T010) isoladamente, com casos de sucesso e falha, sem mock de IA.
-- [ ] T020 [P] [US1] Contract test `GET /v1/orcamentos/{orcamentoId}/validacao/status` em `tests/bounded-contexts/validacao/contract/`.
-- [ ] T021 [P] [US1] Integration test: `OrcamentoExtraido` (documento de teste consistente) publicado → `OrcamentoValidado` publicado, p95 medido em ambiente de teste local (LocalStack).
+- [x] T018 [P] [US1] Unit test do agregado `OrcamentoValidacao.criar(dadosExtraidos)` + `avaliarRegrasDeConsistencia` com todas as 4 regras passando → transita para `VALIDADO`.
+- [x] T019 [P] [US1] Unit test de cada uma das 4 regras determinísticas (T010) isoladamente, com casos de sucesso e falha, sem mock de IA.
+- [x] T020 [P] [US1] Contract test `GET /v1/orcamentos/{orcamentoId}/validacao/status` em `tests/bounded-contexts/validacao/contract/`.
+- [x] T021 [P] [US1] Integration test: `OrcamentoExtraido` (documento de teste consistente) publicado → `OrcamentoValidado` publicado, p95 medido em ambiente de teste local (LocalStack).
 
 ### Implementation (US1)
 
-- [ ] T022 [US1] Infrastructure: `FornecedorCadastradoHttpGateway` + `FornecedorCadastradoACL` (timeout curto, retry limitado, nunca bloqueia processamento de outros orçamentos na fila caso indisponível — ver Segurança do `plan.md`).
-- [ ] T023 [US1] Infrastructure: `DrizzleFaixaPrecoRepository` implementando `ParametroFaixaPrecoGateway` (leitura da tabela `faixas_preco_categoria`).
-- [ ] T024 [US1] Application: caso de uso `ValidarOrcamento` (consome `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, traduz via ACL, aplica `avaliarRegrasDeConsistencia`, persiste, publica `OrcamentoValidado` ou `OrcamentoInconsistenciaDetectada`) — caminho feliz sem categorização de item ainda (item já vem com `categoria` conhecida ou regra de preço não se aplica).
-- [ ] T025 [US1] Interface: handler Lambda consumidor SQS de `validador-queue`, invocando `ValidarOrcamento`.
-- [ ] T026 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/validacao/status` (query, Zod schema de response, Problem Details para erro).
-- [ ] T027 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema das specs 001/002.
-- [ ] T028 [US1] IAM: role dedicada `ValidarOrcamentoLambdaRole` (least privilege: leitura da tabela `faixas_preco_categoria`, sem qualquer permissão sobre `nexo-orcamentos-raw`).
+- [x] T022 [US1] Infrastructure: `FornecedorCadastradoHttpGateway` + `FornecedorCadastradoACL` (timeout curto, retry limitado, nunca bloqueia processamento de outros orçamentos na fila caso indisponível — ver Segurança do `plan.md`).
+- [x] T023 [US1] Infrastructure: `DrizzleFaixaPrecoRepository` implementando `ParametroFaixaPrecoGateway` (leitura da tabela `faixas_preco_categoria`).
+- [x] T024 [US1] Application: caso de uso `ValidarOrcamento` (consome `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`, traduz via ACL, aplica `avaliarRegrasDeConsistencia`, persiste, publica `OrcamentoValidado` ou `OrcamentoInconsistenciaDetectada`) — caminho feliz sem categorização de item ainda (item já vem com `categoria` conhecida ou regra de preço não se aplica).
+- [x] T025 [US1] Interface: handler Lambda consumidor SQS de `validador-queue`, invocando `ValidarOrcamento`.
+- [x] T026 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/validacao/status` (query, Zod schema de response, Problem Details para erro).
+- [x] T027 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema das specs 001/002.
+- [x] T028 [US1] IAM: role dedicada `ValidarOrcamentoLambdaRole` (least privilege: leitura da tabela `faixas_preco_categoria`, sem qualquer permissão sobre `nexo-orcamentos-raw`).
 
 **Checkpoint**: US1 funcional e testável isoladamente — orçamento consistente é validado com sucesso, sem intervenção manual.
 
@@ -78,10 +78,10 @@
 
 ### Tests (US2)
 
-- [ ] T029 [P] [US2] Unit test `OrcamentoValidacao.avaliarRegrasDeConsistencia` com 1+ regra falhando → transita direto para `PENDENTE_REVISAO_HUMANA` (nunca uma segunda tentativa automática, conforme ADR-001), `inconsistencias` populado com a(s) regra(s) específica(s).
-- [ ] T030 [P] [US2] Unit test `OrcamentoValidacao.registrarDecisaoHumana` — só válido a partir de `PENDENTE_REVISAO_HUMANA`; `CORRECAO_APLICADA` reavalia regras (→ `VALIDADO` se todas passarem, ou permanece `PENDENTE_REVISAO_HUMANA` com nova tentativa se ainda falhar, nunca autoaprova); `ACEITE_COM_RESSALVA` → `VALIDADO_COM_RESSALVA` (terminal); histórico nunca sobrescrito.
-- [ ] T031 [P] [US2] Unit test da decisão de negócio "campo com pendência confirmada pela Extração ainda gera inconsistência aqui" (ver `plan.md`, seção Domain) — item com `extraido: false` de origem `OrcamentoExtraidoComPendenciaConfirmada` MUST ainda reprovar a regra "campos obrigatórios preenchidos" quando o campo é obrigatório para validação.
-- [ ] T032 [P] [US2] Contract test `POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana` (aceito em `PENDENTE_REVISAO_HUMANA`; 409 Problem Details em qualquer outro status).
+- [x] T029 [P] [US2] Unit test `OrcamentoValidacao.avaliarRegrasDeConsistencia` com 1+ regra falhando → transita direto para `PENDENTE_REVISAO_HUMANA` (nunca uma segunda tentativa automática, conforme ADR-001), `inconsistencias` populado com a(s) regra(s) específica(s).
+- [x] T030 [P] [US2] Unit test `OrcamentoValidacao.registrarDecisaoHumana` — só válido a partir de `PENDENTE_REVISAO_HUMANA`; `CORRECAO_APLICADA` reavalia regras (→ `VALIDADO` se todas passarem, ou permanece `PENDENTE_REVISAO_HUMANA` com nova tentativa se ainda falhar, nunca autoaprova); `ACEITE_COM_RESSALVA` → `VALIDADO_COM_RESSALVA` (terminal); histórico nunca sobrescrito. Cobertura já existente em `orcamento-validacao.aggregate.test.ts` (adicionada junto com T009/T029): confirmada e marcada concluída, sem duplicar teste.
+- [x] T031 [P] [US2] Unit test da decisão de negócio "campo com pendência confirmada pela Extração ainda gera inconsistência aqui" (ver `plan.md`, seção Domain) — item com `extraido: false` de origem `OrcamentoExtraidoComPendenciaConfirmada` MUST ainda reprovar a regra "campos obrigatórios preenchidos" quando o campo é obrigatório para validação. Cobertura já existente em `regras-consistencia.test.ts` — "CAMPO_OBRIGATORIO_AUSENTE quando item sem descricao e extraido:false — pendência confirmada não isenta a regra" (adicionada junto com T010): confirmada e marcada concluída, sem duplicar teste.
+- [x] T032 [P] [US2] Contract test `POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana` (aceito em `PENDENTE_REVISAO_HUMANA`; 409 Problem Details em qualquer outro status).
 - [ ] T033 [P] [US2] Integration test: `OrcamentoExtraido` com inconsistência conhecida → `OrcamentoInconsistenciaDetectada` publicado → decisão humana via API → `OrcamentoValidado` ou `OrcamentoValidadoComRessalva` publicado; status reflete `PENDENTE_REVISAO_HUMANA` durante a espera (critério de aceite spec.md "estado de pendência fica visível na consulta de status, sem bloquear o processamento de outros orçamentos").
 
 ### Implementation (US2)

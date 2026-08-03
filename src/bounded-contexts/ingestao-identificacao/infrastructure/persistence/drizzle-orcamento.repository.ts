@@ -1,4 +1,4 @@
-import { asc, count, eq } from 'drizzle-orm';
+import { asc, count, eq, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
   Orcamento,
@@ -15,7 +15,21 @@ import {
   type AgenteOrigem,
 } from '../../domain/value-objects/resultado-classificacao.vo.js';
 import { TentativaClassificacao } from '../../domain/value-objects/tentativa-classificacao.vo.js';
+import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import { orcamentos, orcamentosHistorico } from './schema/orcamento.schema.js';
+
+/**
+ * ponytail: placeholder até T008 (`DrizzleTenantScopedRepositoryBase`,
+ * `SET LOCAL` a partir do `TenantContext` real) e T014/T016/T018 (spec 007,
+ * `specs/007-isolamento-multitenant-dados/tasks.md`) propagarem o `tenantId`
+ * real através de Domain/Application deste BC. T007 habilitou RLS
+ * (`tenant_isolation`) em `orcamentos`/`orcamentos_historico` — sem
+ * `SET LOCAL app.current_tenant_id`, a política nega toda leitura/escrita
+ * deste repositório. Valor fixo mantém o comportamento single-tenant já
+ * existente (nenhum tenant real em produção ainda, ADR-005) até a migração
+ * completa deste BC ser concluída pelas tasks acima.
+ */
+const TENANT_ID_PROVISORIO = TenantId.de('00000000-0000-7000-8000-000000000000').toString();
 
 /** Linha de `orcamentos` — nunca cruza para fora deste arquivo (plan.md, T011). */
 type LinhaOrcamento = typeof orcamentos.$inferSelect;
@@ -104,6 +118,19 @@ export class DrizzleOrcamentoRepository implements OrcamentoRepository {
     const resultado = orcamento.resultadoAtual?.paraPayload();
 
     await this.db.transaction(async (tx) => {
+      // RLS (T007): sessão precisa de `app.current_tenant_id` antes de
+      // qualquer SELECT/INSERT nestas tabelas — ver `TENANT_ID_PROVISORIO`.
+      // `set_config(..., true)` equivale a `SET LOCAL` mas aceita bind
+      // parameter normal do Drizzle — `SET LOCAL x = $1` é erro de sintaxe
+      // no Postgres (não aceita parâmetro na posição do valor), o que forçaria
+      // interpolação de string manual. T008 vai reaproveitar este trecho para
+      // o `tenantId` real do `TenantContext` (vindo do JWT) — `set_config`
+      // parametrizado evita herdar um padrão de SQL cru interpolado no ponto
+      // exato que substituirá uma constante local por dado de request.
+      await tx.execute(
+        sql`select set_config('app.current_tenant_id', ${TENANT_ID_PROVISORIO}, true)`,
+      );
+
       // Serializa `salvar` concorrente do mesmo agregado (ex.: retry de Lambda
       // + invocação original) — sem este lock, duas transações poderiam ler a
       // mesma contagem de `orcamentos_historico` e duplicar a mesma tentativa
@@ -119,6 +146,7 @@ export class DrizzleOrcamentoRepository implements OrcamentoRepository {
         .insert(orcamentos)
         .values({
           id: orcamento.id.toString(),
+          tenantId: TENANT_ID_PROVISORIO,
           canal: orcamento.canal.valor,
           recebidoEm: orcamento.recebidoEm,
           bucket: orcamento.referenciaBruta.bucket,
@@ -155,6 +183,7 @@ export class DrizzleOrcamentoRepository implements OrcamentoRepository {
       await tx.insert(orcamentosHistorico).values(
         novasTentativas.map((tentativa) => ({
           orcamentoId: orcamento.id.toString(),
+          tenantId: TENANT_ID_PROVISORIO,
           agente: tentativa.agente,
           ocorreuEm: tentativa.timestamp,
           resultadoFornecedorIdentificado: tentativa.resultado?.fornecedorIdentificado ?? null,
@@ -167,20 +196,28 @@ export class DrizzleOrcamentoRepository implements OrcamentoRepository {
   }
 
   async buscarPorId(id: OrcamentoId): Promise<Orcamento | undefined> {
-    const [linhaOrcamento] = await this.db
-      .select()
-      .from(orcamentos)
-      .where(eq(orcamentos.id, id.toString()));
-    if (!linhaOrcamento) {
-      return undefined;
-    }
+    return this.db.transaction(async (tx) => {
+      // RLS (T007): mesma exigência de `set_config` do `salvar` — ver
+      // `TENANT_ID_PROVISORIO`.
+      await tx.execute(
+        sql`select set_config('app.current_tenant_id', ${TENANT_ID_PROVISORIO}, true)`,
+      );
 
-    const linhasHistorico = await this.db
-      .select()
-      .from(orcamentosHistorico)
-      .where(eq(orcamentosHistorico.orcamentoId, id.toString()))
-      .orderBy(asc(orcamentosHistorico.ocorreuEm), asc(orcamentosHistorico.id));
+      const [linhaOrcamento] = await tx
+        .select()
+        .from(orcamentos)
+        .where(eq(orcamentos.id, id.toString()));
+      if (!linhaOrcamento) {
+        return undefined;
+      }
 
-    return agregadoDaLinha(linhaOrcamento, linhasHistorico.map(tentativaDaLinha));
+      const linhasHistorico = await tx
+        .select()
+        .from(orcamentosHistorico)
+        .where(eq(orcamentosHistorico.orcamentoId, id.toString()))
+        .orderBy(asc(orcamentosHistorico.ocorreuEm), asc(orcamentosHistorico.id));
+
+      return agregadoDaLinha(linhaOrcamento, linhasHistorico.map(tentativaDaLinha));
+    });
   }
 }
