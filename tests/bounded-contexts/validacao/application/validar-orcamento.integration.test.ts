@@ -142,7 +142,11 @@ async function processarMensagemValidadorQueue(
 
   const evento =
     validacao.status === 'VALIDADO'
-      ? new OrcamentoValidado(validacao.orcamentoId.toString())
+      ? new OrcamentoValidado(
+          validacao.orcamentoId.toString(),
+          dadosExtraidos.itens.map((item) => item.paraPayload()),
+          dadosExtraidos.condicoesComerciais,
+        )
       : new OrcamentoInconsistenciaDetectada(
           validacao.orcamentoId.toString(),
           validacao.inconsistencias.map((inconsistencia) => inconsistencia.paraPayload()),
@@ -173,7 +177,7 @@ describe('Consumidor de validador-queue (integração simulada)', () => {
     expect(publisher.eventosPublicados).toHaveLength(1);
     const evento = publisher.eventosPublicados[0] as OrcamentoValidado;
     expect(evento.detailType).toBe(OrcamentoValidado.detailType);
-    expect(evento.schemaVersion).toBe(1);
+    expect(evento.schemaVersion).toBe(2);
     expect(evento.orcamentoId).toBe(orcamentoId.toString());
   });
 

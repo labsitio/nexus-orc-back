@@ -81,7 +81,11 @@ export class ValidarOrcamento {
 
     const evento =
       validacao.status === 'VALIDADO'
-        ? new OrcamentoValidado(validacao.orcamentoId.toString())
+        ? new OrcamentoValidado(
+            validacao.orcamentoId.toString(),
+            dadosExtraidos.itens.map((item) => item.paraPayload()),
+            dadosExtraidos.condicoesComerciais,
+          )
         : new OrcamentoInconsistenciaDetectada(
             validacao.orcamentoId.toString(),
             validacao.inconsistencias.map((inconsistencia) => inconsistencia.paraPayload()),
