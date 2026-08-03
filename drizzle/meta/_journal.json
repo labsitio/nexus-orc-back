@@ -85,6 +85,41 @@
       "when": 1785518222728,
       "tag": "0011_validacoes_orcamento_faixas_preco_reais",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785586799239,
+      "tag": "0012_orquestracao_baseline",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785588425596,
+      "tag": "0013_rls_orcamentos_tenant_isolation",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785589023772,
+      "tag": "0014_indices_orcamento_completo",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1785606417476,
+      "tag": "0015_decisoes_workflow_completo",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785682366152,
+      "tag": "0016_t015b_rls_indices_orcamento_tenant_isolation",
+      "breakpoints": true
     }
   ]
 }

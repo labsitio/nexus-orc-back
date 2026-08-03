@@ -1,0 +1,43 @@
+name: Verificar Contrato - AssumeRole restrito por conta
+
+# Spec 008 (Hardening Segurança/LGPD), T012. Disparo manual apenas —
+# depende das roles de deploy OIDC por ambiente já provisionadas (T015),
+# nenhuma disponível no CI padrão (ci.yml). Executado por Ricardo/DevOps
+# quando os pré-requisitos abaixo estiverem prontos. Ver infra/scripts/README.md.
+on:
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: 'Conta cuja role de deploy será testada (dev ou hml, nunca prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - hml
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verificar-contrato-assume-role:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.ambiente }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Role OIDC específica do ambiente (T015) — configurar como secret/var
+      # do GitHub Environment correspondente (`dev` ou `hml`), nunca uma
+      # role única multi-conta.
+      - name: Assumir role de deploy do ambiente (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Rodar teste de contrato (AssumeRole não atravessa conta/ambiente)
+        run: ./infra/scripts/verificar-contrato-assume-role-por-conta.sh
+        env:
+          AWS_PROD_ACCOUNT_ID: ${{ vars.AWS_PROD_ACCOUNT_ID }}
+          OUTRAS_DEPLOY_ROLE_ARNS: ${{ vars.OUTRAS_DEPLOY_ROLE_ARNS }}

@@ -61,7 +61,7 @@
 - [x] T022 [US1] Application: caso de uso `ExtrairDadosOrcamento` (consome `OrcamentoClassificado`, converte via MarkItDown, invoca Extrator, aplica `registrarTentativaExtrator`, persiste, publica `OrcamentoExtraido` se todos os campos obrigatórios OK ou `ExtracaoEscalonadaParaRevisaoHumana` se 1+ campo sem confiança). #87
 - [x] T023 [US1] Interface: handler Lambda consumidor SQS de `extrator-queue`, invocando `ExtrairDadosOrcamento`. Dependia de ADR-003 (spec 001, `referenciaBruta` no payload de `OrcamentoClassificado` — PR #483) para poder construir `referenciaBrutaS3`. #88
 - [ ] T024 [US1] Interface: controller `GET /v1/orcamentos/{orcamentoId}/extracao/status` (query, Zod schema de response, Problem Details para erro).
-- [ ] T025 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema da spec 001.
+- [x] T025 [US1] Interface: autenticação Cognito (JWT) no endpoint de status, mesmo esquema da spec 001. #90
 - [x] T026 [US1] IAM: role dedicada `ExtratorLambdaRole` (least privilege: `bedrock:InvokeModel` restrito ao ARN do modelo aprovado, `s3:GetObject` restrito ao prefixo do bucket raw, sem `PutObject`/`DeleteObject`). #91
 
 **Checkpoint**: US1 funcional e testável isoladamente — orçamento classificado com documento bem formado é extraído com sucesso, sem intervenção manual.
@@ -76,8 +76,8 @@
 
 ### Tests (US2)
 
-- [ ] T027 [P] [US2] Unit test `ExtracaoOrcamento.registrarTentativaExtrator` com campo obrigatório de confiança insuficiente → transita direto para `PENDENTE_REVISAO_HUMANA`, nunca para `EXTRAIDO`, campo permanece `extraido: false`/`valor: null`.
-- [ ] T029 [P] [US2] Integration test: campo ambíguo conhecido → `ExtracaoEscalonadaParaRevisaoHumana` publicado diretamente pelo Extrator (sem revisor de IA) → status reflete `PENDENTE_REVISAO_HUMANA`.
+- [x] T027 [P] [US2] Unit test `ExtracaoOrcamento.registrarTentativaExtrator` com campo obrigatório de confiança insuficiente → transita direto para `PENDENTE_REVISAO_HUMANA`, nunca para `EXTRAIDO`, campo permanece `extraido: false`/`valor: null`. Já coberto por `tests/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.test.ts` (escrito junto de T009) — nenhum código novo necessário. #92
+- [x] T029 [P] [US2] Integration test: campo ambíguo conhecido → `ExtracaoEscalonadaParaRevisaoHumana` publicado diretamente pelo Extrator (sem revisor de IA) → status reflete `PENDENTE_REVISAO_HUMANA`. #94
 
 > **Nota (revisão)**: T028 (unit test do revisor de extração) e T030–T034 (implementação do `BedrockRevisorExtracaoGateway`, caso de uso `RevisarExtracaoComIA`, fila `revisor-extracao-queue`, regra EventBridge e role `RevisorExtracaoLambdaRole`) foram **removidos** — o Agente Revisor de Extração deixou de existir. O caminho de baixa confiança agora é publicado diretamente pelo `ExtrairDadosOrcamento` (T022) via `registrarTentativaExtrator` (T009). Os IDs T028 e T030–T034 não existem mais; os demais IDs foram mantidos estáveis para preservar a rastreabilidade das issues do GitHub.
 
@@ -93,14 +93,14 @@
 
 ### Tests (US3)
 
-- [ ] T035 [P] [US3] Unit test `ExtracaoOrcamento.registrarConfirmacaoHumana` — só válido a partir de `PENDENTE_REVISAO_HUMANA`; valor real → `EXTRAIDO`; indisponibilidade confirmada → `EXTRAIDO_COM_PENDENCIA_CONFIRMADA`; histórico nunca sobrescrito.
-- [ ] T036 [P] [US3] Unit test de imutabilidade: tentativa de sobrescrever `referenciaBrutaS3` ou `referenciaClassificacao` após criação lança `ReferenciaImutavelError`.
-- [ ] T037 [P] [US3] Contract test `POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana` (aceito em `PENDENTE_REVISAO_HUMANA`; 409 Problem Details em qualquer outro status).
+- [x] T035 [P] [US3] Unit test `ExtracaoOrcamento.registrarConfirmacaoHumana` — só válido a partir de `PENDENTE_REVISAO_HUMANA`; valor real → `EXTRAIDO`; indisponibilidade confirmada → `EXTRAIDO_COM_PENDENCIA_CONFIRMADA`; histórico nunca sobrescrito. Já coberto pela suíte existente em `tests/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.test.ts` (describe `ExtracaoOrcamento.registrarConfirmacaoHumana`, linhas 104-130) — nenhum teste novo necessário.
+- [x] T036 [P] [US3] Unit test de imutabilidade: tentativa de sobrescrever `referenciaBrutaS3` ou `referenciaClassificacao` após criação lança `ReferenciaImutavelError`. Já coberto pela suíte existente em `tests/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.test.ts` (describe `ExtracaoOrcamento — imutabilidade de referências`, linhas 146-156) — nenhum teste novo necessário. #101
+- [x] T037 [P] [US3] Contract test `POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana` (aceito em `PENDENTE_REVISAO_HUMANA`; 409 Problem Details em qualquer outro status). #102
 
 ### Implementation (US3)
 
-- [ ] T038 [US3] Application: caso de uso `ConfirmarRevisaoHumanaExtracao` (valida status, aplica `registrarConfirmacaoHumana`, publica `OrcamentoExtraido` ou `OrcamentoExtraidoComPendenciaConfirmada`).
-- [ ] T039 [US3] Interface: controller `POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana`, Zod schema (campos confirmados: valor real OU marcação explícita "indisponível"), Problem Details para 409.
+- [x] T038 [US3] Application: caso de uso `ConfirmarRevisaoHumanaExtracao` (valida status, aplica `registrarConfirmacaoHumana`, publica `OrcamentoExtraido` ou `OrcamentoExtraidoComPendenciaConfirmada`). #103
+- [x] T039 [US3] Interface: controller `POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana`, Zod schema (campos confirmados: valor real OU marcação explícita "indisponível"), Problem Details para 409. #104
 - [ ] T040 [US3] IAM: role dedicada `ConfirmarRevisaoHumanaExtracaoLambdaRole`, least privilege.
 
 **Checkpoint**: todas as user stories funcionais e testáveis independentemente; nenhum dado bruto ou de classificação sobrescrito em nenhum fluxo.

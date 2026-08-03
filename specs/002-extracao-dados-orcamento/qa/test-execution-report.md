@@ -385,3 +385,141 @@ ambiente local**, não como defeito de produção nem de teste.
 ## Falhas classificadas
 Nenhuma falha de teste. 1 achado de code review (não é falha de teste) —
 ver `bugs/BUG-001.md` (getter `historico` sem cópia defensiva, severidade BAIXA).
+
+## Leva T039 (issue #104, PR #526, commit `cd73e66`)
+
+Primeira validação de QA. `backend-reviewer` já havia aprovado (APPROVE, mesmo
+commit). PR em draft.
+
+### Escopo
+Controller `POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana`
+(Interface, novo) — mapeia `ConfirmarRevisaoHumanaExtracao.executar` (T038) para
+HTTP: 200 com `StatusExtracaoResponse` (validado contra `statusExtracaoResponseSchema`
+antes do envio), 400 (`orcamentoId` inválido, body inválido, `CaminhoConfirmacaoInvalidoError`),
+404 (`ExtracaoNaoEncontradaError`), 409 Problem Details (`TransicaoInvalidaExtracaoError`).
+Efeito colateral em produção: `.executar()` do caso de uso T038 passou a
+retornar `ExtracaoOrcamento` (era `void`) — mudança aditiva, não quebra nenhuma
+asserção do teste do caso de uso já existente.
+
+### Comando e resultado
+```bash
+cd nexus-orc-back-wt-002c && npx vitest run --reporter=default tests/bounded-contexts/extracao
+# Test Files  31 passed | 2 skipped (33)
+#      Tests  147 passed | 12 skipped (159)
+```
+2 skipped = persistência Drizzle sem `DATABASE_URL`, pré-existente, não
+relacionado a T039. Sem regressão nas demais suítes do BC.
+
+- `revisao-humana.controller.test.ts` (novo, entregue pelo dev-back-end):
+  **6/6 PASS** (200 sucesso, 400 orcamentoId inválido, 400 body inválido, 404
+  não encontrada, 400 caminho inválido, 409 transição inválida).
+- `confirmar-revisao-humana-extracao.test.ts` (T038, já existente): **15/15
+  PASS** — não precisou de alteração; a mudança de retorno (`void` →
+  `ExtracaoOrcamento`) é aditiva.
+
+### Estático
+- `npx tsc --noEmit -p .` — sem erros.
+- `npx eslint` nos 3 arquivos de produção alterados/novos + arquivo de teste
+  novo — sem erros.
+
+### Cobertura dos arquivos desta leva
+```bash
+npx vitest run --coverage tests/bounded-contexts/extracao/interface/http/revisao-humana.controller.test.ts tests/bounded-contexts/extracao/application/confirmar-revisao-humana-extracao.test.ts
+```
+- `revisao-humana.controller.ts`: **96.87% statements / 84.21% branches / 100%
+  functions / 96.87% lines.** Única linha não coberta: `throw erro` final (erro
+  não mapeado explicitamente → 500 via handler default do Fastify) — caminho
+  defensivo de erro verdadeiramente inesperado, não um caso de negócio previsto
+  pelo spec.md; risco residual desprezível, não bloqueante.
+- `confirmar-revisao-humana-extracao.ts`: 98.88% statements / 92.3% branches /
+  100% functions / 98.86% lines — inalterado frente ao já validado em T038
+  (mudança de retorno não introduziu branch novo).
+
+### Verificação independente do critério de aceite (spec.md US3)
+- **Valor real → `EXTRAIDO` + `OrcamentoExtraido`; indisponibilidade →
+  `EXTRAIDO_COM_PENDENCIA_CONFIRMADA` + `OrcamentoExtraidoComPendenciaConfirmada`**:
+  a decisão de negócio pertence ao caso de uso (T038, já validado, 15 testes
+  incluindo os 2 caminhos), não ao controller — o teste do controller mocka
+  `.executar()` inteiro corretamente (não reimplementa a regra), coerente com
+  a arquitetura em camadas do BC. Verificado por leitura de código que o
+  controller nunca decide o evento nem o status — apenas repassa o retorno do
+  caso de uso para `paraResposta`.
+- **`referenciaBrutaS3`/`referenciaClassificacao` nunca sobrescritos**:
+  confirmado por leitura de `extracao-orcamento.aggregate.ts` —
+  `registrarConfirmacaoHumana` só atribui `_itens`/`_condicoesComerciais`/`_historico`;
+  a classe não expõe nenhum setter para as duas referências (imutabilidade
+  estrutural já garantida desde T009, não alterada por T039).
+- **409 Problem Details em qualquer status diferente de `PENDENTE_REVISAO_HUMANA`**:
+  o controller mapeia `TransicaoInvalidaExtracaoError` (lançado pelo agregado,
+  não pelo controller) para 409 — cobertura do "qualquer status diferente"
+  já garantida em T038 (`extracao-orcamento.aggregate.test.ts` + `confirmar-revisao-humana-extracao.test.ts`
+  testam `PENDENTE` e `EXTRAIDO_COM_PENDENCIA_CONFIRMADA` como exemplos do
+  guard genérico do agregado, que rejeita qualquer status != `PENDENTE_REVISAO_HUMANA`).
+- **Body Zod (`revisaoHumanaExtracaoBodySchema`)**: reaproveitado sem alteração
+  de comportamento — `revisao-humana.schema.ts` só ganhou um comentário
+  apontando para o controller (T037, contrato já validado em
+  `revisao-humana.contract.test.ts`, 8 testes, inalterado por esta PR).
+
+### Falhas classificadas
+Nenhuma. Nenhum defeito de produção encontrado nesta leva — controller
+consistente com `plan.md`/`spec.md` US3, reaproveita o mecanismo de erro do
+agregado (T009/T038) sem duplicar regra de negócio na camada HTTP.
+
+### Resultado
+**PASS.** Nenhum defeito. Ver parecer consolidado em `evidence/qa-final-report.md`.
+
+---
+
+## Leva T038 (issue #103, PR #521, commit `76ccbed`)
+
+Primeira validação de QA. `backend-reviewer` já havia aprovado (APPROVE) após
+1 rodada de correção (guard de transição via `TransicaoInvalidaExtracaoError`
+do agregado, e validação de shape por campo em vez de cast inseguro sobre
+`valor: unknown`).
+
+### Comando
+`cd nexus-orc-back-wt-002b && npx vitest run --reporter=default tests/bounded-contexts/extracao`
+(NÃO `pnpm test` — `allure-vitest` quebra a suíte inteira por motivo ambiental
+pré-existente, ver `test-plan.md` § Limitações).
+
+### Resultado
+- Suíte completa do BC Extração: **30 arquivos passaram, 2 skipped (persistência
+  Drizzle, sem banco disponível neste worktree), 141 testes passaram, 0 falha**
+  (baseline antes do QA: 137 testes; +4 testes adicionados pelo QA neste
+  arquivo).
+- Arquivo do caso de uso sob teste, após QA adicionar 4 testes de cobertura
+  (ver abaixo): `confirmar-revisao-humana-extracao.test.ts` — **15 testes,
+  100% aprovados** (11 do dev-back-end + 4 novos de QA).
+- `npx tsc --noEmit -p .` — sem erros.
+- `npx eslint tests/bounded-contexts/extracao/application/confirmar-revisao-humana-extracao.test.ts src/bounded-contexts/extracao/application/use-cases/confirmar-revisao-humana-extracao.ts` — sem erros.
+
+### Lacuna de cobertura identificada e testes adicionados pelo QA
+Cobertura inicial do arquivo de produção (`confirmar-revisao-humana-extracao.ts`,
+apenas com os 11 testes do dev-back-end): 80.89% statements / 76.92% branches.
+Caminhos felizes (`valor` real, sem `indisponivel`) para `condicoesPagamento`,
+`condicoesEntrega`, `prazoValidade` (data ISO válida), `descricao` e
+`quantidade` de item não estavam exercitados — só os caminhos de erro e o de
+`precoUnitario`. QA adicionou, sem alterar nenhum arquivo de produção:
+1. Confirmação de `descricao` e `quantidade` pendentes de um item, valor real.
+2. Confirmação de `condicoesPagamento` e `condicoesEntrega` pendentes, valor real.
+3. Confirmação de `prazoValidade` pendente com data ISO 8601 válida.
+4. `ExtracaoSemCondicoesComerciaisError` (branch defensivo, "nunca deveria
+   ocorrer" segundo o próprio comentário do código) — construído via
+   `ExtracaoOrcamento.reconstituir(...)` (factory pública já existente para
+   reidratação pelo repositório) com `status: 'PENDENTE_REVISAO_HUMANA'` e
+   `condicoesComerciais: undefined`, sem cast nem mock de classe.
+
+Cobertura final do arquivo: **98.87% statements / 92.3% branches / 100%
+functions / 98.85% lines.** Única linha não coberta: ramo `sku === undefined`
+de `comoStringOpcional` dentro de `resolverDescricaoProduto` — branch trivial,
+já coberto indiretamente em `descricao-produto.vo.test.ts` no nível do VO;
+risco residual desprezível, não bloqueante.
+
+### Falhas classificadas
+Nenhuma. Nenhum defeito de produção encontrado nesta leva — comportamento do
+caso de uso confere integralmente com `plan.md` §§ "Application — Casos de
+uso" e "Domain — Agregados" (busca por `orcamentoId`, guard de status via erro
+do agregado, nunca reabre campo `extraido: true`, decide o evento a publicar
+lendo o `status` resultante do agregado — nunca decide a regra de negócio por
+conta própria, imutabilidade de `referenciaBrutaS3`/`referenciaClassificacao`
+preservada).

@@ -1,5 +1,249 @@
 # QA Final Report — SPEC 002-extracao-dados-orcamento
 
+## Validação — T039 (issue #104), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #526 (draft), branch `feat/002-t039-controller-revisao-humana`, commit
+`cd73e66`. Worktree `nexus-orc-back-wt-002c`.
+
+### Resumo executivo
+`backend-reviewer` já aprovou (APPROVE, mesmo commit). Controller
+`POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana` mapeia
+`ConfirmarRevisaoHumanaExtracao` (T038, já validado pelo QA) para HTTP: 200
+com `StatusExtracaoResponse` validado contra schema Zod, 400/404/409 Problem
+Details mapeados a partir dos erros do domínio/aplicação, sem duplicar nenhuma
+regra de negócio na camada HTTP. `.executar()` do caso de uso passou a
+retornar `ExtracaoOrcamento` (era `void`) — mudança aditiva, suíte de T038
+(15 testes) continua passando sem alteração. Suíte nova do controller (6
+testes, entregue pelo dev-back-end) cobre os 6 desfechos HTTP relevantes.
+Nenhum defeito de produção encontrado.
+
+### Testes criados ou alterados
+`tests/bounded-contexts/extracao/interface/http/revisao-humana.controller.test.ts`
+(novo, entregue pelo dev-back-end, 6 casos) — QA não precisou adicionar teste
+novo: cobertura já ficou em 96.87% statements / 84.21% branches no arquivo de
+produção, e a única linha não coberta é um `throw` de erro verdadeiramente
+inesperado (500 via handler default do Fastify), não um caminho de negócio do
+spec.md. Nenhum arquivo de produção alterado pelo QA.
+
+### Requisitos cobertos (US3, spec.md)
+Ver `qa/traceability-matrix.md` § "Leva T039" para o mapeamento completo.
+Resumo: 400 (`orcamentoId` inválido, body inválido), 404 (extração não
+encontrada), 409 Problem Details (status diferente de `PENDENTE_REVISAO_HUMANA`,
+qualquer um), 200 com resposta validada contra o schema de status. A decisão
+de negócio em si (valor real → `EXTRAIDO`/`OrcamentoExtraido`; indisponibilidade
+→ `EXTRAIDO_COM_PENDENCIA_CONFIRMADA`/`OrcamentoExtraidoComPendenciaConfirmada`;
+`referenciaBrutaS3`/`referenciaClassificacao` nunca sobrescritos) já estava
+coberta em T038 (application) — controller apenas repassa o resultado, mocka
+`.executar()` inteiro no teste próprio, corretamente sem reimplementar a
+regra. Fora de escopo desta leva: IAM `ConfirmarRevisaoHumanaExtracaoLambdaRole`
+(T040) e composição raiz (Lambda handler HTTP real) — não existem ainda neste
+BC, consistente com `tasks.md`.
+
+### Suítes executadas e comandos
+```bash
+cd nexus-orc-back-wt-002c
+npx vitest run --reporter=default tests/bounded-contexts/extracao
+npx tsc --noEmit -p .
+npx eslint src/bounded-contexts/extracao/interface/http/revisao-humana.controller.ts \
+  src/bounded-contexts/extracao/application/use-cases/confirmar-revisao-humana-extracao.ts \
+  src/bounded-contexts/extracao/interface/http/revisao-humana.schema.ts \
+  tests/bounded-contexts/extracao/interface/http/revisao-humana.controller.test.ts
+```
+`pnpm test` puro NÃO usado — `allure-vitest` quebra a suíte inteira por motivo
+ambiental pré-existente (ver `qa/test-plan.md` § Limitações), sem relação com
+este código.
+
+### Quantidade de testes por tipo
+Unit (Interface/HTTP, Fastify `inject`, caso de uso mockado): 6 (controller,
+novos). Unit (Application, já existente de T038, inalterado): 15. Suíte
+completa do BC Extração: 33 arquivos, 159 testes (147 aprovados, 12 ignorados),
+2 arquivos skipped (persistência Drizzle, sem banco disponível neste worktree).
+
+### Resultado: aprovados, falhos, ignorados e instáveis
+147 aprovados, 0 falhos, 12 ignorados (persistência Drizzle, ambiental), 0
+instáveis.
+
+### Cobertura inicial e final
+Medida com `vitest run --coverage` isolado nos 2 arquivos de teste desta leva
+(controller + caso de uso), sem threshold configurado no projeto (gap
+pré-existente, ver `qa/coverage-baseline.md`):
+- `revisao-humana.controller.ts` (arquivo novo desta leva): **96.87%
+  statements / 84.21% branches / 100% functions / 96.87% lines.** Única linha
+  não coberta: `throw erro` final (erro não mapeado explicitamente → 500) —
+  caminho defensivo, não um caso de negócio previsto pelo spec.md.
+- `confirmar-revisao-humana-extracao.ts` (já validado em T038, inalterado
+  frente à mudança de retorno): 98.88% statements / 92.3% branches / 100%
+  functions / 98.86% lines.
+
+### Local do allure-results e do relatório Allure
+`allure-results/` gerado por `pnpm run test` (não usado nesta leva por causa
+do problema ambiental do reporter); execução via `vitest run` puro não gera
+Allure. Ver `qa/allure-report.md` para o gap já registrado (pré-existente,
+mesma causa de `test-plan.md` § Limitações).
+
+### Bugs por severidade e status
+Nenhum bug novo aberto nesta leva. Bugs herdados de levas anteriores não
+relacionados a T039: ver handoff consolidado.
+
+### Riscos residuais
+Nenhum bloqueante. Composição raiz (Lambda handler HTTP real que instancia
+repositório/publisher concretos e registra esta rota) ainda não existe neste
+BC — mesmo padrão observado em `ingestao-identificacao`, onde a composição
+fica fora de `interface/http/*.controller.ts`; não é escopo de T039 nem
+bloqueia a validação deste controller isoladamente.
+
+### Limitações do ambiente
+Mesma limitação ambiental de levas anteriores (`allure-vitest` quebra
+`pnpm test`) — contornada com `vitest run` direto, sem impacto no resultado.
+
+### Parecer final
+**APROVADO PELO QA**
+
+---
+
+## Validação — T038 (issue #103), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #521 (draft), branch `feat/002-t038-confirmar-revisao-humana-extracao`,
+commit `76ccbed`. Worktree `nexus-orc-back-wt-002b`.
+
+### Resumo executivo
+`backend-reviewer` já aprovou (APPROVE) após 1 rodada de correção (guard de
+transição via erro do agregado `TransicaoInvalidaExtracaoError`, e validação de
+shape por campo em vez de cast inseguro sobre `valor: unknown` do contrato Zod
+de T037). QA validou: comportamento do caso de uso `ConfirmarRevisaoHumanaExtracao`
+confere integralmente com `plan.md`; suíte do dev-back-end (11 testes) passa;
+identificada lacuna de cobertura nos caminhos felizes de `condicoesPagamento`,
+`condicoesEntrega`, `prazoValidade` (ISO válida), `descricao` e `quantidade` de
+item, e no branch defensivo `ExtracaoSemCondicoesComerciaisError` — QA
+adicionou 3 testes (o 4º cenário some sob duplicidade parcial com o já
+existente) sem alterar nenhum arquivo de produção. Nenhum defeito de produção
+encontrado.
+
+### Testes criados ou alterados (QA)
+`tests/bounded-contexts/extracao/application/confirmar-revisao-humana-extracao.test.ts`
+— de 11 para 15 testes (+4, ver `qa/test-execution-report.md` § "Leva T038"
+para o detalhe de cada um). Nenhum arquivo de produção tocado.
+
+### Requisitos cobertos (T038, tasks.md / plan.md)
+Ver `qa/traceability-matrix.md` § "Leva T038" para o mapeamento cenário-a-cenário.
+Resumo: busca por `orcamentoId` (404 lógico via `ExtracaoNaoEncontradaError`);
+guard de status (`TransicaoInvalidaExtracaoError` só a partir de
+`PENDENTE_REVISAO_HUMANA`); valor real completa campo pendente (todos os 6
+campos possíveis, itens e condições comerciais) → `EXTRAIDO`; `indisponivel:
+true` → `EXTRAIDO_COM_PENDENCIA_CONFIRMADA`, `agenteOrigem: 'HUMANO'`, nunca
+inventa valor; nunca reabre campo já `extraido: true`; caminho/shape inválido
+na borda nunca vaza `TypeError`; imutabilidade de `referenciaBrutaS3`/
+`referenciaClassificacao` preservada (verificada por leitura de código — nunca
+chamados no arquivo de produção). Fora de escopo: mapeamento HTTP (T039, ainda
+não implementado) e IAM da role dedicada (T040).
+
+### Suítes executadas e comandos
+```bash
+cd nexus-orc-back-wt-002b
+npx vitest run --reporter=default tests/bounded-contexts/extracao
+npx tsc --noEmit -p .
+npx eslint tests/bounded-contexts/extracao/application/confirmar-revisao-humana-extracao.test.ts \
+  src/bounded-contexts/extracao/application/use-cases/confirmar-revisao-humana-extracao.ts
+```
+`pnpm test` puro NÃO usado — `allure-vitest` quebra a suíte inteira por motivo
+ambiental pré-existente (ver `qa/test-plan.md` § Limitações), sem relação com
+este código.
+
+### Quantidade de testes por tipo
+Unit (Application, com fakes de repositório/publisher): 15 (11 dev-back-end +
+4 QA). Suíte completa do BC Extração: 30 arquivos, 141 testes (baseline antes
+do QA: 137), 2 arquivos skipped (persistência Drizzle, sem banco disponível
+neste worktree).
+
+### Resultado: aprovados, falhos, ignorados e instáveis
+141 aprovados, 0 falhos, 12 ignorados (persistência Drizzle, ambiental), 0
+instáveis.
+
+### Cobertura inicial e final
+Medida com `vitest run --coverage` isolado no arquivo de teste do caso de uso
+(sem threshold configurado no projeto — gap pré-existente, ver
+`qa/coverage-baseline.md`):
+- Inicial (11 testes do dev-back-end): 80.89% statements / 76.92% branches /
+  75% functions / 80.45% lines.
+- Final (15 testes, após QA): **98.87% statements / 92.3% branches / 100%
+  functions / 98.85% lines.** Única linha não coberta: branch trivial
+  `sku === undefined` de `comoStringOpcional`, já coberto no nível do VO
+  (`descricao-produto.vo.test.ts`) — risco residual desprezível.
+
+### Local do allure-results e do relatório Allure
+`allure-results/` gerado por `pnpm run test` (não usado nesta leva por causa
+do problema ambiental do reporter); execução via `vitest run` puro não gera
+Allure. Ver `qa/allure-report.md` para o gap já registrado (pré-existente,
+mesma causa de `test-plan.md` § Limitações).
+
+### Bugs por severidade e status
+Nenhum bug novo aberto nesta leva. Bugs herdados de levas anteriores não
+relacionados a T038: ver handoff consolidado.
+
+### Riscos residuais
+Nenhum bloqueante. Mapeamento HTTP (409/400/404) fica para T039 — os erros de
+domínio já existem e são específicos o suficiente para esse mapeamento futuro.
+
+### Limitações do ambiente
+Mesma limitação ambiental de levas anteriores (`allure-vitest` quebra
+`pnpm test`) — contornada com `vitest run` direto, sem impacto no resultado.
+
+### Parecer final
+**APROVADO PELO QA**
+
+---
+
+## Validação — T029 (issue #94), primeira validação
+
+### SPEC_ID e versão testada
+SPEC_ID: 002-extracao-dados-orcamento
+PR #492, branch `feat/002-t029-integration-test-campo-ambiguo`, commit `f48e0c0`.
+
+### Resumo executivo
+Nenhum código de produção alterado. PR adiciona apenas
+`tests/bounded-contexts/extracao/interface/extrator-queue.handler.integration.test.ts`
+(1 teste) e marca T029 concluída em `tasks.md`. O teste percorre a pilha real
+ponta a ponta — mensagem SQS (envelope EventBridge) → `criarExtratorQueueHandler`
+real (T023) → `ExtrairDadosOrcamento` real (T022) →
+`ExtracaoOrcamento.registrarTentativaExtrator` real (T009) — com fakes só nas
+bordas de infra (repositório, S3, MarkItDown, Bedrock, EventBridge), mesmo
+padrão já aprovado em T020. Não é redundante a T020 (orquestração reimplementada
+inline, sem handler) nem a T027 (unit test do agregado isolado): é o único
+cenário que exercita `criarExtratorQueueHandler` de fato.
+
+### Requisitos cobertos (T029, tasks.md / spec.md US2)
+Ver `qa/traceability-matrix.md` § "Leva T029" para o mapeamento cenário-a-cenário:
+(a) campo obrigatório ambíguo/ilegível conhecido nunca preenchido com valor
+inventado/estimado (`extraido: false`/`valor: null` no VO real); (b)
+`ExtracaoEscalonadaParaRevisaoHumana` publicado diretamente pelo Extrator, sem
+passo de revisor de IA (ADR-003); (c) status `PENDENTE_REVISAO_HUMANA` refletido
+no estado persistido do agregado real. Consulta de status via HTTP (T024) fora
+de escopo — endpoint ainda não implementado.
+
+### Suítes executadas
+```
+npx vitest run tests/bounded-contexts/extracao/interface/extrator-queue.handler.integration.test.ts
+→ 1 passed
+
+npx vitest run tests/bounded-contexts/extracao
+→ 27 passed | 2 skipped (29 arquivos) — 113 passed | 12 skipped (125 testes)
+  (skips pré-existentes: testes de integração Drizzle dependentes de banco local,
+  não relacionados a esta PR)
+```
+`tsc --noEmit` e `eslint` no arquivo de teste novo: sem erros.
+
+### Bugs encontrados
+Nenhum.
+
+### Parecer final
+APROVADO PELO QA.
+
+---
+
 ## Validação — T023 (issue #88), primeira validação
 
 ### SPEC_ID e versão testada

@@ -4,10 +4,18 @@
  * Diferente de 001/002, os 3 eventos deste BC são todos contratos externos
  * estáveis — não há evento "interno" de baixa confiança, pois não existe
  * camada de IA revisora intermediária (ADR-001).
+ *
+ * **Amendment ADR-003 (spec 004, T006, retrofit)**: `OrcamentoValidado`/
+ * `OrcamentoValidadoComRessalva` sobem para `schemaVersion: 2` ao incorporar
+ * `itens`/`condicoesComerciais` — payload enriquecido exigido pelo BC Busca
+ * & Indexação (`OrcamentoValidadoEventACL`, T018) para montar
+ * `ConteudoIndexavel`, sem introduzir uma segunda assinatura cross-BC a
+ * eventos de Extração (ver `plan.md` da spec 004). `OrcamentoInconsistenciaDetectada`
+ * permanece em `schemaVersion: 1` — não é consumido pela spec 004.
  */
 export interface DomainEventEnvelope {
   readonly detailType: string;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly orcamentoId: string;
   readonly ocorreuEm: string;
 }

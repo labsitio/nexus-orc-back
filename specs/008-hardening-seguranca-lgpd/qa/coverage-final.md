@@ -56,3 +56,12 @@ e o `??` de fallback da mensagem). `domain/gateways/event-publisher.ts` é
 apenas uma interface TS (sem código executável em runtime, sem entrada em
 `coverage-final.json`). Nenhuma lacuna de cobertura conhecida para este
 arquivo.
+
+## T011 — não aplicável (commit `8baa2ee`)
+
+Entrega é um script bash de infraestrutura
+(`infra/scripts/verificar-scp-segregacao-ambientes.sh`), fora do runner
+vitest/v8 do monorepo — sem instrumentação de cobertura de código para
+shell scripts neste repositório. Validação de lógica feita por mock
+isolado da função `assert_bloqueado` (ver `test-execution-report.md`),
+não por métrica de cobertura de linha/branch.

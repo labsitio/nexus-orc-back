@@ -55,8 +55,8 @@ Conforme `plan.md` desta spec e convenção herdada de 001: `src/platform/confor
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Teste de infraestrutura (via `cdk-nag`/`aws-cli` em pipeline, documentado como script para Ricardo/DevOps executarem) validando que a SCP da conta dev/hml bloqueia `rds:CopyDBSnapshot`/`rds:RestoreDBInstanceFromDBSnapshot` e `s3:CopyObject` com origem na conta prod.
-- [ ] T012 [P] [US1] Teste de contrato garantindo que a role de deploy de CI/CD de um ambiente não assume role de outro ambiente (verificação de `sts:AssumeRole` restrito por conta).
+- [x] T011 [P] [US1] Teste de infraestrutura (via `cdk-nag`/`aws-cli` em pipeline, documentado como script para Ricardo/DevOps executarem) validando que a SCP da conta dev/hml bloqueia `rds:CopyDBSnapshot`/`rds:RestoreDBInstanceFromDBSnapshot` e `s3:CopyObject` com origem na conta prod. (#312)
+- [x] T012 [P] [US1] Teste de contrato garantindo que a role de deploy de CI/CD de um ambiente não assume role de outro ambiente (verificação de `sts:AssumeRole` restrito por conta). (#313)
 
 ### Implementation for User Story 1
 
@@ -78,8 +78,8 @@ Conforme `plan.md` desta spec e convenção herdada de 001: `src/platform/confor
 
 ### Tests for User Story 2
 
-- [ ] T018 [P] [US2] Teste unit do agregado `SolicitacaoEsquecimento`: transição para `CONCLUIDA` só com 100% de `contextosEsperados` confirmados; rejeição de confirmação duplicada do mesmo contexto; nunca autoconclui por tempo.
-- [ ] T019 [P] [US2] Teste unit do agregado: transição para `PRAZO_EXCEDIDO` quando `prazoLimite` expira sem cobertura total.
+- [x] T018 [P] [US2] Teste unit do agregado `SolicitacaoEsquecimento`: transição para `CONCLUIDA` só com 100% de `contextosEsperados` confirmados; rejeição de confirmação duplicada do mesmo contexto; nunca autoconclui por tempo. (#319)
+- [x] T019 [P] [US2] Teste unit do agregado: transição para `PRAZO_EXCEDIDO` quando `prazoLimite` expira sem cobertura total. (#320, PR #561)
 - [ ] T020 [P] [US2] Teste de contrato para `POST /v1/conformidade/solicitacoes-esquecimento` e `GET /v1/conformidade/solicitacoes-esquecimento/{id}` (Zod schema + Problem Details em erro).
 - [ ] T021 [P] [US2] Teste unit do caso de uso `AnonimizarDadoPessoalDoOrcamento` do BC `ingestao-identificacao`: gera nova versão do dado (nunca sobrescreve o bruto — Princípio III), publica `DadoPessoalAnonimizadoNoContexto` mesmo quando não há dado pessoal daquele titular (`camposAnonimizados: []`).
 

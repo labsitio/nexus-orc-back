@@ -335,3 +335,159 @@ técnicos e verificáveis (mesma interface, mesmo bus, `source` correto,
 sem mecanismo alternativo, sem SDK vazando para Domain) estão satisfeitos.
 Registrado como ambiguidade de redação entre `tasks.md` e `plan.md`, não como
 defeito de implementação — sem impacto no gate desta task.
+
+## T011 -- Teste de infraestrutura: SCP bloqueia segregacao de ambientes (commit `8baa2ee`)
+
+Entrega e um script bash de infraestrutura, sem suite vitest a executar.
+Validacao de QA feita por 4 verificacoes estaticas/sintaticas e mock logico
+isolado (nao executa contra AWS real -- ver limitacao de ambiente).
+
+### Permissao de execucao
+
+    $ git ls-files -s infra/scripts/verificar-scp-segregacao-ambientes.sh
+    100755 5be375df... 0 infra/scripts/verificar-scp-segregacao-ambientes.sh
+
+PASS -- modo 100755 confirmado.
+
+### Sintaxe bash
+
+    $ bash -n infra/scripts/verificar-scp-segregacao-ambientes.sh
+    (sem saida -- sintaxe OK)
+
+### Validacao do workflow YAML
+
+    $ npx --yes js-yaml .github/workflows/verificar-scp-segregacao-ambientes.yml
+    (JSON parseado sem erro)
+
+Inspecao programatica confirma chave `on` do YAML parseado contendo
+exclusivamente `workflow_dispatch` -- nunca dispara em push/pull_request.
+
+### Mock isolado de `assert_bloqueado` e da guarda de producao
+
+Script de QA (scratchpad, nao versionado no repositorio) extrai a funcao
+`assert_bloqueado` do script real via `awk` e a `SCP_DENY_REGEX` real via
+`grep`, e executa 3 casos com comandos fake:
+
+    === Caso A: sucesso inesperado (simula vazamento) ===
+    CRITICO [teste]: a acao NAO foi bloqueada -- teve sucesso...
+    Executando limpeza best-effort do recurso criado: echo LIMPEZA_EXECUTADA
+    LIMPEZA_EXECUTADA
+    RESULTADO_FINAL=1
+
+    === Caso B: explicit deny de SCP ===
+    OK [teste]: bloqueado pela SCP (explicit deny).
+    RESULTADO_FINAL=0
+
+    === Caso C: outro erro (nao SCP) ===
+    FALHA [teste]: comando falhou, mas nao por explicit deny de SCP...
+    RESULTADO_FINAL=1
+
+    === Caso D: guarda conta de producao ===
+    FALHA: credenciais atuais pertencem a conta de producao (999999999999)
+    - abortando por seguranca.
+    exit code guarda (esperado 1): 1
+
+Todos os 4 casos produziram o resultado esperado. Confirma, de forma
+independente da correcao ja validada pelo backend-reviewer: (1) sucesso
+inesperado e tratado como CRITICO com limpeza best-effort efetivamente
+invocada; (2) explicit deny de SCP e o unico caminho que resulta em OK;
+(3) outro erro nao e confundido com bloqueio por SCP; (4) a guarda de
+conta de producao aborta antes de qualquer chamada destrutiva.
+
+### Limitacao de ambiente
+
+Nao ha credenciais AWS reais nem contas dev/hml/prod provisionadas neste
+ambiente (T013/T014/T015 pendentes) -- execucao real do script contra AWS
+nao pode ser exercitada neste QA. `shellcheck` e `python3`/`pyyaml` tambem
+indisponiveis no ambiente Windows/Git Bash usado; contornado com `bash -n`
+e `js-yaml` via `npx`, suficientes para o escopo desta verificacao.
+
+## T012 -- Teste de contrato: sts:AssumeRole restrito por conta (PR #512, commit `7fed710`)
+
+Entrega e um script bash de infraestrutura (mesmo padrao de T011), sem
+suite vitest a executar. Validacao de QA feita por verificacoes
+estaticas/sintaticas e mock logico isolado (nao executa contra AWS real --
+ver limitacao de ambiente).
+
+### Permissao de execucao
+
+    $ git ls-tree -l pr-512 infra/scripts/verificar-contrato-assume-role-por-conta.sh
+    100755 blob 8b58a09... 5485 infra/scripts/verificar-contrato-assume-role-por-conta.sh
+
+PASS -- modo 100755 confirmado (achado do backend-reviewer na revisao 1 corrigido).
+
+### Sintaxe bash
+
+    $ bash -n infra/scripts/verificar-contrato-assume-role-por-conta.sh
+    (sem saida -- sintaxe OK)
+
+### Validacao do workflow YAML
+
+    $ npx --yes js-yaml .github/workflows/verificar-contrato-assume-role-por-conta.yml
+    (JSON parseado sem erro)
+
+Inspecao do JSON parseado confirma chave `on` contendo exclusivamente
+`workflow_dispatch` -- nunca dispara em push/pull_request. Estrutura
+(`permissions`, `environment: ${{ inputs.ambiente }}`, `timeout-minutes: 10`,
+step de `configure-aws-credentials@v4` antes do script) identica ao padrao
+de T011.
+
+### Mock isolado de `assert_assume_role_bloqueado`
+
+Script de QA (scratchpad, nao versionado) extrai a funcao
+`assert_assume_role_bloqueado` do script real via `awk` e executa 3 casos
+com comando `aws` fake:
+
+    === CASO 1: AssumeRole tem sucesso (CRITICO esperado) ===
+    CRITICO [AssumeRole -> arn:fake:role1]: o AssumeRole NAO foi bloqueado...
+    {}
+    RESULTADO=1
+
+    === CASO 2: AccessDenied (OK esperado) ===
+    OK [AssumeRole -> arn:fake:role2]: bloqueado (AccessDenied)...
+    RESULTADO=0
+
+    === CASO 3: outro erro nao-AccessDenied (FALHA esperado) ===
+    FALHA [AssumeRole -> arn:fake:role3]: comando falhou, mas nao por AccessDenied...
+    RESULTADO=1
+
+No Caso 1, com `jq` disponivel no ambiente de QA, a saida bruta (que
+conteria `Credentials.AccessKeyId`/`SecretAccessKey`/`SessionToken` reais)
+foi efetivamente filtrada para `{}` -- confirma a redacao de credenciais
+aplicada na revisao 1 do backend-reviewer, sem vazamento no log.
+
+Adicionalmente, executado o script completo (nao so a funcao) fim a fim
+com `aws` fake via `PATH`, cobrindo:
+
+    === guarda de conta de producao (conta corrente == AWS_PROD_ACCOUNT_ID) ===
+    FALHA: credenciais atuais pertencem a conta de producao (111111111111)...
+    exit=1
+
+    === guarda de lista vazia/so-espacos em OUTRAS_DEPLOY_ROLE_ARNS ===
+    FALHA: OUTRAS_DEPLOY_ROLE_ARNS nao continha nenhum ARN valido...
+    exit=1
+
+    === fluxo feliz (2 roles, ambas AccessDenied) ===
+    OK [...role/x]: bloqueado (AccessDenied)...
+    OK [...role/y]: bloqueado (AccessDenied)...
+    RESULTADO: role de deploy da conta corrente nao assume role de nenhum
+    outro ambiente verificado -- restricao por conta confirmada.
+    exit=0
+
+Todos os casos produziram o resultado esperado. Confirma, de forma
+independente do backend-reviewer: (1) sucesso inesperado (AssumeRole
+cross-conta funcionou) e tratado como CRITICO, com a saida sensivel
+redigida antes do log; (2) AccessDenied e o unico caminho que resulta em
+OK; (3) outro erro nao e confundido com AccessDenied; (4) a guarda de
+conta de producao aborta antes de qualquer AssumeRole; (5) lista vazia de
+roles nao produz sucesso silencioso sem verificacao real; (6) fluxo feliz
+completo com 2 roles termina em exit 0.
+
+### Limitacao de ambiente
+
+Nao ha credenciais AWS reais nem contas dev/hml/prod provisionadas neste
+ambiente (T013/T015 pendentes) -- execucao real do script contra AWS nao
+pode ser exercitada neste QA; esperado ate essas tasks serem entregues,
+nao um defeito deste teste. `shellcheck` e `python3`/`pyyaml` tambem
+indisponiveis no ambiente Windows/Git Bash usado; contornado com `bash -n`
+e `js-yaml` via `npx`, mesma abordagem de T011.
