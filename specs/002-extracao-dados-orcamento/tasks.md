@@ -111,7 +111,7 @@
 
 - [x] T041 [P] Documentação OpenAPI gerada a partir dos schemas Zod dos 2 endpoints REST deste BC. #106
 - [ ] T042 Medir p95 real end-to-end (classificação disponível → extração disponível) em ambiente de teste; decidir Provisioned Concurrency para `ExtratorLambdaRole` se meta de 5 minutos não for atingida (ver Constraints do `plan.md`).
-- [ ] T043 [P] Monitorar tamanho de payload de `OrcamentoExtraido` contra limite de 256KB do EventBridge (risco registrado no `plan.md`) — alarme se aproximar do limite.
+- [x] T043 [P] Monitorar tamanho de payload de `OrcamentoExtraido` contra limite de 256KB do EventBridge (risco registrado no `plan.md`) — alarme se aproximar do limite. #108
 - [ ] T044 Security review: `npm audit`/`pnpm audit`, Semgrep, revisão de prompt injection no prompt do Extrator (mesmo checklist da spec 001).
 - [ ] T045 [P] Métrica de observabilidade: taxa de campos marcados "não extraído" e taxa de uso de serviço pago como exceção (MarkItDown vs. exceção) — conforme "Métricas de Avaliação Contínua" do spec.md.
 

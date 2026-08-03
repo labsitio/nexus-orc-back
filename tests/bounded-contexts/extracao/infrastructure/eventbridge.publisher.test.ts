@@ -16,7 +16,47 @@ function eventoFake(orcamentoId: string): DomainEventEnvelope {
   };
 }
 
+function loggerFake(): { warn: ReturnType<typeof vi.fn>; child: () => unknown } {
+  return { warn: vi.fn(), child: vi.fn() };
+}
+
 describe('EventBridgePublisher (extracao)', () => {
+  it('não alerta payload pequeno, bem abaixo do limite de 256KB do EventBridge (T043/#108)', async () => {
+    const send = vi.fn().mockResolvedValue({ FailedEntryCount: 0 });
+    const logger = loggerFake();
+    const publisher = new EventBridgePublisher(
+      eventBridgeClientFake(send),
+      'nexo-dominio-bus',
+      logger as unknown as import('pino').Logger,
+    );
+
+    await publisher.publicar(eventoFake('orc-pequeno'));
+
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('alerta via logger.warn quando o payload se aproxima do limite de 256KB do EventBridge (T043/#108)', async () => {
+    const send = vi.fn().mockResolvedValue({ FailedEntryCount: 0 });
+    const logger = loggerFake();
+    const publisher = new EventBridgePublisher(
+      eventBridgeClientFake(send),
+      'nexo-dominio-bus',
+      logger as unknown as import('pino').Logger,
+    );
+    const eventoGrande = {
+      ...eventoFake('orc-grande'),
+      itens: 'x'.repeat(230 * 1024),
+    } as unknown as DomainEventEnvelope;
+
+    await publisher.publicar(eventoGrande);
+
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    const [dados, mensagem] = logger.warn.mock.calls[0] as [Record<string, unknown>, string];
+    expect(dados.orcamentoId).toBe('orc-grande');
+    expect(dados.tamanhoBytes).toBeGreaterThanOrEqual(256 * 1024 * 0.8);
+    expect(mensagem).toMatch(/256KB/);
+  });
+
   it('publica no bus informado com source fixo `nexo.extracao` e detail-type do evento', async () => {
     const send = vi.fn().mockResolvedValue({ FailedEntryCount: 0 });
     const publisher = new EventBridgePublisher(eventBridgeClientFake(send), 'nexo-dominio-bus');
