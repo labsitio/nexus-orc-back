@@ -170,6 +170,28 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — control
     expect(resposta.headers['content-type']).toContain('application/problem+json');
   });
 
+  it('400 Problem Details quando dadosCorrigidos.periodoValidade não reconstrói um PeriodoValidade válido', async () => {
+    const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a7');
+    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos());
+    validacao.avaliarRegrasDeConsistencia([
+      InconsistenciaDetectada.de('PRAZO_INCOERENTE', 'prazo incoerente'),
+    ]);
+    await repositorio.salvar(validacao);
+
+    const resposta = await app.inject({
+      method: 'POST',
+      url: `/v1/orcamentos/${id.toString()}/validacao/decisao-humana`,
+      payload: {
+        decisao: 'CORRECAO_APLICADA',
+        justificativa: 'periodoValidade corrigido incorretamente',
+        dadosCorrigidos: { periodoValidade: 'nao-e-data' },
+      },
+    });
+
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
+  });
+
   it('400 Problem Details para body sem justificativa', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a6');
 
