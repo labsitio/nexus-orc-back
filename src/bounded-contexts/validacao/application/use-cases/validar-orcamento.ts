@@ -28,6 +28,12 @@ import { InconsistenciaDetectada } from '../../domain/value-objects/inconsistenc
  * Caminho feliz de US1 (T024): item já vem com `categoria` conhecida ou a
  * regra de preço não se aplica — invocar `AgenteCategorizadorItemGateway`
  * (Bedrock) para itens sem categoria é US3/T042, fora do escopo desta task.
+ *
+ * Caminho de falha de US2 (T034): 1+ regra falhando publica
+ * `OrcamentoInconsistenciaDetectada` em vez de `OrcamentoValidado` — decisão
+ * inteiramente delegada ao status resultante de
+ * `OrcamentoValidacao.avaliarRegrasDeConsistencia` (nunca reimplementada
+ * aqui), coberto por `validar-orcamento.test.ts`.
  */
 export class ValidarOrcamento {
   constructor(
