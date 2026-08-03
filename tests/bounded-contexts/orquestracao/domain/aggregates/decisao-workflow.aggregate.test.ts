@@ -10,6 +10,7 @@ import { ContextoClassificacao } from '../../../../../src/bounded-contexts/orque
 import { ContextoExtracao } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/contexto-extracao.vo.js';
 import { ContextoValidacao } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/contexto-validacao.vo.js';
 import {
+  AprovacaoSemValidacaoError,
   CriterioAusenteError,
   ReenvioSemFundamentoError,
 } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/decisao-roteamento.vo.js';
@@ -303,6 +304,33 @@ describe('DecisaoWorkflow', () => {
           requerIntegracaoExterna: false,
         }),
       ).toThrow(ReenvioSemFundamentoError);
+
+      expect(decisao.status).toBe('CONTEXTO_CONSOLIDADO');
+      expect(decisao.decisaoAtual).toBeUndefined();
+      expect(decisao.historico).toHaveLength(0);
+    });
+
+    it('aprovação sem contextoValidacao lança AprovacaoSemValidacaoError sem mutar estado — invariante T010', () => {
+      // contextoValidacao só admite resultado VALIDADO/VALIDADO_COM_RESSALVA (ambos
+      // aprováveis) — "reprovado" não é representável no VO; a única forma real de
+      // chegar a CONTEXTO_CONSOLIDADO sem validação aprovável é reidratar estado
+      // persistido (reconstituir) sem esse contexto, nunca via fluxo normal.
+      const decisao = DecisaoWorkflow.reconstituir({
+        orcamentoId,
+        contextoClassificacao,
+        contextoExtracao,
+        status: 'CONTEXTO_CONSOLIDADO',
+        historico: [],
+      });
+
+      expect(() =>
+        decisao.registrarTentativaOrquestrador({
+          acao: 'APROVAR',
+          nivelConfianca: NivelConfianca.de(90),
+          criterio: 'sem validação registrada',
+          requerIntegracaoExterna: false,
+        }),
+      ).toThrow(AprovacaoSemValidacaoError);
 
       expect(decisao.status).toBe('CONTEXTO_CONSOLIDADO');
       expect(decisao.decisaoAtual).toBeUndefined();
