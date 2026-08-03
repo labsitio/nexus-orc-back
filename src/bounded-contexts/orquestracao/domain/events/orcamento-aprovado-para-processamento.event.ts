@@ -14,9 +14,7 @@ export interface OrcamentoAprovadoParaProcessamentoPayload extends DomainEventEn
  * pelas etapas de negócio subsequentes (fora de escopo desta spec) e por
  * Acompanhamento (plan.md, "Domain Events").
  */
-export class OrcamentoAprovadoParaProcessamento
-  implements OrcamentoAprovadoParaProcessamentoPayload
-{
+export class OrcamentoAprovadoParaProcessamento implements OrcamentoAprovadoParaProcessamentoPayload {
   static readonly detailType = 'OrcamentoAprovadoParaProcessamento' as const;
   readonly detailType = OrcamentoAprovadoParaProcessamento.detailType;
   readonly schemaVersion = 1 as const;

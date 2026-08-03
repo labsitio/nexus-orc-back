@@ -39,7 +39,12 @@ describe('FornecedorCadastradoHttpGateway', () => {
       .fn()
       .mockResolvedValueOnce(respostaFake(503))
       .mockResolvedValueOnce(respostaFake(200, { cadastrado: true }));
-    const gateway = new FornecedorCadastradoHttpGateway('https://cadastro.exemplo', fetchFn, 100, 2);
+    const gateway = new FornecedorCadastradoHttpGateway(
+      'https://cadastro.exemplo',
+      fetchFn,
+      100,
+      2,
+    );
 
     await expect(gateway.estaCadastrado(CNPJ_VALIDO)).resolves.toBe(true);
     expect(fetchFn).toHaveBeenCalledTimes(2);
@@ -50,7 +55,12 @@ describe('FornecedorCadastradoHttpGateway', () => {
       .fn()
       .mockRejectedValueOnce(new Error('network error'))
       .mockResolvedValueOnce(respostaFake(200, { cadastrado: true }));
-    const gateway = new FornecedorCadastradoHttpGateway('https://cadastro.exemplo', fetchFn, 100, 2);
+    const gateway = new FornecedorCadastradoHttpGateway(
+      'https://cadastro.exemplo',
+      fetchFn,
+      100,
+      2,
+    );
 
     await expect(gateway.estaCadastrado(CNPJ_VALIDO)).resolves.toBe(true);
     expect(fetchFn).toHaveBeenCalledTimes(2);
@@ -58,7 +68,12 @@ describe('FornecedorCadastradoHttpGateway', () => {
 
   it('lança FornecedorCadastradoIndisponivelError após esgotar as tentativas com 5xx repetido', async () => {
     const fetchFn = vi.fn().mockResolvedValue(respostaFake(503));
-    const gateway = new FornecedorCadastradoHttpGateway('https://cadastro.exemplo', fetchFn, 100, 2);
+    const gateway = new FornecedorCadastradoHttpGateway(
+      'https://cadastro.exemplo',
+      fetchFn,
+      100,
+      2,
+    );
 
     await expect(gateway.estaCadastrado(CNPJ_VALIDO)).rejects.toThrow(
       FornecedorCadastradoIndisponivelError,
@@ -68,7 +83,12 @@ describe('FornecedorCadastradoHttpGateway', () => {
 
   it('não retenta em erro 4xx — falha definitiva na primeira tentativa', async () => {
     const fetchFn = vi.fn().mockResolvedValue(respostaFake(404));
-    const gateway = new FornecedorCadastradoHttpGateway('https://cadastro.exemplo', fetchFn, 100, 3);
+    const gateway = new FornecedorCadastradoHttpGateway(
+      'https://cadastro.exemplo',
+      fetchFn,
+      100,
+      3,
+    );
 
     await expect(gateway.estaCadastrado(CNPJ_VALIDO)).rejects.toThrow(
       FornecedorCadastradoIndisponivelError,
@@ -78,7 +98,12 @@ describe('FornecedorCadastradoHttpGateway', () => {
 
   it('não retenta quando o corpo da resposta 200 é malformado — propaga erro do ACL', async () => {
     const fetchFn = vi.fn().mockResolvedValue(respostaFake(200, { cadastrado: 'sim' }));
-    const gateway = new FornecedorCadastradoHttpGateway('https://cadastro.exemplo', fetchFn, 100, 3);
+    const gateway = new FornecedorCadastradoHttpGateway(
+      'https://cadastro.exemplo',
+      fetchFn,
+      100,
+      3,
+    );
 
     await expect(gateway.estaCadastrado(CNPJ_VALIDO)).rejects.toThrow(
       FornecedorCadastradoACLInvalidaError,

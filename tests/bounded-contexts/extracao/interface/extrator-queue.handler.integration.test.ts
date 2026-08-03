@@ -84,7 +84,11 @@ class AgenteExtratorGatewayFake implements AgenteExtratorGateway {
             confiancaAlta,
             AGENTE_EXTRATOR_ORIGEM,
           ),
-          quantidade: CampoExtraido.extraido(Quantidade.de(200), confiancaAlta, AGENTE_EXTRATOR_ORIGEM),
+          quantidade: CampoExtraido.extraido(
+            Quantidade.de(200),
+            confiancaAlta,
+            AGENTE_EXTRATOR_ORIGEM,
+          ),
           // Campo ambíguo/ilegível conhecido: confiança insuficiente → nunca inventado.
           precoUnitario: CampoExtraido.naoExtraido(confiancaBaixa, AGENTE_EXTRATOR_ORIGEM),
         }),

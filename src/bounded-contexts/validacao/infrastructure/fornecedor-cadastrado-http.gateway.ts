@@ -61,10 +61,9 @@ export class FornecedorCadastradoHttpGateway implements FornecedorCadastradoGate
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
       try {
-        const resposta = await this.fetchFn(
-          `${this.baseUrl}/fornecedores/${cnpj.paraPayload()}`,
-          { signal: controller.signal },
-        );
+        const resposta = await this.fetchFn(`${this.baseUrl}/fornecedores/${cnpj.paraPayload()}`, {
+          signal: controller.signal,
+        });
 
         if (resposta.status >= 500) {
           throw new Error(`sistema externo respondeu ${resposta.status}`);

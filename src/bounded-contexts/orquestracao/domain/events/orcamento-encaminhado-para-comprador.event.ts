@@ -14,9 +14,7 @@ export interface OrcamentoEncaminhadoParaCompradorPayload extends DomainEventEnv
  * confundir com `DecisaoWorkflowEscalonadaParaComprador`: este é um desfecho
  * decidido, não uma ausência de decisão (plan.md, "Domain Events").
  */
-export class OrcamentoEncaminhadoParaComprador
-  implements OrcamentoEncaminhadoParaCompradorPayload
-{
+export class OrcamentoEncaminhadoParaComprador implements OrcamentoEncaminhadoParaCompradorPayload {
   static readonly detailType = 'OrcamentoEncaminhadoParaComprador' as const;
   readonly detailType = OrcamentoEncaminhadoParaComprador.detailType;
   readonly schemaVersion = 1 as const;

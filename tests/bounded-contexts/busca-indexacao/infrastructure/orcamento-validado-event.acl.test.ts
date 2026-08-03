@@ -44,9 +44,7 @@ describe('OrcamentoValidadoEventACL', () => {
       'Cimento CP-II 50kg',
       'Areia média m³',
     ]);
-    expect(resultado.conteudoIndexavel.condicoesResumo).toBe(
-      'Pagamento em 30 dias, frete incluso',
-    );
+    expect(resultado.conteudoIndexavel.condicoesResumo).toBe('Pagamento em 30 dias, frete incluso');
     expect(resultado.conteudoIndexavel.categorias).toEqual(['MATERIAL_CONSTRUCAO']);
   });
 

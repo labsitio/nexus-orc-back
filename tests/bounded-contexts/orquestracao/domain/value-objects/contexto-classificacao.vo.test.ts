@@ -22,7 +22,10 @@ describe('ContextoClassificacao', () => {
 
   it('rejeita formatoIdentificado vazio', () => {
     expect(() =>
-      ContextoClassificacao.de({ fornecedorIdentificado: 'Fornecedor Alfa', formatoIdentificado: '' }),
+      ContextoClassificacao.de({
+        fornecedorIdentificado: 'Fornecedor Alfa',
+        formatoIdentificado: '',
+      }),
     ).toThrow(ContextoClassificacaoInvalidoError);
   });
 

@@ -15,9 +15,7 @@ export interface DecisaoWorkflowEscalonadaParaCompradorPayload extends DomainEve
  * exaustão/tempo/volume — apenas por confiança insuficiente reportada
  * (Princípio IV, NON-NEGOTIABLE).
  */
-export class DecisaoWorkflowEscalonadaParaComprador
-  implements DecisaoWorkflowEscalonadaParaCompradorPayload
-{
+export class DecisaoWorkflowEscalonadaParaComprador implements DecisaoWorkflowEscalonadaParaCompradorPayload {
   static readonly detailType = 'DecisaoWorkflowEscalonadaParaComprador' as const;
   readonly detailType = DecisaoWorkflowEscalonadaParaComprador.detailType;
   readonly schemaVersion = 1 as const;

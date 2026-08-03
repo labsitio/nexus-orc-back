@@ -35,7 +35,9 @@ describe('ContextoValidacao', () => {
       ContextoValidacao.de(params).equals(
         ContextoValidacao.de({
           ...params,
-          inconsistenciasAceitas: [{ regra: 'PRECO_FORA_DE_FAIXA', detalhe: 'preço acima da média' }],
+          inconsistenciasAceitas: [
+            { regra: 'PRECO_FORA_DE_FAIXA', detalhe: 'preço acima da média' },
+          ],
         }),
       ),
     ).toBe(false);

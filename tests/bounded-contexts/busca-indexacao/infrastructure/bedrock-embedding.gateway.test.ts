@@ -17,14 +17,12 @@ function vetor(dimensao: number, valor = 0.1): number[] {
 
 describe('BedrockEmbeddingGateway', () => {
   it('gerarEmbedding invoca o InvokeModel API com inputText/dimensions/normalize e devolve o VO Embedding', async () => {
-    const send = vi
-      .fn()
-      .mockResolvedValue(
-        respostaInvokeModel({
-          embedding: vetor(DIMENSAO_EMBEDDING_TITAN_V2),
-          inputTextTokenCount: 12,
-        }),
-      );
+    const send = vi.fn().mockResolvedValue(
+      respostaInvokeModel({
+        embedding: vetor(DIMENSAO_EMBEDDING_TITAN_V2),
+        inputTextTokenCount: 12,
+      }),
+    );
     const gateway = new BedrockEmbeddingGateway(
       bedrockClientFake(send),
       'amazon.titan-embed-text-v2:0',
