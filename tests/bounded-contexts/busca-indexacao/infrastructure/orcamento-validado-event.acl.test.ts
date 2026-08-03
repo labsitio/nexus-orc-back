@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { ConteudoIndexavelInvalidoError } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/conteudo-indexavel.vo.js';
+import { OrcamentoIdInvalidoError } from '../../../../src/bounded-contexts/busca-indexacao/domain/value-objects/orcamento-id.vo.js';
 import {
   OrcamentoValidadoEventACL,
   OrcamentoValidadoEventACLInvalidaError,
@@ -125,6 +127,8 @@ describe('OrcamentoValidadoEventACL', () => {
         itens: [{ quantidade: 1, precoUnitario: { valorCentavos: '100' }, extraido: false }],
       }),
     ],
+    ['item não é objeto (null)', payloadValido({ itens: [null] })],
+    ['item não é objeto (primitivo)', payloadValido({ itens: ['não é objeto'] })],
   ])('lança OrcamentoValidadoEventACLInvalidaError para %s', (_descricao, payloadInvalido) => {
     const acl = new OrcamentoValidadoEventACL();
 
@@ -137,13 +141,15 @@ describe('OrcamentoValidadoEventACL', () => {
     const acl = new OrcamentoValidadoEventACL();
     const payload = payloadValido({ orcamentoId: 'não-é-uuid' });
 
-    expect(() => acl.traduzir('OrcamentoValidado', payload)).toThrow();
+    expect(() => acl.traduzir('OrcamentoValidado', payload)).toThrow(OrcamentoIdInvalidoError);
   });
 
   it('lança erro de ConteudoIndexavel inválido quando payload não tem nenhum conteúdo aproveitável', () => {
     const acl = new OrcamentoValidadoEventACL();
     const payload = payloadValido({ itens: [], condicoesComerciais: '' });
 
-    expect(() => acl.traduzir('OrcamentoValidado', payload)).toThrow();
+    expect(() => acl.traduzir('OrcamentoValidado', payload)).toThrow(
+      ConteudoIndexavelInvalidoError,
+    );
   });
 });
