@@ -240,6 +240,41 @@ describe('DecisaoWorkflow', () => {
       expect(decisao.decisaoAtual?.acao).toBe('APROVAR');
     });
 
+    it('confiança suficiente com resultado VALIDADO decide APROVAR e registra o desfecho correspondente', () => {
+      const decisao = criarComContextoConsolidado(contextoValidacaoAprovavel);
+
+      decisao.registrarTentativaOrquestrador({
+        acao: 'APROVAR',
+        nivelConfianca: NivelConfianca.de(95),
+        criterio: 'validação aprovada, confiança suficiente',
+        requerIntegracaoExterna: false,
+      });
+
+      expect(decisao.status).toBe('DECIDIDO');
+      expect(decisao.decisaoAtual?.acao).toBe('APROVAR');
+      expect(decisao.decisaoAtual?.agenteOrigem).toBe('ORQUESTRADOR');
+      expect(decisao.historico).toHaveLength(1);
+      expect(decisao.historico[0]?.resultado).toBe(decisao.decisaoAtual);
+    });
+
+    it('confiança suficiente com resultado VALIDADO decide SOLICITAR_REENVIO e registra o desfecho correspondente', () => {
+      const decisao = criarComContextoConsolidado(contextoValidacaoAprovavel);
+
+      decisao.registrarTentativaOrquestrador({
+        acao: 'SOLICITAR_REENVIO',
+        nivelConfianca: NivelConfianca.de(90),
+        criterio: 'confiança suficiente, pendência identificada',
+        requerIntegracaoExterna: false,
+        motivoDadoAusente: 'preço unitário ausente no item 2',
+      });
+
+      expect(decisao.status).toBe('DECIDIDO');
+      expect(decisao.decisaoAtual?.acao).toBe('SOLICITAR_REENVIO');
+      expect(decisao.decisaoAtual?.agenteOrigem).toBe('ORQUESTRADOR');
+      expect(decisao.historico).toHaveLength(1);
+      expect(decisao.historico[0]?.resultado).toBe(decisao.decisaoAtual);
+    });
+
     it('decisão automática sem critério lança CriterioAusenteError sem mutar estado', () => {
       const decisao = criarComContextoConsolidado();
 
