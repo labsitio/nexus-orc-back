@@ -115,6 +115,12 @@
 - [ ] T044 Security review: `npm audit`/`pnpm audit`, Semgrep, revisão de prompt injection no prompt do Extrator (mesmo checklist da spec 001).
 - [ ] T045 [P] Métrica de observabilidade: taxa de campos marcados "não extraído" e taxa de uso de serviço pago como exceção (MarkItDown vs. exceção) — conforme "Métricas de Avaliação Contínua" do spec.md.
 
+### Conversão de documento: Lambda MarkItDown deste BC (gap de Infrastructure — achado 2026-08-03)
+
+`MarkItDownConversaoExtracaoACL` (T018, mergeado) invoca via `lambda:Invoke` um Lambda Python dedicado que **não existe** — nem código, nem stack IaC, nem task até este bloco. Mesmo gap identificado na spec 001 (T066/T067 de lá); aqui é instância própria por exigência do **ADR-002** desta spec ("MarkItDown roda em instância própria por Bounded Context, não como serviço de conversão compartilhado"). Consequência: `ExtrairDadosOrcamento` não converte documento nenhum em runtime.
+
+- [ ] T046 Infrastructure: implementar o Lambda Python dedicado ao MarkItDown **deste** BC — função separada da spec 001 (ADR-002), nunca reaproveitar a função da Ingestão. **Contrato já fixado pelo lado mergeado** (`src/bounded-contexts/extracao/infrastructure/markitdown-conversao-extracao.acl.ts`): request `{conteudoBase64, nomeArquivo}`, response `{texto}` — idêntico ao da 001, o ACL é o lado existente, não alterar. Entregar: (a) handler Python + empacotamento (Lambda Layer ou container); (b) stack CDK em `infra/lib/`; (c) role IAM dedicada least-privilege — **somente logs**, não lê S3 nem publica Domain Event, portanto NÃO recebe `events:PutEvents` (ADR-004 da spec 001, critério (b)); (d) timeout e memória dimensionados para a conversão **completa/estruturável** desta spec, maiores que a conversão leve da 001 (`plan.md` Constraints: "parsing de documento potencialmente maior/mais complexo que o uso leve da spec 001"); (e) nome da função exposto ao consumidor como parâmetro/variável de ambiente (o ACL recebe `functionName` por construtor). O pacote/layer Python **pode** ser compartilhado com a spec 001 — ADR-002 exige instâncias de Lambda separadas (isolamento de falha e dimensionamento independente), não pacotes duplicados. Bloqueia US1/US2 em produção para qualquer formato binário. Ferramental de execução local: reusar spec 001 T067 (LocalStack Lambda), sem segunda implementação de ACL.
+
 ---
 
 ## Dependencies & Execution Order
@@ -140,6 +146,7 @@
 - Todos os T00X marcados [P] na mesma fase podem rodar em paralelo (arquivos distintos, sem dependência).
 - VOs (T005–T008) em paralelo entre si; agregado (T009) depende de todos os VOs.
 - O gateway de Infrastructure do Extrator (T021) pode ser implementado assim que Foundational estiver completo.
+- T046 (Lambda MarkItDown deste BC) em paralelo com spec 001 T066 — funções e stacks distintas (ADR-002); a única sobreposição possível é o pacote/layer Python compartilhado, que se for extraído deve ser mergeado uma vez antes das duas stacks o referenciarem.
 
 ---
 
