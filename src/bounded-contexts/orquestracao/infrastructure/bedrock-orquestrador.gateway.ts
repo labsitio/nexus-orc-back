@@ -55,6 +55,7 @@ const FERRAMENTA_DECISAO_WORKFLOW: Tool = {
           motivoDadoAusente: { type: 'string' },
         },
         required: ['acao', 'nivelConfianca', 'criterio', 'requerIntegracaoExterna'],
+        additionalProperties: false,
       },
     },
   },
