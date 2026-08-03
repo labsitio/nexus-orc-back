@@ -25,6 +25,16 @@ describe('TenantId', () => {
     );
   });
 
+  it('rejeita string vazia', () => {
+    expect(() => TenantId.de('')).toThrow(TenantIdInvalidoError);
+  });
+
+  it('rejeita UUID v7 com variant nibble errado', () => {
+    expect(() => TenantId.de('018f4b1a-0000-7000-0000-000000000000')).toThrow(
+      TenantIdInvalidoError,
+    );
+  });
+
   it('equals compara por valor', () => {
     const valor = '018f4b1a-0000-7000-8000-000000000000';
     expect(TenantId.de(valor).equals(TenantId.de(valor))).toBe(true);
