@@ -6,10 +6,10 @@ import { AGENTES_ORIGEM_CAMPO } from '../../domain/value-objects/campo-extraido.
  * Contrato de borda (Zod) de `GET /v1/orcamentos/{orcamentoId}/extracao/status`,
  * derivado de `docs/openapi.yaml` (`StatusExtracaoResponse`) e dos `paraPayload()`
  * dos VOs reais deste BC (`ItemOrcamento`, `CondicoesComerciais`, `CampoExtraido<T>`)
- * — fonte de verdade é o domínio, não o exemplo do openapi.yaml (que usa `montante`
- * em vez de `valorCentavos`/`moeda`, drift a corrigir em T041). Consumido pelo
- * controller (T024) quando este existir — aqui define-se apenas o contrato, sem
- * depender de nenhuma implementação de caso de uso.
+ * — fonte de verdade é o domínio. Drift do `docs/openapi.yaml` (exemplo usava
+ * `montante` em vez de `valorCentavos`/`moeda`) corrigido em T041/#106. Consumido
+ * pelo controller (T024) quando este existir — aqui define-se apenas o contrato,
+ * sem depender de nenhuma implementação de caso de uso.
  */
 
 export const orcamentoIdParamSchema = z.object({

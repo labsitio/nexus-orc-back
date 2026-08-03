@@ -261,12 +261,12 @@ paths:
                 orcamentoId: "018f2f6a-7c2e-7b1a-9c3d-1a2b3c4d5e6f"
                 status: EXTRAIDO
                 itens:
-                  - descricao: { valor: "Caixa de papelão ondulado 40x30x20", confianca: 96, extraido: true, agenteOrigem: EXTRATOR }
+                  - descricao: { valor: { descricao: "Caixa de papelão ondulado 40x30x20", sku: "CX-4030" }, confianca: 96, extraido: true, agenteOrigem: EXTRATOR }
                     quantidade: { valor: 500, confianca: 94, extraido: true, agenteOrigem: EXTRATOR }
-                    precoUnitario: { valor: { montante: 3.20, moeda: "BRL" }, confianca: 91, extraido: true, agenteOrigem: EXTRATOR }
+                    precoUnitario: { valor: { valorCentavos: 320, moeda: "BRL" }, confianca: 91, extraido: true, agenteOrigem: EXTRATOR }
                 condicoesComerciais:
                   condicoesPagamento: { valor: "30/60/90 dias", confianca: 88, extraido: true, agenteOrigem: EXTRATOR }
-                  prazoValidade: { valor: "2026-08-30", confianca: 90, extraido: true, agenteOrigem: EXTRATOR }
+                  prazoValidade: { valor: "2026-08-30T00:00:00.000Z", confianca: 90, extraido: true, agenteOrigem: EXTRATOR }
                   condicoesEntrega: { valor: "CIF, até 10 dias úteis", confianca: 85, extraido: true, agenteOrigem: EXTRATOR }
                 historico: []
         "401":
@@ -285,8 +285,8 @@ paths:
         `OrcamentoExtraidoComPendenciaConfirmada` (1+ confirmado indisponível).
 
 
-        PROVISÓRIO: o shape exato de `camposConfirmados` foi assumido — a spec 002
-        descreve o comportamento esperado, não o schema de payload deste endpoint.
+        Confirmado pela implementação (T037/#102, `revisao-humana.schema.ts`): shape
+        exato validado abaixo, `camposConfirmados` exige 1+ item.
       operationId: confirmarRevisaoHumanaExtracao
       parameters:
         - $ref: "#/components/parameters/OrcamentoIdPath"
@@ -299,7 +299,7 @@ paths:
             example:
               camposConfirmados:
                 - caminho: "itens[0].precoUnitario"
-                  valor: { montante: 3.20, moeda: "BRL" }
+                  valor: { valorCentavos: 320, moeda: "BRL" }
                   indisponivel: false
                 - caminho: "condicoesComerciais.prazoValidade"
                   valor: null
@@ -864,12 +864,40 @@ components:
         formatoIdentificado: { type: string }
       required: [fornecedorIdentificado, formatoIdentificado]
 
+    DinheiroCentavos:
+      type: object
+      description: >
+        Representação monetária real do BC Extração (`Dinheiro` VO,
+        `dinheiro.vo.ts`) — inteiro em centavos, nunca ponto flutuante. Distinto
+        do `Dinheiro` (montante/moeda) usado pela spec 003; consolidar quando o
+        shared-kernel de dinheiro for decidido (fora do escopo desta task).
+      properties:
+        valorCentavos: { type: integer, minimum: 0 }
+        moeda: { type: string, example: "BRL" }
+      required: [valorCentavos, moeda]
+
+    DescricaoProdutoValor:
+      type: object
+      description: valor real de `ItemOrcamento.descricao` (`descricao-produto.vo.ts`).
+      properties:
+        descricao: { type: string }
+        sku: { type: string }
+      required: [descricao]
+
     ItemOrcamento:
       type: object
       properties:
-        descricao: { $ref: "#/components/schemas/CampoExtraido" }
+        descricao:
+          allOf:
+            - $ref: "#/components/schemas/CampoExtraido"
+            - type: object
+              properties: { valor: { $ref: "#/components/schemas/DescricaoProdutoValor" } }
         quantidade: { $ref: "#/components/schemas/CampoExtraido" }
-        precoUnitario: { $ref: "#/components/schemas/CampoExtraido" }
+        precoUnitario:
+          allOf:
+            - $ref: "#/components/schemas/CampoExtraido"
+            - type: object
+              properties: { valor: { $ref: "#/components/schemas/DinheiroCentavos" } }
 
     CondicoesComerciais:
       type: object
@@ -888,7 +916,10 @@ components:
         itens:
           type: array
           items: { $ref: "#/components/schemas/ItemOrcamento" }
-        condicoesComerciais: { $ref: "#/components/schemas/CondicoesComerciais" }
+        condicoesComerciais:
+          oneOf:
+            - $ref: "#/components/schemas/CondicoesComerciais"
+            - type: "null"
         historico:
           type: array
           items: { type: object }
@@ -896,17 +927,21 @@ components:
 
     RevisaoHumanaExtracaoRequest:
       type: object
-      description: PROVISÓRIO — ver nota no path.
+      description: >
+        Schema validado contra a implementação real (T037/#102,
+        `revisao-humana.schema.ts`).
       properties:
         camposConfirmados:
           type: array
+          minItems: 1
           items:
             type: object
             properties:
-              caminho: { type: string, description: "ex.: 'itens[0].precoUnitario'" }
+              caminho: { type: string, minLength: 1, description: "ex.: 'itens[0].precoUnitario'" }
               valor: { nullable: true }
               indisponivel: { type: boolean }
             required: [caminho, indisponivel]
+            description: exige valor real OU indisponivel:true — nunca ambos ausentes.
       required: [camposConfirmados]
 
     InconsistenciaDetectada:
