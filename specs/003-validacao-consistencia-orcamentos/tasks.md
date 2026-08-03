@@ -86,7 +86,7 @@
 
 ### Implementation (US2)
 
-- [ ] T034 [US2] Application: completar caso de uso `ValidarOrcamento` (T024) para o caminho de falha — publicar `OrcamentoInconsistenciaDetectada` quando 1+ regra falha.
+- [x] T034 [US2] Application: completar caso de uso `ValidarOrcamento` (T024) para o caminho de falha — publicar `OrcamentoInconsistenciaDetectada` quando 1+ regra falha.
 - [x] T035 [US2] Application: caso de uso `RegistrarDecisaoHumanaValidacao` (valida status `PENDENTE_REVISAO_HUMANA`, aplica `registrarDecisaoHumana`, publica `OrcamentoValidado` ou `OrcamentoValidadoComRessalva`).
 - [ ] T036 [US2] Interface: controller `POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana`, Zod schema (`decisao: 'CORRECAO_APLICADA' | 'ACEITE_COM_RESSALVA'`, dados corrigidos ou justificativa), Problem Details para 409.
 - [ ] T037 [US2] IAM: role dedicada `RegistrarDecisaoHumanaValidacaoLambdaRole`, least privilege.
