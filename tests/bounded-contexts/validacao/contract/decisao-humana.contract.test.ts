@@ -131,8 +131,14 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — contrat
   });
 
   it('200 — decisão aceita a partir de PENDENTE_REVISAO_HUMANA: CORRECAO_APLICADA sem inconsistência remanescente transita para VALIDADO', () => {
-    const agregado = agregadoEmStatus('PENDENTE_REVISAO_HUMANA');
+    const requestBody = decisaoHumanaValidacaoRequestSchema.parse({
+      decisao: 'CORRECAO_APLICADA',
+      justificativa: 'CNPJ corrigido após contato com o fornecedor.',
+      dadosCorrigidos: { cnpjFornecedor: '11222333000181' },
+    });
+    expect(requestBody.decisao).toBe('CORRECAO_APLICADA');
 
+    const agregado = agregadoEmStatus('PENDENTE_REVISAO_HUMANA');
     agregado.registrarDecisaoHumana({ tipo: 'CORRECAO_APLICADA', inconsistencias: [] });
 
     expect(agregado.status).toBe('VALIDADO');
@@ -142,8 +148,14 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — contrat
   });
 
   it('200 — decisão aceita a partir de PENDENTE_REVISAO_HUMANA: ACEITE_COM_RESSALVA transita para VALIDADO_COM_RESSALVA (terminal)', () => {
-    const agregado = agregadoEmStatus('PENDENTE_REVISAO_HUMANA');
+    const requestBody = decisaoHumanaValidacaoRequestSchema.parse({
+      decisao: 'ACEITE_COM_RESSALVA',
+      justificativa:
+        'Comprador aceita preço abaixo da faixa por acordo comercial pontual com o fornecedor.',
+    });
+    expect(requestBody.decisao).toBe('ACEITE_COM_RESSALVA');
 
+    const agregado = agregadoEmStatus('PENDENTE_REVISAO_HUMANA');
     agregado.registrarDecisaoHumana({ tipo: 'ACEITE_COM_RESSALVA' });
 
     expect(agregado.status).toBe('VALIDADO_COM_RESSALVA');
@@ -157,16 +169,23 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — contrat
     (status) => {
       const agregado = agregadoEmStatus(status);
 
-      expect(() => agregado.registrarDecisaoHumana({ tipo: 'ACEITE_COM_RESSALVA' })).toThrow(
-        TransicaoInvalidaValidacaoError,
-      );
+      let erroCapturado: unknown;
+      try {
+        agregado.registrarDecisaoHumana({ tipo: 'ACEITE_COM_RESSALVA' });
+      } catch (erro) {
+        erroCapturado = erro;
+      }
 
-      // O que o controller (T036) mapeará para 409 Problem Details.
+      expect(erroCapturado).toBeInstanceOf(TransicaoInvalidaValidacaoError);
+
+      // O que o controller (T036) mapeará para 409 Problem Details — `detail`
+      // deriva da mensagem real lançada pelo agregado, não de um literal
+      // duplicado, para o teste quebrar se a mensagem de domínio mudar.
       const problem = {
         type: 'https://nexo.internal/problems/transicao-invalida',
         title: 'Ação não permitida para o estado atual do agregado',
         status: 409,
-        detail: `Transição inválida: "registrarDecisaoHumana" a partir do status ${status}`,
+        detail: (erroCapturado as Error).message,
       };
       expect(problemDetailsSchema.parse(problem)).toEqual(problem);
     },
