@@ -56,7 +56,7 @@
 
 ### Tests (US1)
 
-- [ ] T020 [P] [US1] Unit test `DecisaoWorkflow.registrarContextoClassificacao/Extracao/Validacao` + `consolidarContexto()` com os 3 contextos presentes → transita para `CONTEXTO_CONSOLIDADO`.
+- [x] T020 [P] [US1] Unit test `DecisaoWorkflow.registrarContextoClassificacao/Extracao/Validacao` + `consolidarContexto()` com os 3 contextos presentes → transita para `CONTEXTO_CONSOLIDADO`. Já coberto integralmente pela suíte escrita junto do agregado: `tests/bounded-contexts/orquestracao/domain/aggregates/decisao-workflow.aggregate.test.ts` — describe `registrarContexto*` (linhas 73-127: registro dos 3 contextos sem transição, idempotência, `ContextoImutavelError` para cada um) e describe `consolidarContexto` (linhas 129-133: transição para `CONTEXTO_CONSOLIDADO` com os 3 contextos presentes).
 - [ ] T021 [P] [US1] Unit test `DecisaoWorkflow.registrarTentativaOrquestrador` com confiança suficiente e `contextoValidacao.resultado === 'VALIDADO'` → transita para `DECIDIDO`, publica o desfecho correspondente à `acao` reportada pelo agente.
 - [ ] T022 [P] [US1] Unit test da invariante "nunca aprovar sem validação bem-sucedida" (T010) especificamente no fluxo de `registrarTentativaOrquestrador` — tentar `acao: 'APROVAR'` com `contextoValidacao` ausente/reprovado lança `AprovacaoSemValidacaoError`.
 - [ ] T023 [P] [US1] Contract test `GET /v1/orcamentos/{orcamentoId}/workflow/status` em `tests/bounded-contexts/orquestracao/contract/`.
