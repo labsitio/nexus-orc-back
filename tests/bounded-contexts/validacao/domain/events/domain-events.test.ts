@@ -8,26 +8,40 @@ const inconsistencias = [
   { regra: 'CNPJ_INVALIDO' as const, detalhe: 'dígito verificador incorreto' },
 ];
 
+const itens = [
+  {
+    descricao: 'Caixa de papelão ondulado 40x30x20',
+    quantidade: 500,
+    precoUnitario: { valorCentavos: 32000, moeda: 'BRL' },
+    extraido: true,
+  },
+];
+const condicoesComerciais = '30/60/90 dias';
+
 describe.each([
   {
     nome: 'OrcamentoValidado',
     detailType: 'OrcamentoValidado',
-    criar: () => new OrcamentoValidado(orcamentoId),
+    schemaVersion: 2,
+    criar: () => new OrcamentoValidado(orcamentoId, itens, condicoesComerciais),
   },
   {
     nome: 'OrcamentoInconsistenciaDetectada',
     detailType: 'OrcamentoInconsistenciaDetectada',
+    schemaVersion: 1,
     criar: () => new OrcamentoInconsistenciaDetectada(orcamentoId, inconsistencias),
   },
   {
     nome: 'OrcamentoValidadoComRessalva',
     detailType: 'OrcamentoValidadoComRessalva',
-    criar: () => new OrcamentoValidadoComRessalva(orcamentoId, inconsistencias),
+    schemaVersion: 2,
+    criar: () =>
+      new OrcamentoValidadoComRessalva(orcamentoId, inconsistencias, itens, condicoesComerciais),
   },
-])('$nome', ({ detailType, criar }) => {
-  it(`schemaVersion 1, orcamentoId e detailType "${detailType}"`, () => {
+])('$nome', ({ detailType, schemaVersion, criar }) => {
+  it(`schemaVersion ${schemaVersion}, orcamentoId e detailType "${detailType}"`, () => {
     const evento = criar();
-    expect(evento.schemaVersion).toBe(1);
+    expect(evento.schemaVersion).toBe(schemaVersion);
     expect(evento.orcamentoId).toBe(orcamentoId);
     expect(evento.detailType).toBe(detailType);
     expect(() => new Date(evento.ocorreuEm)).not.toThrow();
@@ -42,9 +56,33 @@ describe('OrcamentoInconsistenciaDetectada', () => {
   });
 });
 
+describe('OrcamentoValidado', () => {
+  it('carrega itens e condicoesComerciais (ADR-003, spec 004/T006) para o BC Busca & Indexação montar ConteudoIndexavel', () => {
+    const evento = new OrcamentoValidado(orcamentoId, itens, condicoesComerciais);
+    expect(evento.itens).toEqual(itens);
+    expect(evento.condicoesComerciais).toBe(condicoesComerciais);
+  });
+});
+
 describe('OrcamentoValidadoComRessalva', () => {
   it('carrega a lista de inconsistências aceitas com ressalva', () => {
-    const evento = new OrcamentoValidadoComRessalva(orcamentoId, inconsistencias);
+    const evento = new OrcamentoValidadoComRessalva(
+      orcamentoId,
+      inconsistencias,
+      itens,
+      condicoesComerciais,
+    );
     expect(evento.inconsistencias).toEqual(inconsistencias);
+  });
+
+  it('carrega itens e condicoesComerciais (ADR-003, spec 004/T006)', () => {
+    const evento = new OrcamentoValidadoComRessalva(
+      orcamentoId,
+      inconsistencias,
+      itens,
+      condicoesComerciais,
+    );
+    expect(evento.itens).toEqual(itens);
+    expect(evento.condicoesComerciais).toBe(condicoesComerciais);
   });
 });
