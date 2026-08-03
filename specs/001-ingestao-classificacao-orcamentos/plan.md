@@ -55,6 +55,8 @@ Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API 
 
 **Re-check pós T023/spec 002 (2026-07-31)**: ADR-003 (abaixo) enriquece o payload de `OrcamentoClassificado` com `referenciaBruta`, resolvendo dependência de contrato sinalizada como risco remanescente no `plan.md` da spec 002. Mudança aditiva sobre Value Object de evento já existente, sem alterar invariante do agregado `Orcamento` — gate permanece PASS, nenhuma violação nova.
 
+**Re-check pós achado do `backend-reviewer` (issue #105, spec-002 T040, PR #573, 2026-08-03)**: ADR-004 (abaixo) corrige gap sistêmico de IAM — nenhuma role de Lambda publicadora concedia `events:PutEvents` no bus `nexo-dominio-bus`, apesar de todo caso de uso já publicar Domain Events via `EventBridgePublisher` desde T014/#19. Achado é pré-existente a esta issue, não introduzido por ela. Gate permanece PASS: a correção é aditiva (adiciona a permissão que já deveria existir), não altera nenhuma invariante de domínio nem o Princípio II.
+
 ## Convenções estabelecidas nesta spec (vinculantes para specs 002–009)
 
 1. **Nomenclatura de Bounded Context**: nome estratégico do contexto vem do Context Map macro (candidatos: Ingestão & Identificação, Extração, Validação, Busca & Indexação, Orquestração, Acompanhamento). O nome da pasta `specs/00N-slug-tatico` é o nome tático da feature, não o nome do Bounded Context — uma spec pode ser um recorte parcial de um BC maior. Esta spec pertence ao BC **Ingestão & Identificação**.
@@ -64,6 +66,7 @@ Abordagem técnica: arquitetura orientada a eventos 100% serverless na AWS (API 
 5. **Layout de código por Bounded Context** (monorepo único): `src/bounded-contexts/<slug-do-bc>/{domain,application,infrastructure,interface}`. Código nunca compartilhado por import direto entre contextos — comunicação sempre via evento ou, quando síncrona e inevitável, via um cliente HTTP/SDK explícito tratado como Anti-Corruption Layer.
 6. **Identificador canônico**: `OrcamentoId` é UUID v7 (ordenável por tempo, facilita índice/paginação em Aurora), gerado exclusivamente no Gateway de Ingestão deste contexto. Qualquer referência externa (ex.: número de cotação do ERP do fornecedor) é armazenada como metadado (`referenciaExterna`), nunca como identidade.
 7. **Evolução de payload de evento já publicado**: adicionar um campo a um evento existente é mudança aditiva/compatível (nenhum consumidor existente quebra ao ignorar campo novo) e NÃO exige incrementar `schemaVersion` — reservar o incremento de `schemaVersion` para mudança que remova, renomeie ou altere semântica de campo existente (ver ADR-003).
+8. **Toda role IAM de Lambda que publica Domain Event MUST conceder `events:PutEvents` restrito ao ARN de `nexo-dominio-bus`** (ver ADR-004) — a checklist de least privilege de cada spec (equivalente ao T060 desta spec) MUST validar tanto ausência de permissão excessiva (wildcard) quanto ausência de permissão faltante (o caso de uso publica evento mas a role não autoriza `PutEvents`). Nenhuma role nasce sem essa permissão se seu caso de uso publica evento — verificar isso já no desenho da role, não depois em auditoria.
 
 ## Bounded Context e Context Map (recorte desta spec)
 
@@ -140,7 +143,7 @@ Todos os casos de uso publicam evento via interface `EventPublisher` (implementa
 - `EventBridgePublisher` — implementa `EventPublisher`, publica no bus `nexo-dominio-bus`.
 - `DrizzleOrcamentoRepository` — traduz linha↔agregado sobre Aurora Serverless v2 Postgres; tabelas `orcamentos` (estado atual) e `orcamentos_historico` (append-only, nunca UPDATE/DELETE, apenas INSERT).
 - Filas SQS por consumidor: `classificador-queue`, com DLQ própria + alarme CloudWatch em mensagem na DLQ (Princípio IV — exceção de infraestrutura também nunca silenciosa).
-- IAM: uma role por Lambda (`ReceberOrcamentoLambdaRole`, `ClassificadorLambdaRole`, `ConfirmarRevisaoHumanaLambdaRole`, `ConsultaStatusLambdaRole`), least privilege — ex.: `ClassificadorLambdaRole` tem `bedrock:InvokeModel` restrito ao ARN do(s) modelo(s) aprovado(s), `s3:GetObject` restrito ao prefixo do bucket raw, sem `s3:DeleteObject` em nenhuma role.
+- IAM: uma role por Lambda (`ReceberOrcamentoLambdaRole`, `ClassificadorLambdaRole`, `ConfirmarRevisaoHumanaLambdaRole`, `ConsultaStatusLambdaRole`), least privilege — ex.: `ClassificadorLambdaRole` tem `bedrock:InvokeModel` restrito ao ARN do(s) modelo(s) aprovado(s), `s3:GetObject` restrito ao prefixo do bucket raw, sem `s3:DeleteObject` em nenhuma role. **Toda role cujo Lambda publica Domain Event também tem `events:PutEvents` restrito ao ARN de `nexo-dominio-bus`, condicionado por `events:source` (ver ADR-004)** — `ReceberOrcamentoLambdaRole` e `ClassificadorLambdaRole` publicam evento e MUST ter essa permissão; `ConsultaStatusLambdaRole` é somente leitura e não publica, então não recebe essa permissão.
 
 ## Interface
 
@@ -157,7 +160,7 @@ Todos os casos de uso publicam evento via interface `EventPublisher` (implementa
 - **Prompt injection via documento de fornecedor**: o texto convertido pelo MarkItDown é entrada não confiável. Prompt do Classificador MUST isolar esse texto em um bloco delimitado de "conteúdo do documento", nunca concatenado como instrução de sistema; resposta do Bedrock MUST usar saída estruturada (tool-use/JSON Schema) validada pelo ACL — texto livre do modelo nunca é interpretado como comando.
 - **Dado bruto imutável e criptografado**: SSE-KMS no bucket raw, chave dedicada, rotação gerenciada.
 - **LGPD**: orçamento pode conter dado de contato do fornecedor (não dado pessoal de consumidor final) — retenção via lifecycle policy do S3 (categoria "orçamento", política a parametrizar; SLA de retenção fica pendente de decisão de produto/compliance, registrar como risco remanescente).
-- **Least privilege**: ver seção Infrastructure/IAM acima — sem role compartilhada ampla entre os 5 Lambdas deste contexto.
+- **Least privilege**: ver seção Infrastructure/IAM acima — sem role compartilhada ampla entre os 5 Lambdas deste contexto. Publicação de Domain Event é permissão explícita e auditável por role (`events:PutEvents` escopado ao ARN do bus + `events:source`), nunca implícita/assumida.
 
 ## Project Structure
 
@@ -268,3 +271,45 @@ Escopo de execução: mudança cirúrgica de 2 arquivos (`orcamento-classificado
 **Trade-offs**: pequeno retrabalho em uma spec com issues já fechadas, em troca de manter o desacoplamento por eventos como único mecanismo de contrato entre BCs (Princípio II, NON-NEGOTIABLE) — trade-off aceitável, e menor que as alternativas descartadas.
 
 **Impactos futuros**: qualquer spec futura (Validação, 003; Orquestração, 005) que precise de um ponteiro/atributo hoje ausente de um evento já publicado por outra spec MUST seguir o mesmo padrão: mudança aditiva ao payload do evento existente, nunca leitura cross-schema, nunca chamada síncrona cross-BC. `plan.md` da spec consumidora MUST registrar a dependência de contrato explicitamente na Constitution Check (como a spec 002 já fazia) para que a lacuna seja detectada antes da implementação, não durante.
+
+### ADR-004 — IAM de publicação de Domain Event: `events:PutEvents` por role, não policy no bus
+
+**Contexto**: achado do `backend-reviewer` (issue #105, spec-002 T040, PR #573 já mergeado, 2026-08-03). Nenhuma das 4 role-stacks de Lambda hoje entregues (`infra/lib/receber-orcamento-lambda-role-stack.ts`, `classificador-lambda-role-stack.ts`, `extrator-lambda-role-stack.ts`, `confirmar-revisao-humana-lambda-role-stack.ts`) concede `events:PutEvents` no bus `nexo-dominio-bus` (T013/#18, `infra/lib/dominio-event-bus-stack.ts`). Ao mesmo tempo, todo `EventBridgePublisher` já implementado (Ingestão, Extração, Validação, Conformidade) chama `PutEventsCommand` contra esse mesmo bus a partir desses Lambdas. Gap sistêmico e pré-existente: qualquer `publicar()` real em produção falha hoje com `AccessDeniedException`. Não é falha de nenhuma issue específica — é ausência de convenção declarada até este ADR.
+
+**Problema**: como autorizar as Lambdas publicadoras a escrever no bus único sem violar least privilege nem introduzir um novo ponto de serialização de merge sobre a stack IaC do bus, que já é compartilhada por todo o produto.
+
+**Alternativas consideradas**:
+(a) **Resource-based policy no bus** (`dominioBus.addToResourcePolicy(...)`) — uma única policy, no stack `DominioEventBusStack`, autorizando os ARNs das roles publicadoras.
+(b) **Política IAM por role** — cada role-stack publicadora ganha um `PolicyStatement` com `events:PutEvents`, `Resource` restrito ao ARN do bus, `Condition` restringindo `events:source` (e, quando a role só publica um subconjunto de detail-types, também `events:detail-type`).
+(c) Role IAM ampla e compartilhada entre todas as Lambdas publicadoras, com `events:PutEvents` sem condição.
+
+**Vantagens (a)**: ponto único de leitura de "quem pode publicar no bus"; zero alteração nas 4 role-stacks existentes.
+
+**Desvantagens (a)**: (i) resource-based policy em EventBridge é o mecanismo pensado para autorização **cross-account** — usá-lo para autorizar principals do mesmo conta é fora do padrão AWS mais comum e menos legível para quem audita a role de uma Lambda isoladamente (a permissão fica "invisível" quando se lê `receber-orcamento-lambda-role-stack.ts`); (ii) toda nova Lambda publicadora exige uma edição no mesmo arquivo de stack do bus (`dominio-event-bus-stack.ts`) — o próprio `docs/plano-paralelismo-issues.md` já identifica a stack IaC do bus como ponto de serialização de merge para *regras* EventBridge; concentrar também a autorização de publicação nesse arquivo aumenta a fila de merge sequencial exatamente no recurso mais compartilhado do repo; (iii) quebra o padrão já estabelecido nas 6 role-stacks existentes, que sempre expressam least privilege *na role*, nunca no recurso.
+
+**Vantagens (b)**: (i) least privilege real e auditável por role — abrir `classificador-lambda-role-stack.ts` mostra 100% do que aquele Lambda pode fazer, incluindo publicar evento; (ii) **zero novos arquivos e zero edição na stack do bus** — cada dev-back-end edita apenas a role-stack que já é dona da sua trilha (a mesma que ele edita para `bedrock:InvokeModel`, `s3:GetObject`, etc.); (iii) nenhuma serialização nova: cada role-stack é um arquivo próprio, sem overlap entre trilhas, então N Lambdas publicadoras podem receber a correção em N PRs paralelos; (iv) `events:source`/`events:detail-type` como condition keys são suportados tanto em policy baseada em identidade quanto em resource-based policy no EventBridge (confirmado em docs.aws.amazon.com/eventbridge/latest/userguide/eb-use-conditions.html) — permite condicionar cada role ao(s) exato(s) `source`/`detail-type` que ela de fato publica, replicando a granularidade já usada em `bedrock:InvokeModel` restrito por ARN de modelo.
+
+**Desvantagens (b)**: mais verboso — N role-stacks tocadas em vez de 1; qualquer auditoria "quem pode publicar no bus" exige varrer N arquivos em vez de ler 1 policy central (mitigável com o próprio T060-equivalente de cada spec, que já audita todas as roles).
+
+**Por que (c) foi descartada**: viola diretamente least privilege e o padrão já estabelecido — role compartilhada ampla é exatamente o que as 6 role-stacks existentes evitam deliberadamente (`plan.md` §Infrastructure/IAM: "nunca role ampla compartilhada entre os Lambdas deste contexto"); permitiria a um Lambda publicar `detail-type`/`source` de outro Bounded Context sem necessidade real.
+
+**Decisão**: alternativa (b). Cada role-stack de Lambda cujo caso de uso publica Domain Event ganha:
+
+```ts
+role.addToPolicy(
+  new iam.PolicyStatement({
+    sid: 'PublicarDominioEventBus',
+    actions: ['events:PutEvents'],
+    resources: [props.dominioBus.eventBusArn],
+    conditions: {
+      StringEquals: { 'events:source': SOURCE_DESTE_BC },
+    },
+  }),
+);
+```
+
+`SOURCE_DESTE_BC` é a mesma constante já usada em cada `EventBridgePublisher` (`nexo.ingestao-identificacao`, `nexo.extracao`, `nexo.validacao`, etc.) — nenhum novo valor a inventar. Quando a role publica um único `detail-type` (ex.: `ConfirmarRevisaoHumanaLambdaRole` só publica `OrcamentoReclassificadoPorRevisaoHumana`), adicionar também `'events:detail-type': '<DetailType>'` na mesma condição, restringindo ainda mais. O bus (`DominioEventBusStack`) não é alterado — nenhuma resource-based policy adicionada a ele.
+
+**Trade-offs**: 4 PRs pequenos e paralelizáveis agora (uma por role-stack existente) em vez de 1 PR concentrado na stack do bus; specs futuras (003 Validação, 004 Indexação, 005 Orquestração) que ainda vão criar sua primeira role-stack de Lambda publicadora simplesmente incluem esse `PolicyStatement` desde a criação — sem retrabalho, porque a role ainda não existe hoje.
+
+**Impactos futuros**: convenção 8 (acima) formaliza a regra para specs 002–009. O item de checklist "validar todas as roles IAM contra least privilege" (T060 desta spec e equivalente em cada spec) MUST verificar não só ausência de wildcard, mas também presença de `events:PutEvents` em toda role cujo caso de uso associado publica evento — ver amendment em `tasks.md` desta spec.

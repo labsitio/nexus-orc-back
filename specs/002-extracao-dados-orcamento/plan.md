@@ -6,6 +6,8 @@
 
 **Nota de convenção**: este plano herda, sem redefinir, as convenções vinculantes estabelecidas em `specs/001-ingestao-classificacao-orcamentos/plan.md` (nomenclatura de Bounded Context, convenção de Domain Event, bus único `nexo-dominio-bus`, layout de pastas por BC, `OrcamentoId` gerado só pelo Gateway de Ingestão, ADR-001 Drizzle). Todo desvio dessas convenções é registrado explicitamente como ADR nesta spec.
 
+**Amendment 2026-08-03 (ADR-008 de `specs/007-isolamento-multitenant-dados/plan.md`)**: os Domain Events desta spec (`OrcamentoExtraido`, `OrcamentoExtraidoComPendenciaConfirmada`) foram planejados sem `tenantId` — gap corrigido por retrofit, não por reescrita deste plano. Ver `specs/007-isolamento-multitenant-dados/tasks.md` T040.
+
 ## Summary
 
 Requisito primário: orçamento já classificado (evento `OrcamentoClassificado`, confiança ≥ 80%) tem seus itens, preços e condições comerciais extraídos e estruturados por um Agente Extrator (Bedrock), nunca inventando valor quando a confiança é insuficiente — campo não extraído aciona o mesmo padrão de exceção da spec 001 (escalonamento direto para fila de revisão humana), reaproveitado como padrão de governança, não como componente físico compartilhado entre Bounded Contexts.

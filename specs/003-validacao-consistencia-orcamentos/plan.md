@@ -6,6 +6,8 @@
 
 **Nota de convenção**: este plano herda, sem redefinir, as convenções vinculantes estabelecidas em `specs/001-ingestao-classificacao-orcamentos/plan.md` e `specs/002-extracao-dados-orcamento/plan.md` (nomenclatura de Bounded Context, convenção de Domain Event, bus único `nexo-dominio-bus`, layout de pastas por BC, `OrcamentoId` gerado só pelo Gateway de Ingestão, ADR-001 Drizzle, ADR-003 "padrão replicado, nunca componente físico compartilhado entre BCs"). Todo desvio dessas convenções é registrado explicitamente como ADR nesta spec.
 
+**Amendment 2026-08-03 (ADR-008 de `specs/007-isolamento-multitenant-dados/plan.md`)**: os 3 Domain Events desta spec foram planejados sem `tenantId`. O retrofit sobe `schemaVersion` para `2` num único bump fundido com o enriquecimento de `itens`/`condicoesComerciais` já exigido por ADR-003 de `specs/004-indexacao-busca-semantica-orcamentos/plan.md`. Ver `specs/007-isolamento-multitenant-dados/tasks.md` T041.
+
 ## Summary
 
 Requisito primário: orçamento já extraído (evento `OrcamentoExtraido` ou `OrcamentoExtraidoComPendenciaConfirmada` da spec 002) é submetido a regras de negócio determinísticas de consistência — CNPJ do fornecedor válido e compatível com cadastro conhecido, campos obrigatórios preenchidos, preço dentro de faixa esperada por categoria (configurável), coerência de prazo de validade — e só é marcado "validado" quando todas as regras passam. Inconsistência nunca é silenciada; a spec deixa aberto ao arquiteto o mecanismo de resolução.

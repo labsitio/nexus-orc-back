@@ -36,8 +36,8 @@
 - [x] T013 Infrastructure: schema Drizzle das tabelas `validacoes_orcamento` (estado atual, `dados_extraidos`/`inconsistencias` JSONB), `validacoes_orcamento_historico` (append-only, sem UPDATE/DELETE) e `faixas_preco_categoria` (configuração) + migração.
 - [x] T014 Infrastructure: `DrizzleOrcamentoValidacaoRepository` implementando `OrcamentoValidacaoRepository`, traduzindo linha↔agregado, nunca vazando tipo JSONB bruto para fora da Infra.
 - [x] T015 [P] Infrastructure: `OrcamentoExtraidoEventACL` traduzindo o payload dos eventos `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada` para `DadosExtraidosParaValidacao` — nunca importa tipos de domínio do BC Extração.
-- [ ] T016 Infrastructure: `EventBridgePublisher` implementando `EventPublisher` (instância própria deste BC, mesmo bus `nexo-dominio-bus`).
-- [ ] T017 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta das specs 001/002).
+- [x] T016 Infrastructure: `EventBridgePublisher` implementando `EventPublisher` (instância própria deste BC, mesmo bus `nexo-dominio-bus`).
+- [x] T017 Configurar logging estruturado (pino) + OpenTelemetry Node SDK para os handlers Lambda deste BC, correlação por `orcamentoId` (mesma trilha ponta a ponta das specs 001/002).
 
 **Checkpoint**: Domain testável isoladamente (sem infra, sem IA), repositório e publisher funcionais contra ambiente local (LocalStack).
 

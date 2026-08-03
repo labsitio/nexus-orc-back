@@ -8,7 +8,7 @@ description: >
   desenhar ou evoluir um Bounded Context da Nexo, avaliar trade-offs de design, revisar uma
   decisão arquitetural, ou quebrar uma feature em tarefas técnicas rastreáveis antes de o
   Desenvolvedor Back-end implementar.
-tools: Read, Write, Grep, Glob, WebFetch, WebSearch, Skill
+tools: Read, Write, Edit, Bash, Grep, Glob, WebFetch, WebSearch, Skill
 model: sonnet
 effort: medium
 ---
