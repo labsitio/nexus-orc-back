@@ -1,10 +1,13 @@
+import { createHash } from 'node:crypto';
 import type { AgenteClassificadorGateway } from '../../domain/gateways/agente-classificador.gateway.js';
 import type { ArmazenamentoBrutoGateway } from '../../domain/gateways/armazenamento-bruto.gateway.js';
+import type { CacheIdentificacaoGateway } from '../../domain/gateways/cache-identificacao.gateway.js';
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import type { MarkItDownConversaoACL } from '../../domain/gateways/markitdown-conversao.acl.js';
 import { ErroDominio } from '../../domain/errors/erro-dominio.js';
 import { OrcamentoClassificado } from '../../domain/events/orcamento-classificado.event.js';
 import { OrcamentoEscalonadoParaRevisaoHumana } from '../../domain/events/orcamento-escalonado-revisao-humana.event.js';
+import { AssinaturaEstrutural } from '../../domain/value-objects/assinatura-estrutural.js';
 import { NivelConfianca } from '../../domain/value-objects/nivel-confianca.vo.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { ResultadoClassificacao } from '../../domain/value-objects/resultado-classificacao.vo.js';
@@ -32,6 +35,7 @@ export class ClassificarOrcamento {
     private readonly conversor: MarkItDownConversaoACL,
     private readonly agenteClassificador: AgenteClassificadorGateway,
     private readonly eventPublisher: EventPublisher,
+    private readonly cacheIdentificacao?: CacheIdentificacaoGateway,
   ) {}
 
   async executar(orcamentoIdBruto: string): Promise<void> {
@@ -45,6 +49,21 @@ export class ClassificarOrcamento {
     const nomeArquivo =
       orcamento.referenciaBruta.key.split('/').at(-1) ?? orcamento.referenciaBruta.key;
     const textoDocumento = await this.conversor.converterParaTexto(conteudoBruto, nomeArquivo);
+
+    // Consulta best-effort ao cache de identificação (T012/spec-009): falha de
+    // leitura (throttle, timeout) MUST degradar para cache-miss silencioso,
+    // nunca bloquear ou falhar o caminho de custo total via Bedrock. O uso do
+    // sinal de hit como contexto do agente é escopo de T016, ainda não ligado.
+    if (this.cacheIdentificacao) {
+      try {
+        const assinatura = AssinaturaEstrutural.de(
+          createHash('sha256').update(textoDocumento).digest('hex'),
+        );
+        await this.cacheIdentificacao.buscar(assinatura);
+      } catch {
+        // cache-miss silencioso — segue para classificação normal via Bedrock.
+      }
+    }
 
     const resultadoBruto = await this.agenteClassificador.classificar(textoDocumento);
     const resultado = ResultadoClassificacao.criar({
