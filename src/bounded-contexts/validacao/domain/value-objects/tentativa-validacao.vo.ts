@@ -24,12 +24,21 @@ export class TentativaValidacao {
     readonly resultado: ResultadoTentativaValidacao,
     readonly inconsistencias: readonly InconsistenciaDetectada[],
     readonly timestamp: Date,
+    /**
+     * Justificativa textual da decisão humana que originou esta tentativa
+     * (T036/#146) — `undefined` para tentativas automáticas (`ValidarOrcamento`,
+     * sem intervenção humana ainda). Nunca obrigatória aqui: a regra de borda
+     * "justificativa obrigatória no request" já é validação de Interface
+     * (Zod, `decisao-humana.schema.ts`), este VO só carrega o valor.
+     */
+    readonly justificativa?: string,
   ) {}
 
   static de(
     resultado: ResultadoTentativaValidacao,
     inconsistencias: readonly InconsistenciaDetectada[],
     timestamp: Date,
+    justificativa?: string,
   ): TentativaValidacao {
     if (resultado === 'INCONSISTENTE' && inconsistencias.length === 0) {
       throw new TentativaValidacaoInvalidaError(
@@ -44,6 +53,6 @@ export class TentativaValidacao {
     if (Number.isNaN(timestamp.getTime())) {
       throw new TentativaValidacaoInvalidaError('timestamp inválido');
     }
-    return new TentativaValidacao(resultado, inconsistencias, timestamp);
+    return new TentativaValidacao(resultado, inconsistencias, timestamp, justificativa);
   }
 }

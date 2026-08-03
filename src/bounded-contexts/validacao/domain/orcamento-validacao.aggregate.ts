@@ -36,8 +36,9 @@ export type DecisaoHumanaValidacao =
   | {
       readonly tipo: 'CORRECAO_APLICADA';
       readonly inconsistencias: readonly InconsistenciaDetectada[];
+      readonly justificativa?: string;
     }
-  | { readonly tipo: 'ACEITE_COM_RESSALVA' };
+  | { readonly tipo: 'ACEITE_COM_RESSALVA'; readonly justificativa?: string };
 
 export interface OrcamentoValidacaoProps {
   readonly orcamentoId: OrcamentoId;
@@ -136,26 +137,36 @@ export class OrcamentoValidacao {
     }
 
     if (decisao.tipo === 'CORRECAO_APLICADA') {
-      this.aplicarResultadoAvaliacao(decisao.inconsistencias);
+      this.aplicarResultadoAvaliacao(decisao.inconsistencias, decisao.justificativa);
       return;
     }
 
     this._historico.push(
-      TentativaValidacao.de('ACEITE_COM_RESSALVA', this._inconsistencias, new Date()),
+      TentativaValidacao.de(
+        'ACEITE_COM_RESSALVA',
+        this._inconsistencias,
+        new Date(),
+        decisao.justificativa,
+      ),
     );
     this._status = 'VALIDADO_COM_RESSALVA';
   }
 
-  private aplicarResultadoAvaliacao(inconsistencias: readonly InconsistenciaDetectada[]): void {
+  private aplicarResultadoAvaliacao(
+    inconsistencias: readonly InconsistenciaDetectada[],
+    justificativa?: string,
+  ): void {
     this._inconsistencias = [...inconsistencias];
 
     if (inconsistencias.length === 0) {
-      this._historico.push(TentativaValidacao.de('VALIDADO', [], new Date()));
+      this._historico.push(TentativaValidacao.de('VALIDADO', [], new Date(), justificativa));
       this._status = 'VALIDADO';
       return;
     }
 
-    this._historico.push(TentativaValidacao.de('INCONSISTENTE', inconsistencias, new Date()));
+    this._historico.push(
+      TentativaValidacao.de('INCONSISTENTE', inconsistencias, new Date(), justificativa),
+    );
     this._status = 'PENDENTE_REVISAO_HUMANA';
   }
 }

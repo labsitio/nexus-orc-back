@@ -19,6 +19,7 @@ export function paraResposta(orcamentoValidacao: OrcamentoValidacao): StatusVali
       resultado: tentativa.resultado,
       inconsistencias: tentativa.inconsistencias.map((i) => i.paraPayload()),
       timestamp: tentativa.timestamp.toISOString(),
+      ...(tentativa.justificativa !== undefined ? { justificativa: tentativa.justificativa } : {}),
     })),
   });
 }
