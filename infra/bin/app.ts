@@ -12,6 +12,7 @@ import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
 import { IndexadorQueueStack } from '../lib/indexador-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
 import { ReceberOrcamentoLambdaRoleStack } from '../lib/receber-orcamento-lambda-role-stack.ts';
+import { RegistrarDecisaoHumanaValidacaoLambdaRoleStack } from '../lib/registrar-decisao-humana-validacao-lambda-role-stack.ts';
 import { ValidadorQueueStack } from '../lib/validador-queue-stack.ts';
 import { ValidarOrcamentoLambdaRoleStack } from '../lib/validar-orcamento-lambda-role-stack.ts';
 
@@ -82,6 +83,15 @@ new ValidarOrcamentoLambdaRoleStack(app, 'ValidarOrcamentoLambdaRoleStack', {
     'Role IAM least-privilege da Lambda ValidarOrcamento (sem Bedrock/S3 raw) — spec 003, T028.',
   validadorQueue: validadorQueueStack.validadorQueue,
 });
+
+new RegistrarDecisaoHumanaValidacaoLambdaRoleStack(
+  app,
+  'RegistrarDecisaoHumanaValidacaoLambdaRoleStack',
+  {
+    description:
+      'Role IAM least-privilege da Lambda RegistrarDecisaoHumanaValidacao (sem Bedrock/S3 raw) — spec 003, T037.',
+  },
+);
 
 new ContextoClassificacaoQueueStack(app, 'ContextoClassificacaoQueueStack', {
   description:
