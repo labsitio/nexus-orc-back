@@ -190,6 +190,21 @@ describe('GET /v1/orcamentos/{orcamentoId}/indexacao/status — controller', () 
     expect(resposta.headers['content-type']).toContain('application/problem+json');
   });
 
+  it('404 Problem Details para UUID válido porém não-v7 (OrcamentoIdInvalidoError, nunca 500/leak)', async () => {
+    // Passa o filtro Zod (`z.string().uuid()` aceita qualquer versão) mas falha em
+    // `OrcamentoId.de` (exige v7) — precisa cair no mesmo bucket 404 do "não encontrado",
+    // nunca 500, para não distinguir "UUID mal formado para este BC" de "não existe".
+    const uuidV4 = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+
+    const resposta = await app.inject({
+      method: 'GET',
+      url: `/v1/orcamentos/${uuidV4}/indexacao/status`,
+    });
+
+    expect(resposta.statusCode).toBe(404);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
+  });
+
   it('propaga (500) erro inesperado do repositório sem mascarar como 404', async () => {
     const appComRepositorioQuebrado = Fastify();
     const repositorioQuebrado: IndiceOrcamentoRepository = {
