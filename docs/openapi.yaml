@@ -886,18 +886,30 @@ components:
 
     ItemOrcamento:
       type: object
+      description: >
+        `descricao`/`precoUnitario` redefinem `CampoExtraido.valor` com o tipo real
+        (nunca `allOf`/`oneOf` sobre `CampoExtraido` — combinar `type: object` de um
+        segundo branch com o `valor: {}` irrestrito da base rejeitaria `valor: null`,
+        que é o estado válido de `extraido: false`). `nullable: true` segue a mesma
+        convenção do restante do arquivo (ex.: `ResultadoClassificacao`).
       properties:
         descricao:
-          allOf:
-            - $ref: "#/components/schemas/CampoExtraido"
-            - type: object
-              properties: { valor: { $ref: "#/components/schemas/DescricaoProdutoValor" } }
+          type: object
+          properties:
+            valor: { $ref: "#/components/schemas/DescricaoProdutoValor", nullable: true }
+            confianca: { $ref: "#/components/schemas/NivelConfianca" }
+            extraido: { type: boolean }
+            agenteOrigem: { type: string, enum: [EXTRATOR, HUMANO] }
+          required: [confianca, extraido, agenteOrigem]
         quantidade: { $ref: "#/components/schemas/CampoExtraido" }
         precoUnitario:
-          allOf:
-            - $ref: "#/components/schemas/CampoExtraido"
-            - type: object
-              properties: { valor: { $ref: "#/components/schemas/DinheiroCentavos" } }
+          type: object
+          properties:
+            valor: { $ref: "#/components/schemas/DinheiroCentavos", nullable: true }
+            confianca: { $ref: "#/components/schemas/NivelConfianca" }
+            extraido: { type: boolean }
+            agenteOrigem: { type: string, enum: [EXTRATOR, HUMANO] }
+          required: [confianca, extraido, agenteOrigem]
 
     CondicoesComerciais:
       type: object
@@ -916,10 +928,7 @@ components:
         itens:
           type: array
           items: { $ref: "#/components/schemas/ItemOrcamento" }
-        condicoesComerciais:
-          oneOf:
-            - $ref: "#/components/schemas/CondicoesComerciais"
-            - type: "null"
+        condicoesComerciais: { $ref: "#/components/schemas/CondicoesComerciais", nullable: true }
         historico:
           type: array
           items: { type: object }
