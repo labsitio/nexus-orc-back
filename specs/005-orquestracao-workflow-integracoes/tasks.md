@@ -65,7 +65,7 @@
 ### Implementation (US1)
 
 - [x] T025 [US1] Infrastructure: `BedrockOrquestradorGateway` + `BedrockDecisaoWorkflowACL` (structured output/tool-use exigindo `acao`, `nivelConfianca`, `criterio` não vazio, `requerIntegracaoExterna`; rejeita resposta sem `criterio` — mitigação estrutural contra confiança artificial, ver Segurança do `plan.md`).
-- [ ] T026 [US1] Application: caso de uso `RegistrarContextoClassificacao` (consome `OrcamentoClassificado`, traduz via ACL, cria/atualiza agregado, persiste — nunca decide).
+- [x] T026 [US1] Application: caso de uso `RegistrarContextoClassificacao` (consome `OrcamentoClassificado`, traduz via ACL, cria/atualiza agregado, persiste — nunca decide).
 - [ ] T027 [US1] Application: caso de uso `RegistrarContextoExtracao` (mesmo padrão, consome `OrcamentoExtraido`/`ComPendenciaConfirmada`).
 - [ ] T028 [US1] Application: caso de uso `ConsolidarEDecidirWorkflow` (consome `OrcamentoValidado`/`ComRessalva`, traduz via ACL, tenta `consolidarContexto()`; se sucesso, invoca `AgenteOrquestradorGateway`, aplica `registrarTentativaOrquestrador`, persiste, publica evento de desfecho) — caminho feliz de confiança suficiente.
 - [ ] T029 [US1] Interface: handlers Lambda consumidores de `contexto-classificacao-queue`, `contexto-extracao-queue` e `decisao-workflow-queue`, invocando os 3 casos de uso acima.
