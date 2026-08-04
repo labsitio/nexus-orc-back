@@ -82,3 +82,41 @@ describe('DecisaoWorkflowEscalonadaParaComprador', () => {
     expect(evento.nivelConfianca).toBe(40);
   });
 });
+
+describe('tenantId (spec-007, T044 — expand/contract)', () => {
+  const tenantId = '018f4b1a-tenant-0000-0000-000000000000';
+
+  it.each([
+    {
+      nome: 'OrcamentoAprovadoParaProcessamento',
+      comTenant: () =>
+        new OrcamentoAprovadoParaProcessamento(orcamentoId, 'ORQUESTRADOR', 'criterio', 95, tenantId),
+      semTenant: () => new OrcamentoAprovadoParaProcessamento(orcamentoId, 'ORQUESTRADOR', 'criterio', 95),
+    },
+    {
+      nome: 'OrcamentoEncaminhadoParaComprador',
+      comTenant: () =>
+        new OrcamentoEncaminhadoParaComprador(orcamentoId, 'HUMANO', 'criterio', null, tenantId),
+      semTenant: () => new OrcamentoEncaminhadoParaComprador(orcamentoId, 'HUMANO', 'criterio', null),
+    },
+    {
+      nome: 'OrcamentoReenvioSolicitado',
+      comTenant: () =>
+        new OrcamentoReenvioSolicitado(orcamentoId, 'ORQUESTRADOR', 'criterio', 90, 'motivo', tenantId),
+      semTenant: () => new OrcamentoReenvioSolicitado(orcamentoId, 'ORQUESTRADOR', 'criterio', 90, 'motivo'),
+    },
+    {
+      nome: 'IntegracaoExternaSolicitada',
+      comTenant: () => new IntegracaoExternaSolicitada(orcamentoId, 'APROVAR', tenantId),
+      semTenant: () => new IntegracaoExternaSolicitada(orcamentoId, 'APROVAR'),
+    },
+    {
+      nome: 'DecisaoWorkflowEscalonadaParaComprador',
+      comTenant: () => new DecisaoWorkflowEscalonadaParaComprador(orcamentoId, 62, tenantId),
+      semTenant: () => new DecisaoWorkflowEscalonadaParaComprador(orcamentoId, 62),
+    },
+  ])('$nome propaga tenantId quando informado e mantém undefined quando omitido', ({ comTenant, semTenant }) => {
+    expect(comTenant().tenantId).toBe(tenantId);
+    expect(semTenant().tenantId).toBeUndefined();
+  });
+});
