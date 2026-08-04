@@ -26,6 +26,7 @@ export class OrcamentoClassificado implements OrcamentoClassificadoPayload {
     readonly orcamentoId: string,
     readonly resultado: ResultadoClassificacaoPayload,
     readonly referenciaBruta: ReferenciaS3Params,
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

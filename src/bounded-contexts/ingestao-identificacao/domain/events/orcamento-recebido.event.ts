@@ -25,6 +25,7 @@ export class OrcamentoRecebido implements OrcamentoRecebidoPayload {
     readonly canal: CanalValor,
     readonly referenciaBruta: ReferenciaBrutaPayload,
     readonly referenciaExterna?: string,
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

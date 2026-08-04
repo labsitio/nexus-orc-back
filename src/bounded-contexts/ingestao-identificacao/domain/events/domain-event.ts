@@ -12,4 +12,12 @@ export interface DomainEventEnvelope {
    * Ausente = comportamento padrão atual (retrocompatível): tratado como `PADRAO`.
    */
   readonly prioridade?: 'PADRAO' | 'LOTE_BAIXA_PRIORIDADE';
+  /**
+   * Tenant dono do orçamento (spec-007, T015 — expand/contract).
+   * Opcional e `schemaVersion` mantido em `1` de propósito: as issues #279/#280/#281
+   * ainda não preenchem este campo nos sites de emissão. Uma PR de contract futura
+   * torna `tenantId` obrigatório e sobe `schemaVersion` para `2` nos 4 BCs de uma vez
+   * (ADR-008 — cutover único, sem suporte dual v1/v2 publicado).
+   */
+  readonly tenantId?: string;
 }
