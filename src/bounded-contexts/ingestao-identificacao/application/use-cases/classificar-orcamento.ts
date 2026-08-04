@@ -21,13 +21,29 @@ export class OrcamentoNaoEncontradoParaClassificacaoError extends ErroDominio {
 }
 
 /**
+ * (fix #640) Discrimina os dois casos que `TenantDivergenciaError` cobre —
+ * materialmente diferentes para quem consome o erro (handler de fila, log,
+ * alarme):
+ * - `AUSENTE`: agregado sem `tenantId` (registro pré-retrofit, ADR-008). Normal
+ *   durante a fase de expand; desaparece após o cutover (#632).
+ * - `DIVERGENTE`: `tenantId` da requisição ausente ou diferente do agregado.
+ *   Nunca esperado — sinal de acesso cross-tenant/evento mal roteado.
+ */
+export type MotivoTenantDivergencia = 'AUSENTE' | 'DIVERGENTE';
+
+/**
  * (spec 007, T017) Disparado quando `tenantId` do agregado é ausente/undefined
  * (registro legado pré-retrofit) ou não corresponde ao `tenantId` da requisição
  * (tentativa de acesso cross-tenant). Retornado como 404 nunca 403, para não
  * revelar ao cliente a existência de um orçamento pertencente a outro tenant.
  */
 export class TenantDivergenciaError extends ErroDominio {
-  constructor(orcamentoId: string) {
+  constructor(
+    orcamentoId: string,
+    readonly motivo: MotivoTenantDivergencia,
+    readonly tenantIdAgregado?: string,
+    readonly tenantIdSolicitante?: string,
+  ) {
     super(`Acesso negado ao orçamento: ${orcamentoId}`);
   }
 }
@@ -71,8 +87,21 @@ export class ClassificarOrcamento {
     // - se agregado tem tenantId e parâmetro não: divergência, 404
     // - se agregado não tem tenantId (legado): divergência, 404
     // - se ambos têm e coincidem: sucesso
-    if (!orcamento.tenantId || !tenantId || orcamento.tenantId.toString() !== tenantId.toString()) {
-      throw new TenantDivergenciaError(orcamentoIdBruto);
+    if (!orcamento.tenantId) {
+      throw new TenantDivergenciaError(
+        orcamentoIdBruto,
+        'AUSENTE',
+        undefined,
+        tenantId?.toString(),
+      );
+    }
+    if (!tenantId || orcamento.tenantId.toString() !== tenantId.toString()) {
+      throw new TenantDivergenciaError(
+        orcamentoIdBruto,
+        'DIVERGENTE',
+        orcamento.tenantId.toString(),
+        tenantId?.toString(),
+      );
     }
 
     const conteudoBruto = await this.armazenamentoBruto.lerConteudoBruto(orcamento.referenciaBruta);
