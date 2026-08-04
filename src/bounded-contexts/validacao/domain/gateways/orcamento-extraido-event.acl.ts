@@ -6,15 +6,12 @@ export interface OrcamentoExtraidoEventACLResultado {
   readonly orcamentoId: OrcamentoId;
   readonly dadosExtraidos: DadosExtraidosParaValidacao;
   /**
-   * (issue #649 — expand/contract, ADR-008) Extraído do envelope de 002, que
-   * ainda publica `tenantId` opcional (spec-002 #648). `undefined` nunca é
-   * rejeitado aqui — diferente da ACL estrita de 004 sobre eventos de 003
-   * (#584/T042): `OrcamentoValidacao` é sempre criado no caminho da fila
-   * (nunca há agregado pré-existente de outro tenant para divergir contra),
-   * mesmo racional de `ExtracaoOrcamento` (spec 002, #648). Propagado como
-   * `undefined` até a #632 tornar o campo obrigatório nos 4 BCs de uma vez.
+   * (spec 007, ADR-008 — cutover de contract, #632) Extraído do envelope de
+   * 002, obrigatório desde `schemaVersion: 2`. Evento sem `tenantId` é
+   * rejeitado por `OrcamentoExtraidoEventACLImpl` (Infrastructure) — nunca
+   * propagado como `undefined`.
    */
-  readonly tenantId?: TenantId;
+  readonly tenantId: TenantId;
 }
 
 /**

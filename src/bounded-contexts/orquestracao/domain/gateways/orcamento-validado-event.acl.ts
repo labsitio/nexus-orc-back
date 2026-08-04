@@ -6,11 +6,12 @@ export interface OrcamentoValidadoEventACLResultado {
   readonly orcamentoId: OrcamentoId;
   readonly contextoValidacao: ContextoValidacao;
   /**
-   * (issue #650 — expand/contract, ADR-008) Extraído do envelope de 003, que
-   * ainda publica `tenantId` opcional. `undefined` nunca é rejeitado aqui —
-   * propagado como tal até a #632 tornar o campo obrigatório nos 4 BCs.
+   * (spec 007, ADR-008 — cutover de contract, #632) Extraído do envelope de
+   * 003, obrigatório desde `schemaVersion: 2`. Evento sem `tenantId` é
+   * rejeitado por `OrcamentoValidadoEventACL` (Infrastructure) — nunca
+   * propagado como `undefined`.
    */
-  readonly tenantId?: TenantId;
+  readonly tenantId: TenantId;
 }
 
 /**

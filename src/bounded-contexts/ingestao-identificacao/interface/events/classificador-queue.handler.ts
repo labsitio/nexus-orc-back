@@ -28,14 +28,11 @@ interface EventBridgeEnvelope {
   readonly detail: {
     readonly orcamentoId: string;
     /**
-     * (spec 007, T017) `tenantId` é obrigatório no envelope desde T015 (`schemaVersion: 2`).
-     * Opcional aqui no type guard porque a premissa de T015 é zero tenant real em produção
-     * (baseline da spec) — nenhum evento v1 sem `tenantId` circulará concorrentemente com v2;
-     * quando T015 for implementado, o cutover é direto (sem dual v1/v2). Até lá,
-     * `tenantId` é undefined em produção e será propagado como tal (ou a validação
-     * de tenant no use case rejeitará como legado).
+     * (spec 007, ADR-008 — cutover de contract, #632) `tenantId` é obrigatório
+     * no envelope desde `schemaVersion: 2` (T015/#278). Mensagem sem `tenantId`
+     * é rejeitada aqui (batch item failure), nunca propagada como `undefined`.
      */
-    readonly tenantId?: string;
+    readonly tenantId: string;
   };
 }
 
@@ -47,7 +44,8 @@ function ehEventBridgeEnvelope(valor: unknown): valor is EventBridgeEnvelope {
   return (
     typeof detail === 'object' &&
     detail !== null &&
-    typeof (detail as Record<string, unknown>).orcamentoId === 'string'
+    typeof (detail as Record<string, unknown>).orcamentoId === 'string' &&
+    typeof (detail as Record<string, unknown>).tenantId === 'string'
   );
 }
 
@@ -90,22 +88,22 @@ export function criarClassificadorQueueHandler(
         }
         orcamentoId = corpo.detail.orcamentoId;
 
-        // (spec 007, T017) `tenantId` vem do evento `OrcamentoRecebido` publicado por T016.
-        // Até T015 ser implementado, `tenantId` é undefined no envelope (schemaVersion: 1).
-        // Depois de T015, é obrigatório (schemaVersion: 2). A validação de tenant no use case
-        // rejeita como legado (404) se `tenantId` for undefined — comportamento transitório
-        // até o cutover completo de todos os eventos.
+        // (spec 007, ADR-008 — cutover de contract, #632) `tenantId` vem do
+        // evento `OrcamentoRecebido` publicado por T016, obrigatório desde
+        // `schemaVersion: 2`. Malformado (não UUID v7) é dado de produtor
+        // corrompido — mesmo tratamento de erro genérico do envelope (batch
+        // item failure, retry, eventual DLQ).
         const tenantIdStr = corpo.detail.tenantId;
-        let tenantId: TenantId | undefined;
+        let tenantId: TenantId;
         try {
-          tenantId = tenantIdStr ? TenantId.de(tenantIdStr) : undefined;
+          tenantId = TenantId.de(tenantIdStr);
         } catch {
           throw new Error(`Mensagem ${record.messageId} contém tenantId inválido: ${tenantIdStr}`);
         }
 
         const logDoOrcamento = logDaMensagem.child({
           orcamentoId,
-          tenantId: tenantId?.toString(),
+          tenantId: tenantId.toString(),
         });
         logDoOrcamento.info('Classificando orçamento');
         await classificarOrcamento.executar(orcamentoId, tenantId);

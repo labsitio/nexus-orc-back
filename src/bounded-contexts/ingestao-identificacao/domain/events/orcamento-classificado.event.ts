@@ -19,14 +19,14 @@ export interface OrcamentoClassificadoPayload extends DomainEventEnvelope {
 export class OrcamentoClassificado implements OrcamentoClassificadoPayload {
   static readonly detailType = 'OrcamentoClassificado' as const;
   readonly detailType = OrcamentoClassificado.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
     readonly resultado: ResultadoClassificacaoPayload,
     readonly referenciaBruta: ReferenciaS3Params,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

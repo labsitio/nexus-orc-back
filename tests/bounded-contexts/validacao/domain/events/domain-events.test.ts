@@ -4,6 +4,7 @@ import { OrcamentoValidadoComRessalva } from '../../../../../src/bounded-context
 import { OrcamentoValidado } from '../../../../../src/bounded-contexts/validacao/domain/events/orcamento-validado.event.js';
 
 const orcamentoId = '018f4b1a-0000-7000-8000-000000000000';
+const tenantId = '018f4b1a-tenant-0000-000000000000';
 const inconsistencias = [
   { regra: 'CNPJ_INVALIDO' as const, detalhe: 'dígito verificador incorreto' },
 ];
@@ -22,27 +23,31 @@ describe.each([
   {
     nome: 'OrcamentoValidado',
     detailType: 'OrcamentoValidado',
-    schemaVersion: 2,
-    criar: () => new OrcamentoValidado(orcamentoId, itens, condicoesComerciais),
+    criar: () => new OrcamentoValidado(orcamentoId, itens, condicoesComerciais, tenantId),
   },
   {
     nome: 'OrcamentoInconsistenciaDetectada',
     detailType: 'OrcamentoInconsistenciaDetectada',
-    schemaVersion: 1,
-    criar: () => new OrcamentoInconsistenciaDetectada(orcamentoId, inconsistencias),
+    criar: () => new OrcamentoInconsistenciaDetectada(orcamentoId, inconsistencias, tenantId),
   },
   {
     nome: 'OrcamentoValidadoComRessalva',
     detailType: 'OrcamentoValidadoComRessalva',
-    schemaVersion: 2,
     criar: () =>
-      new OrcamentoValidadoComRessalva(orcamentoId, inconsistencias, itens, condicoesComerciais),
+      new OrcamentoValidadoComRessalva(
+        orcamentoId,
+        inconsistencias,
+        itens,
+        condicoesComerciais,
+        tenantId,
+      ),
   },
-])('$nome', ({ detailType, schemaVersion, criar }) => {
-  it(`schemaVersion ${schemaVersion}, orcamentoId e detailType "${detailType}"`, () => {
+])('$nome', ({ detailType, criar }) => {
+  it(`schemaVersion 2, orcamentoId, tenantId e detailType "${detailType}"`, () => {
     const evento = criar();
-    expect(evento.schemaVersion).toBe(schemaVersion);
+    expect(evento.schemaVersion).toBe(2);
     expect(evento.orcamentoId).toBe(orcamentoId);
+    expect(evento.tenantId).toBe(tenantId);
     expect(evento.detailType).toBe(detailType);
     expect(() => new Date(evento.ocorreuEm)).not.toThrow();
     expect(new Date(evento.ocorreuEm).toISOString()).toBe(evento.ocorreuEm);
@@ -51,14 +56,14 @@ describe.each([
 
 describe('OrcamentoInconsistenciaDetectada', () => {
   it('carrega a lista completa de inconsistências da tentativa atual', () => {
-    const evento = new OrcamentoInconsistenciaDetectada(orcamentoId, inconsistencias);
+    const evento = new OrcamentoInconsistenciaDetectada(orcamentoId, inconsistencias, tenantId);
     expect(evento.inconsistencias).toEqual(inconsistencias);
   });
 });
 
 describe('OrcamentoValidado', () => {
   it('carrega itens e condicoesComerciais (ADR-003, spec 004/T006) para o BC Busca & Indexação montar ConteudoIndexavel', () => {
-    const evento = new OrcamentoValidado(orcamentoId, itens, condicoesComerciais);
+    const evento = new OrcamentoValidado(orcamentoId, itens, condicoesComerciais, tenantId);
     expect(evento.itens).toEqual(itens);
     expect(evento.condicoesComerciais).toBe(condicoesComerciais);
   });
@@ -71,6 +76,7 @@ describe('OrcamentoValidadoComRessalva', () => {
       inconsistencias,
       itens,
       condicoesComerciais,
+      tenantId,
     );
     expect(evento.inconsistencias).toEqual(inconsistencias);
   });
@@ -81,6 +87,7 @@ describe('OrcamentoValidadoComRessalva', () => {
       inconsistencias,
       itens,
       condicoesComerciais,
+      tenantId,
     );
     expect(evento.itens).toEqual(itens);
     expect(evento.condicoesComerciais).toBe(condicoesComerciais);

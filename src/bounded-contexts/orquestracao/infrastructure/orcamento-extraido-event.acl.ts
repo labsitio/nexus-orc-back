@@ -45,11 +45,11 @@ interface OrcamentoExtraidoPayloadBruto {
   readonly itens: readonly ItemOrcamentoBruto[];
   readonly condicoesComerciais: CondicoesComerciaisBruto;
   /**
-   * (issue #650 — expand/contract, ADR-008) Ainda opcional no envelope de
-   * origem (spec 002). `undefined` nunca é rejeitado aqui — ver
-   * `OrcamentoExtraidoEventACLResultado.tenantId`.
+   * (spec 007, ADR-008 — cutover de contract, #632) Obrigatório desde
+   * `schemaVersion: 2` do envelope de origem (spec 002) — o type guard
+   * estrutural (`ehOrcamentoExtraidoPayloadBruto`) já rejeita ausente.
    */
-  readonly tenantId?: string;
+  readonly tenantId: string;
 }
 
 /**
@@ -129,7 +129,7 @@ function ehOrcamentoExtraidoPayloadBruto(valor: unknown): valor is OrcamentoExtr
     Array.isArray(objeto.itens) &&
     objeto.itens.every(ehItemOrcamentoBruto) &&
     ehCondicoesComerciaisBruto(objeto.condicoesComerciais) &&
-    (objeto.tenantId === undefined || typeof objeto.tenantId === 'string')
+    typeof objeto.tenantId === 'string'
   );
 }
 
@@ -182,10 +182,7 @@ export class OrcamentoExtraidoEventACL implements OrcamentoExtraidoEventACLPort 
         houvePendenciaConfirmada:
           payloadBruto.detailType === 'OrcamentoExtraidoComPendenciaConfirmada',
       }),
-      // (issue #650) Nunca rejeitado quando ausente — ver
-      // `OrcamentoExtraidoEventACLResultado.tenantId`.
-      tenantId:
-        payloadBruto.tenantId !== undefined ? TenantId.de(payloadBruto.tenantId) : undefined,
+      tenantId: TenantId.de(payloadBruto.tenantId),
     };
   }
 }

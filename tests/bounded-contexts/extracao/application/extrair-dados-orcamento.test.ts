@@ -25,6 +25,7 @@ import type { ExtracaoOrcamentoRepository } from '../../../../src/bounded-contex
 import { OrcamentoExtraido } from '../../../../src/bounded-contexts/extracao/domain/events/orcamento-extraido.event.js';
 import { ExtracaoEscalonadaParaRevisaoHumana } from '../../../../src/bounded-contexts/extracao/domain/events/extracao-escalonada-revisao-humana.event.js';
 import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
+import { ExtracaoSemTenantIdError } from '../../../../src/bounded-contexts/extracao/domain/errors/tenant.errors.js';
 
 const AGENTE_EXTRATOR_ORIGEM = 'EXTRATOR' as const;
 const ORCAMENTO_ID = '01890a5d-ac96-774b-bcce-b302099a8057';
@@ -41,6 +42,7 @@ const PARAMS_BASE = {
     key: 'portal/arquivo.pdf',
     versionId: 'v1',
   },
+  tenantId: TenantId.novo(),
 };
 
 class RepositorioFake implements ExtracaoOrcamentoRepository {
@@ -189,6 +191,7 @@ describe('ExtrairDadosOrcamento', () => {
       OrcamentoId.de(ORCAMENTO_ID),
       ReferenciaClassificacao.de(PARAMS_BASE.referenciaClassificacao),
       ReferenciaS3.de(PARAMS_BASE.referenciaBrutaS3),
+      PARAMS_BASE.tenantId,
     );
     const repositorio = new RepositorioFake(existente);
     const publisher = new EventPublisherFake();
@@ -291,8 +294,13 @@ describe('ExtrairDadosOrcamento', () => {
     expect(evento.tenantId).toBe(tenantOriginal.toString());
   });
 
-  it('(issue #648) tenantId ausente é propagado como undefined — nunca rejeitado (ADR-008, fase de expand)', async () => {
-    const repositorio = new RepositorioFake();
+  it('(guarda fail-fast ADR-008, #632) rejeita publicar evento quando o agregado existente é legado e não possui tenantId persistido', async () => {
+    const existente = ExtracaoOrcamento.criar(
+      OrcamentoId.de(ORCAMENTO_ID),
+      ReferenciaClassificacao.de(PARAMS_BASE.referenciaClassificacao),
+      ReferenciaS3.de(PARAMS_BASE.referenciaBrutaS3),
+    );
+    const repositorio = new RepositorioFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ExtrairDadosOrcamento(
       repositorio,
@@ -305,10 +313,9 @@ describe('ExtrairDadosOrcamento', () => {
       publisher,
     );
 
-    await useCase.executar(PARAMS_BASE);
-
-    expect(repositorio.salvos[0]?.tenantId).toBeUndefined();
-    const evento = publisher.eventosPublicados[0] as OrcamentoExtraido;
-    expect(evento.tenantId).toBeUndefined();
+    await expect(
+      useCase.executar({ ...PARAMS_BASE, tenantId: TenantId.de(ORCAMENTO_ID) }),
+    ).rejects.toThrow(ExtracaoSemTenantIdError);
+    expect(publisher.eventosPublicados).toHaveLength(0);
   });
 });

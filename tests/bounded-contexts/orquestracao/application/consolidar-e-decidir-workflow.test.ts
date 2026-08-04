@@ -4,6 +4,7 @@ import { ConsolidarEDecidirWorkflow } from '../../../../src/bounded-contexts/orq
 import {
   ContextoIncompletoError,
   DecisaoWorkflow,
+  DecisaoWorkflowSemTenantIdError,
 } from '../../../../src/bounded-contexts/orquestracao/domain/aggregates/decisao-workflow.aggregate.js';
 import { DecisaoWorkflowEscalonadaParaComprador } from '../../../../src/bounded-contexts/orquestracao/domain/events/decisao-workflow-escalonada-para-comprador.event.js';
 import { IntegracaoExternaSolicitada } from '../../../../src/bounded-contexts/orquestracao/domain/events/integracao-externa-solicitada.event.js';
@@ -69,6 +70,7 @@ class EventPublisherFake implements EventPublisher {
 }
 
 const ORCAMENTO_ID = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+const TENANT_ID = TenantId.novo();
 
 const CONTEXTO_VALIDACAO = ContextoValidacao.de({ resultado: 'VALIDADO' });
 
@@ -96,7 +98,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
@@ -141,7 +147,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
@@ -164,7 +174,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'ENCAMINHAR_COMPRADOR',
@@ -187,7 +201,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'SOLICITAR_REENVIO',
@@ -210,7 +228,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake();
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
@@ -251,7 +273,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
       },
     };
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       agenteOrquestrador,
       publisher,
@@ -284,7 +310,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
       },
     };
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       agenteOrquestrador,
       publisher,
@@ -294,6 +324,36 @@ describe('ConsolidarEDecidirWorkflow', () => {
       useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() }),
     ).resolves.toBeUndefined();
 
+    expect(publisher.publicados).toHaveLength(0);
+  });
+
+  it('(guarda fail-fast ADR-008, #632) rejeita publicar desfecho quando o tenantId consolidado no agregado é indefinido — defesa contra ACL que viole seu próprio contrato de tipo', async () => {
+    const existente = agregadoComContextoConsolidado();
+    const repositorio = new DecisaoWorkflowRepositoryFake(existente);
+    const publisher = new EventPublisherFake();
+    const useCase = new ConsolidarEDecidirWorkflow(
+      // As 3 ACLs de entrada garantem tenantId sempre presente no tipo — este
+      // fake simula uma implementação de ACL com bug que viola o próprio
+      // contrato (retorna `undefined` em runtime), único jeito de alcançar
+      // este ramo de defesa em profundidade (nunca ocorre com as ACLs reais).
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: undefined as unknown as TenantId,
+      }),
+      repositorio,
+      new AgenteOrquestradorGatewayFake({
+        acao: 'APROVAR',
+        nivelConfianca: NivelConfianca.de(90),
+        criterio: 'Fornecedor recorrente, itens e condições consistentes',
+        requerIntegracaoExterna: false,
+      }),
+      publisher,
+    );
+
+    await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).rejects.toThrow(
+      DecisaoWorkflowSemTenantIdError,
+    );
     expect(publisher.publicados).toHaveLength(0);
   });
 });

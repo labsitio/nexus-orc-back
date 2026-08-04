@@ -64,7 +64,7 @@ function condicoesCompletas(): CondicoesComerciais {
 }
 
 /** Extração já escalada para PENDENTE_REVISAO_HUMANA — precoUnitario do item 0 pendente. */
-function extracaoPendente(tenantId?: TenantId): ExtracaoOrcamento {
+function extracaoPendente(tenantId: TenantId = TenantId.novo()): ExtracaoOrcamento {
   const extracao = ExtracaoOrcamento.criar(
     OrcamentoId.de(ORCAMENTO_ID),
     ReferenciaClassificacao.de({
@@ -101,7 +101,9 @@ function itemCompleto(): ItemOrcamento {
 }
 
 /** Extração PENDENTE_REVISAO_HUMANA com itens completos, mas `prazoValidade` pendente. */
-function extracaoPendenteCondicoesComerciais(): ExtracaoOrcamento {
+function extracaoPendenteCondicoesComerciais(
+  tenantId: TenantId = TenantId.novo(),
+): ExtracaoOrcamento {
   const extracao = ExtracaoOrcamento.criar(
     OrcamentoId.de(ORCAMENTO_ID),
     ReferenciaClassificacao.de({
@@ -110,6 +112,7 @@ function extracaoPendenteCondicoesComerciais(): ExtracaoOrcamento {
       agenteOrigem: 'CLASSIFICADOR',
     }),
     ReferenciaS3.de({ bucket: 'nexo-orcamentos-raw', key: 'portal/arquivo.pdf', versionId: 'v1' }),
+    tenantId,
   );
   const condicoesIncompletas = CondicoesComerciais.de({
     condicoesPagamento: CampoExtraido.extraido('30 dias', confiancaAlta, 'EXTRATOR'),
@@ -394,6 +397,7 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
         key: 'portal/arquivo.pdf',
         versionId: 'v1',
       }),
+      TenantId.novo(),
     );
     const itemComDescricaoEQuantidadePendentes = ItemOrcamento.de({
       descricao: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
@@ -437,6 +441,7 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
         key: 'portal/arquivo.pdf',
         versionId: 'v1',
       }),
+      TenantId.novo(),
     );
     const condicoesIncompletas = CondicoesComerciais.de({
       condicoesPagamento: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),

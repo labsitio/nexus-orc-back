@@ -14,6 +14,7 @@ import {
 import type { OrcamentoValidacaoRepository } from '../../domain/repositories/orcamento-validacao.repository.js';
 import { CNPJ } from '../../domain/value-objects/cnpj.vo.js';
 import { InconsistenciaDetectada } from '../../domain/value-objects/inconsistencia-detectada.vo.js';
+import { OrcamentoValidacaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 
 /**
  * Consumidor dos eventos `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`
@@ -85,18 +86,31 @@ export class ValidarOrcamento {
     validacao.avaliarRegrasDeConsistencia(inconsistencias);
     await this.repositorio.salvar(validacao);
 
+    // (spec 007, ADR-008 — cutover de contract, #632; achado MAJOR do
+    // backend-reviewer) O evento carrega o `tenantId` já persistido no
+    // agregado (fonte da verdade, imutável desde a criação) — nunca o
+    // `tenantId` desestruturado da tradução desta invocação: numa reentrega
+    // com `tenantId` divergente do já registrado, o evento nunca deve
+    // reportar um tenant diferente do dono real do agregado (mesmo padrão de
+    // `extrair-dados-orcamento.ts`/`confirmar-revisao-humana-extracao.ts`).
+    const tenantIdPersistido = validacao.tenantId;
+    if (!tenantIdPersistido) {
+      throw new OrcamentoValidacaoSemTenantIdError(validacao.orcamentoId.toString());
+    }
+    const tenantIdParaEvento = tenantIdPersistido.toString();
+
     const evento =
       validacao.status === 'VALIDADO'
         ? new OrcamentoValidado(
             validacao.orcamentoId.toString(),
             dadosExtraidos.itens.map((item) => item.paraPayload()),
             dadosExtraidos.condicoesComerciais,
-            validacao.tenantId?.toString(),
+            tenantIdParaEvento,
           )
         : new OrcamentoInconsistenciaDetectada(
             validacao.orcamentoId.toString(),
             validacao.inconsistencias.map((inconsistencia) => inconsistencia.paraPayload()),
-            validacao.tenantId?.toString(),
+            tenantIdParaEvento,
           );
     await this.eventPublisher.publicar(evento);
   }

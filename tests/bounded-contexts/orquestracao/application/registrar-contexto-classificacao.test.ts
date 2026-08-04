@@ -39,6 +39,7 @@ class DecisaoWorkflowRepositoryFake implements DecisaoWorkflowRepository {
 }
 
 const ORCAMENTO_ID = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+const TENANT_ID = TenantId.novo();
 
 function contexto(fornecedorIdentificado = 'Fornecedor XYZ'): ContextoClassificacao {
   return ContextoClassificacao.de({
@@ -51,7 +52,11 @@ describe('RegistrarContextoClassificacao', () => {
   it('cria o agregado e registra o contexto quando ainda não existe', async () => {
     const repositorio = new DecisaoWorkflowRepositoryFake();
     const useCase = new RegistrarContextoClassificacao(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoClassificacao: contexto() }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoClassificacao: contexto(),
+        tenantId: TENANT_ID,
+      }),
       repositorio,
     );
 
@@ -67,7 +72,11 @@ describe('RegistrarContextoClassificacao', () => {
     const existente = DecisaoWorkflow.criar(ORCAMENTO_ID);
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const useCase = new RegistrarContextoClassificacao(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoClassificacao: contexto() }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoClassificacao: contexto(),
+        tenantId: TENANT_ID,
+      }),
       repositorio,
     );
 
@@ -83,7 +92,11 @@ describe('RegistrarContextoClassificacao', () => {
     existente.registrarContextoClassificacao(contexto());
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const useCase = new RegistrarContextoClassificacao(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoClassificacao: contexto() }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoClassificacao: contexto(),
+        tenantId: TENANT_ID,
+      }),
       repositorio,
     );
 
@@ -101,6 +114,7 @@ describe('RegistrarContextoClassificacao', () => {
       new ACLFake({
         orcamentoId: ORCAMENTO_ID,
         contextoClassificacao: contexto('Fornecedor Divergente'),
+        tenantId: TENANT_ID,
       }),
       repositorio,
     );

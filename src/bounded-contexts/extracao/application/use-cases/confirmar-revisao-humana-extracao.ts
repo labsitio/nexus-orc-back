@@ -1,5 +1,6 @@
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import { ErroDominio } from '../../domain/errors/erro-dominio.js';
+import { ExtracaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 import type {
   ExtracaoOrcamento,
   StatusExtracao,
@@ -304,6 +305,14 @@ export class ConfirmarRevisaoHumanaExtracao {
       throw new ExtracaoSemCondicoesComerciaisError(params.orcamentoId);
     }
 
+    // (spec 007, ADR-008 — cutover de contract, #632) Capturado antes de
+    // `registrarConfirmacaoHumana` mutar o agregado — mesma indireção de
+    // `statusDe` (getter perde narrowing após chamada de método mutável).
+    // Guarda de ausência só é aplicada mais abaixo, perto da publicação do
+    // evento: erros de validação do próprio `camposConfirmados` (caminho,
+    // shape) têm precedência sobre a checagem de `tenantId`.
+    const tenantId = extracao.tenantId;
+
     const { itens, condicoesComerciais } = aplicarConfirmacoes(
       extracao.itens,
       condicoesAtuais,
@@ -313,19 +322,23 @@ export class ConfirmarRevisaoHumanaExtracao {
     extracao.registrarConfirmacaoHumana(itens, condicoesComerciais);
     await this.repositorio.salvar(extracao);
 
+    if (!tenantId) {
+      throw new ExtracaoSemTenantIdError(params.orcamentoId);
+    }
+
     const evento =
       statusDe(extracao) === 'EXTRAIDO'
         ? new OrcamentoExtraido(
             extracao.orcamentoId.toString(),
             extracao.itens.map((item) => item.paraPayload()),
             condicoesComerciais.paraPayload(),
-            extracao.tenantId?.toString(),
+            tenantId.toString(),
           )
         : new OrcamentoExtraidoComPendenciaConfirmada(
             extracao.orcamentoId.toString(),
             extracao.itens.map((item) => item.paraPayload()),
             condicoesComerciais.paraPayload(),
-            extracao.tenantId?.toString(),
+            tenantId.toString(),
           );
     await this.eventPublisher.publicar(evento);
 

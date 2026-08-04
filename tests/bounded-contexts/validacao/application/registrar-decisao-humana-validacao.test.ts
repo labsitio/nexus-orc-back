@@ -68,7 +68,7 @@ function dadosExtraidos(): DadosExtraidosParaValidacao {
   });
 }
 
-function orcamentoPendenteRevisaoHumana(tenantId?: TenantId): OrcamentoValidacao {
+function orcamentoPendenteRevisaoHumana(tenantId: TenantId = TenantId.novo()): OrcamentoValidacao {
   const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dadosExtraidos(), tenantId);
   validacao.avaliarRegrasDeConsistencia([
     InconsistenciaDetectada.de('PRAZO_INCOERENTE', 'Período de validade anterior à emissão'),

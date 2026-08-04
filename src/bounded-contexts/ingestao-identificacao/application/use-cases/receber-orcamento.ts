@@ -93,6 +93,7 @@ export class ReceberOrcamento {
           key: params.referenciaBruta.key,
           versionId: params.referenciaBruta.versionId,
         },
+        params.tenantId.toString(),
         params.referenciaExterna,
       ),
     );

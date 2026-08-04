@@ -15,14 +15,14 @@ export interface OrcamentoExtraidoPayload extends DomainEventEnvelope {
 export class OrcamentoExtraido implements OrcamentoExtraidoPayload {
   static readonly detailType = 'OrcamentoExtraido' as const;
   readonly detailType = OrcamentoExtraido.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
     readonly itens: readonly ItemOrcamentoPayload[],
     readonly condicoesComerciais: CondicoesComerciaisPayload,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

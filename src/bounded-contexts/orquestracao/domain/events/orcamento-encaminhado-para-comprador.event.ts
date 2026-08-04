@@ -17,7 +17,7 @@ export interface OrcamentoEncaminhadoParaCompradorPayload extends DomainEventEnv
 export class OrcamentoEncaminhadoParaComprador implements OrcamentoEncaminhadoParaCompradorPayload {
   static readonly detailType = 'OrcamentoEncaminhadoParaComprador' as const;
   readonly detailType = OrcamentoEncaminhadoParaComprador.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
@@ -25,7 +25,7 @@ export class OrcamentoEncaminhadoParaComprador implements OrcamentoEncaminhadoPa
     readonly agenteOrigem: AgenteOrigemDecisao,
     readonly criterio: string,
     readonly nivelConfianca: number | null,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

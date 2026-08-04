@@ -38,11 +38,11 @@ interface OrcamentoValidadoPayloadBruto {
   readonly detailType: DetailTypeOrcamentoValidado;
   readonly inconsistencias?: readonly InconsistenciaDetectadaBruta[];
   /**
-   * (issue #650 — expand/contract, ADR-008) Ainda opcional no envelope de
-   * origem (spec 003). `undefined` nunca é rejeitado aqui — ver
-   * `OrcamentoValidadoEventACLResultado.tenantId`.
+   * (spec 007, ADR-008 — cutover de contract, #632) Obrigatório desde
+   * `schemaVersion: 2` do envelope de origem (spec 003) — o type guard
+   * estrutural (`ehOrcamentoValidadoPayloadBruto`) já rejeita ausente.
    */
-  readonly tenantId?: string;
+  readonly tenantId: string;
 }
 
 function ehInconsistenciaDetectadaBruta(valor: unknown): valor is InconsistenciaDetectadaBruta {
@@ -67,7 +67,7 @@ function ehOrcamentoValidadoPayloadBruto(valor: unknown): valor is OrcamentoVali
   ) {
     return false;
   }
-  if (objeto.tenantId !== undefined && typeof objeto.tenantId !== 'string') {
+  if (typeof objeto.tenantId !== 'string') {
     return false;
   }
   if (objeto.detailType === 'OrcamentoValidadoComRessalva') {
@@ -107,10 +107,7 @@ export class OrcamentoValidadoEventACL implements OrcamentoValidadoEventACLPort 
             : 'VALIDADO',
         inconsistenciasAceitas,
       }),
-      // (issue #650) Nunca rejeitado quando ausente — ver
-      // `OrcamentoValidadoEventACLResultado.tenantId`.
-      tenantId:
-        payloadBruto.tenantId !== undefined ? TenantId.de(payloadBruto.tenantId) : undefined,
+      tenantId: TenantId.de(payloadBruto.tenantId),
     };
   }
 }

@@ -4,6 +4,7 @@ import { OrcamentoId } from '../../../../src/bounded-contexts/orquestracao/domai
 import { OrcamentoExtraidoEventACL } from '../../../../src/bounded-contexts/orquestracao/infrastructure/orcamento-extraido-event.acl.js';
 
 const ORCAMENTO_ID_VALIDO = '01912e2e-7f3a-7c3a-89ab-0123456789ab';
+const TENANT_ID_VALIDO = '01912e2e-7f3a-7c3a-89ab-0123456789cd';
 
 const ITEM_COMPLETO = {
   descricao: {
@@ -38,6 +39,7 @@ describe('OrcamentoExtraidoEventACL', () => {
       ocorreuEm: new Date().toISOString(),
       itens: [ITEM_COMPLETO],
       condicoesComerciais: CONDICOES_COMERCIAIS_COMPLETAS,
+      tenantId: TENANT_ID_VALIDO,
     });
 
     expect(resultado.orcamentoId.equals(OrcamentoId.de(ORCAMENTO_ID_VALIDO))).toBe(true);
@@ -57,6 +59,7 @@ describe('OrcamentoExtraidoEventACL', () => {
       orcamentoId: ORCAMENTO_ID_VALIDO,
       itens: [ITEM_COMPLETO],
       condicoesComerciais: CONDICOES_COMERCIAIS_COMPLETAS,
+      tenantId: TENANT_ID_VALIDO,
     });
 
     expect(resultado.contextoExtracao.houvePendenciaConfirmada).toBe(true);
@@ -89,6 +92,7 @@ describe('OrcamentoExtraidoEventACL', () => {
         ...CONDICOES_COMERCIAIS_COMPLETAS,
         prazoValidade: { valor: null, confianca: 0, extraido: false, agenteOrigem: 'EXTRATOR' },
       },
+      tenantId: TENANT_ID_VALIDO,
     });
 
     expect(resultado.contextoExtracao.itensResumo).toContain('não informado');
@@ -157,9 +161,6 @@ describe('OrcamentoExtraidoEventACL', () => {
     );
   });
 
-  // (issue #650) tenantId — envelope de 002 ainda opcional (expand/contract, ADR-008).
-  const TENANT_ID_VALIDO = '01912e2e-7f3a-7c3a-89ab-0123456789cd';
-
   it('extrai tenantId como TenantId quando presente no envelope', () => {
     const acl = new OrcamentoExtraidoEventACL();
 
@@ -171,20 +172,20 @@ describe('OrcamentoExtraidoEventACL', () => {
       tenantId: TENANT_ID_VALIDO,
     });
 
-    expect(resultado.tenantId?.toString()).toBe(TENANT_ID_VALIDO);
+    expect(resultado.tenantId.toString()).toBe(TENANT_ID_VALIDO);
   });
 
-  it('nunca rejeita quando tenantId está ausente — resultado.tenantId é undefined', () => {
+  it('rejeita quando tenantId está ausente — obrigatório desde o cutover de contract (#632, ADR-008)', () => {
     const acl = new OrcamentoExtraidoEventACL();
 
-    const resultado = acl.traduzir({
-      orcamentoId: ORCAMENTO_ID_VALIDO,
-      detailType: 'OrcamentoExtraido',
-      itens: [ITEM_COMPLETO],
-      condicoesComerciais: CONDICOES_COMERCIAIS_COMPLETAS,
-    });
-
-    expect(resultado.tenantId).toBeUndefined();
+    expect(() =>
+      acl.traduzir({
+        orcamentoId: ORCAMENTO_ID_VALIDO,
+        detailType: 'OrcamentoExtraido',
+        itens: [ITEM_COMPLETO],
+        condicoesComerciais: CONDICOES_COMERCIAIS_COMPLETAS,
+      }),
+    ).toThrow(OrcamentoExtraidoEventACLInvalidoError);
   });
 
   it('lança OrcamentoExtraidoEventACLInvalidoError para tenantId com shape inválido (não string)', () => {

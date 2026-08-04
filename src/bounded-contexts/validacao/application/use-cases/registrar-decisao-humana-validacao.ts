@@ -3,6 +3,7 @@ import type {
   DecisaoHumanaValidacao,
   OrcamentoValidacao,
 } from '../../domain/orcamento-validacao.aggregate.js';
+import { OrcamentoValidacaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 import { OrcamentoValidado } from '../../domain/events/orcamento-validado.event.js';
 import { OrcamentoValidadoComRessalva } from '../../domain/events/orcamento-validado-com-ressalva.event.js';
 import {
@@ -132,20 +133,25 @@ export class RegistrarDecisaoHumanaValidacao {
     const itens = validacao.dadosExtraidos.itens.map((item) => item.paraPayload());
     const condicoesComerciais = validacao.dadosExtraidos.condicoesComerciais;
 
-    const tenantId = validacao.tenantId?.toString();
+    if (validacao.status !== 'VALIDADO' && validacao.status !== 'VALIDADO_COM_RESSALVA') {
+      return undefined;
+    }
+
+    const tenantIdVo = validacao.tenantId;
+    if (!tenantIdVo) {
+      throw new OrcamentoValidacaoSemTenantIdError(orcamentoId);
+    }
+    const tenantId = tenantIdVo.toString();
 
     if (validacao.status === 'VALIDADO') {
       return new OrcamentoValidado(orcamentoId, itens, condicoesComerciais, tenantId);
     }
-    if (validacao.status === 'VALIDADO_COM_RESSALVA') {
-      return new OrcamentoValidadoComRessalva(
-        orcamentoId,
-        validacao.inconsistencias.map((inconsistencia) => inconsistencia.paraPayload()),
-        itens,
-        condicoesComerciais,
-        tenantId,
-      );
-    }
-    return undefined;
+    return new OrcamentoValidadoComRessalva(
+      orcamentoId,
+      validacao.inconsistencias.map((inconsistencia) => inconsistencia.paraPayload()),
+      itens,
+      condicoesComerciais,
+      tenantId,
+    );
   }
 }

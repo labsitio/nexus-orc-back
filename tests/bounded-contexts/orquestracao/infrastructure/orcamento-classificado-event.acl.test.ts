@@ -21,6 +21,7 @@ describe('OrcamentoClassificadoEventACL', () => {
         agenteOrigem: 'CLASSIFICADOR',
       },
       referenciaBruta: { bucket: 'nexo-orcamentos-brutos', chave: 'orcamentos/123.pdf' },
+      tenantId: '01912e2e-7f3a-7c3a-89ab-0123456789cd',
     });
 
     expect(resultado.orcamentoId.equals(OrcamentoId.de(ORCAMENTO_ID_VALIDO))).toBe(true);
@@ -38,6 +39,7 @@ describe('OrcamentoClassificadoEventACL', () => {
         resultado: { fornecedorIdentificado: 'Fornecedor ABC', formatoIdentificado: 'XML' },
         referenciaBruta: { qualquer: 'coisa' },
         campoDesconhecido: true,
+        tenantId: '01912e2e-7f3a-7c3a-89ab-0123456789cd',
       }),
     ).not.toThrow();
   });
@@ -87,7 +89,7 @@ describe('OrcamentoClassificadoEventACL', () => {
     ).toThrow();
   });
 
-  // (issue #650) tenantId — envelope de 001 ainda opcional (expand/contract, ADR-008).
+  // (spec 007, ADR-008 — cutover de contract, #632) tenantId obrigatório no envelope de 001.
   const TENANT_ID_VALIDO = '01912e2e-7f3a-7c3a-89ab-0123456789cd';
 
   it('extrai tenantId como TenantId quando presente no envelope', () => {
@@ -100,19 +102,19 @@ describe('OrcamentoClassificadoEventACL', () => {
       tenantId: TENANT_ID_VALIDO,
     });
 
-    expect(resultado.tenantId?.toString()).toBe(TENANT_ID_VALIDO);
+    expect(resultado.tenantId.toString()).toBe(TENANT_ID_VALIDO);
   });
 
-  it('nunca rejeita quando tenantId está ausente — resultado.tenantId é undefined', () => {
+  it('rejeita quando tenantId está ausente — obrigatório desde o cutover de contract (#632, ADR-008)', () => {
     const acl = new OrcamentoClassificadoEventACL();
 
-    const resultado = acl.traduzir({
-      orcamentoId: ORCAMENTO_ID_VALIDO,
-      detailType: 'OrcamentoClassificado',
-      resultado: { fornecedorIdentificado: 'Fornecedor XPTO', formatoIdentificado: 'PDF' },
-    });
-
-    expect(resultado.tenantId).toBeUndefined();
+    expect(() =>
+      acl.traduzir({
+        orcamentoId: ORCAMENTO_ID_VALIDO,
+        detailType: 'OrcamentoClassificado',
+        resultado: { fornecedorIdentificado: 'Fornecedor XPTO', formatoIdentificado: 'PDF' },
+      }),
+    ).toThrow(OrcamentoClassificadoEventACLInvalidoError);
   });
 
   it('lança OrcamentoClassificadoEventACLInvalidoError para tenantId com shape inválido (não string)', () => {

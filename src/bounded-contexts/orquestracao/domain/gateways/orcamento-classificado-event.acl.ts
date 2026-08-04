@@ -6,11 +6,12 @@ export interface OrcamentoClassificadoEventACLResultado {
   readonly orcamentoId: OrcamentoId;
   readonly contextoClassificacao: ContextoClassificacao;
   /**
-   * (issue #650 — expand/contract, ADR-008) Extraído do envelope de 001, que
-   * ainda publica `tenantId` opcional. `undefined` nunca é rejeitado aqui —
-   * propagado como tal até a #632 tornar o campo obrigatório nos 4 BCs.
+   * (spec 007, ADR-008 — cutover de contract, #632) Extraído do envelope de
+   * 001, obrigatório desde `schemaVersion: 2`. Evento sem `tenantId` é
+   * rejeitado por `OrcamentoClassificadoEventACL` (Infrastructure) — nunca
+   * propagado como `undefined`.
    */
-  readonly tenantId?: TenantId;
+  readonly tenantId: TenantId;
 }
 
 /**

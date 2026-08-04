@@ -5,6 +5,7 @@ import type {
   ExtrairDadosOrcamento,
   ExtrairDadosOrcamentoParams,
 } from '../../../../src/bounded-contexts/extracao/application/use-cases/extrair-dados-orcamento.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 function useCaseFake(
   executar: (params: ExtrairDadosOrcamentoParams) => Promise<void>,
@@ -12,7 +13,12 @@ function useCaseFake(
   return { executar } as unknown as ExtrairDadosOrcamento;
 }
 
-function envelopeEventBridge(orcamentoId: string, tenantId?: string): string {
+const DEFAULT_TENANT_ID = '01890a5d-ac96-774b-bcce-b302099a8057';
+
+function envelopeEventBridge(
+  orcamentoId: string,
+  tenantId: string | undefined = DEFAULT_TENANT_ID,
+): string {
   return JSON.stringify({
     detail: {
       orcamentoId,
@@ -65,6 +71,7 @@ describe('criarExtratorQueueHandler', () => {
         key: 'portal-web/id-1.pdf',
         versionId: 'v1',
       },
+      tenantId: expect.any(TenantId),
     });
     expect(executar).toHaveBeenNthCalledWith(2, expect.objectContaining({ orcamentoId: 'id-2' }));
     expect(resposta.batchItemFailures).toHaveLength(0);
@@ -150,7 +157,7 @@ describe('criarExtratorQueueHandler', () => {
     expect(linhas[0]?.messageId).toBe('m1');
   });
 
-  it('(issue #648) extrai tenantId do envelope e o propaga como TenantId ao caso de uso', async () => {
+  it('(spec 007, ADR-008 — #632) extrai tenantId do envelope e o propaga como TenantId ao caso de uso', async () => {
     const executar = vi.fn().mockResolvedValue(undefined);
     const handler = criarExtratorQueueHandler(useCaseFake(executar));
     const tenantId = '01890a5d-ac96-774b-bcce-b302099a8057';
@@ -161,20 +168,34 @@ describe('criarExtratorQueueHandler', () => {
 
     expect(resposta.batchItemFailures).toHaveLength(0);
     const params = executar.mock.calls[0]?.[0] as ExtrairDadosOrcamentoParams;
-    expect(params.tenantId?.toString()).toBe(tenantId);
+    expect(params.tenantId.toString()).toBe(tenantId);
   });
 
-  it('(issue #648) tenantId ausente no envelope é propagado como undefined — nunca rejeitado (ADR-008, fase de expand)', async () => {
-    const executar = vi.fn().mockResolvedValue(undefined);
+  it('(spec 007, ADR-008 — #632) rejeita (batch item failure) quando tenantId está ausente no envelope — obrigatório desde o cutover de contract', async () => {
+    const executar = vi.fn();
     const handler = criarExtratorQueueHandler(useCaseFake(executar));
-
-    const resposta = await handler({
-      Records: [{ messageId: 'm1', body: envelopeEventBridge('id-1') }],
+    const envelopeSemTenantId = JSON.stringify({
+      detail: {
+        orcamentoId: 'id-1',
+        resultado: {
+          fornecedorIdentificado: 'Fornecedor X',
+          formatoIdentificado: 'PDF',
+          agenteOrigem: 'CLASSIFICADOR',
+        },
+        referenciaBruta: {
+          bucket: 'nexo-orcamentos-raw',
+          key: 'portal-web/id-1.pdf',
+          versionId: 'v1',
+        },
+      },
     });
 
-    expect(resposta.batchItemFailures).toHaveLength(0);
-    const params = executar.mock.calls[0]?.[0] as ExtrairDadosOrcamentoParams;
-    expect(params.tenantId).toBeUndefined();
+    const resposta = await handler({
+      Records: [{ messageId: 'm1', body: envelopeSemTenantId }],
+    });
+
+    expect(executar).not.toHaveBeenCalled();
+    expect(resposta.batchItemFailures).toEqual([{ itemIdentifier: 'm1' }]);
   });
 
   it('(issue #648) reporta falha (batch item failure) quando tenantId presente é malformado (não UUID v7)', async () => {

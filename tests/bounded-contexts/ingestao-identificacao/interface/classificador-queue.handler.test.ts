@@ -13,7 +13,12 @@ function useCaseFake(
   return { executar } as unknown as ClassificarOrcamento;
 }
 
-function envelopeEventBridge(orcamentoId: string, tenantId?: string): string {
+const DEFAULT_TENANT_ID = '018f0c1a-0000-7000-8000-000000000000';
+
+function envelopeEventBridge(
+  orcamentoId: string,
+  tenantId: string | undefined = DEFAULT_TENANT_ID,
+): string {
   return JSON.stringify({ detail: { orcamentoId, tenantId } });
 }
 
@@ -34,16 +39,31 @@ describe('criarClassificadorQueueHandler', () => {
 
     const resposta = await handler({
       Records: [
-        { messageId: 'm1', body: envelopeEventBridge('id-1', undefined) },
-        { messageId: 'm2', body: envelopeEventBridge('id-2', undefined) },
+        { messageId: 'm1', body: envelopeEventBridge('id-1') },
+        { messageId: 'm2', body: envelopeEventBridge('id-2') },
       ],
     });
 
-    // (spec 007, T017) tenantId é undefined durante transição (T015 não implementado);
-    // no use case, isso resulta em 404 (divergência de tenant — agregado não tem tenantId).
-    expect(executar).toHaveBeenNthCalledWith(1, 'id-1', undefined);
-    expect(executar).toHaveBeenNthCalledWith(2, 'id-2', undefined);
+    // (spec 007, ADR-008 — cutover de contract, #632) tenantId é obrigatório
+    // no envelope desde schemaVersion 2 — sempre um TenantId concreto aqui.
+    expect(executar).toHaveBeenCalledTimes(2);
+    const [orcamentoId1, tenantId1] = executar.mock.calls[0] as [string, { toString(): string }];
+    expect(orcamentoId1).toBe('id-1');
+    expect(tenantId1.toString()).toBe(DEFAULT_TENANT_ID);
     expect(resposta.batchItemFailures).toHaveLength(0);
+  });
+
+  it('rejeita (batch item failure) quando tenantId está ausente no envelope — obrigatório desde o cutover de contract (#632, ADR-008)', async () => {
+    const executar = vi.fn();
+    const handler = criarClassificadorQueueHandler(useCaseFake(executar));
+    const envelopeSemTenantId = JSON.stringify({ detail: { orcamentoId: 'id-1' } });
+
+    const resposta = await handler({
+      Records: [{ messageId: 'm1', body: envelopeSemTenantId }],
+    });
+
+    expect(executar).not.toHaveBeenCalled();
+    expect(resposta.batchItemFailures).toEqual([{ itemIdentifier: 'm1' }]);
   });
 
   it('reporta só o item falho (batch item failure) sem interromper o processamento das demais mensagens', async () => {
@@ -56,8 +76,8 @@ describe('criarClassificadorQueueHandler', () => {
 
     const resposta = await handler({
       Records: [
-        { messageId: 'm1', body: envelopeEventBridge('id-falha', undefined) },
-        { messageId: 'm2', body: envelopeEventBridge('id-ok', undefined) },
+        { messageId: 'm1', body: envelopeEventBridge('id-falha') },
+        { messageId: 'm2', body: envelopeEventBridge('id-ok') },
       ],
     });
 

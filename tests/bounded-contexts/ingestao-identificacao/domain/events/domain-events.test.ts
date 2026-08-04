@@ -17,37 +17,45 @@ const referenciaBrutaPayload = {
   key: 'k',
   versionId: 'v1',
 };
+const tenantId = '018f4b1a-0000-7000-8000-000000000001';
 
 describe.each([
   {
     nome: 'OrcamentoRecebido',
     detailType: 'OrcamentoRecebido',
     criar: () =>
-      new OrcamentoRecebido(orcamentoId, 'PORTAL_WEB', {
-        bucket: 'nexo-orcamentos-raw',
-        key: 'k',
-        versionId: 'v1',
-      }),
+      new OrcamentoRecebido(
+        orcamentoId,
+        'PORTAL_WEB',
+        {
+          bucket: 'nexo-orcamentos-raw',
+          key: 'k',
+          versionId: 'v1',
+        },
+        tenantId,
+      ),
   },
   {
     nome: 'OrcamentoClassificado',
     detailType: 'OrcamentoClassificado',
-    criar: () => new OrcamentoClassificado(orcamentoId, resultadoPayload, referenciaBrutaPayload),
+    criar: () =>
+      new OrcamentoClassificado(orcamentoId, resultadoPayload, referenciaBrutaPayload, tenantId),
   },
   {
     nome: 'OrcamentoEscalonadoParaRevisaoHumana',
     detailType: 'OrcamentoEscalonadoParaRevisaoHumana',
-    criar: () => new OrcamentoEscalonadoParaRevisaoHumana(orcamentoId, resultadoPayload),
+    criar: () => new OrcamentoEscalonadoParaRevisaoHumana(orcamentoId, resultadoPayload, tenantId),
   },
   {
     nome: 'OrcamentoReclassificadoPorRevisaoHumana',
     detailType: 'OrcamentoReclassificadoPorRevisaoHumana',
-    criar: () => new OrcamentoReclassificadoPorRevisaoHumana(orcamentoId, resultadoPayload),
+    criar: () =>
+      new OrcamentoReclassificadoPorRevisaoHumana(orcamentoId, resultadoPayload, tenantId),
   },
 ])('$nome', ({ detailType, criar }) => {
-  it(`schemaVersion 1, orcamentoId e detailType "${detailType}"`, () => {
+  it(`schemaVersion 2, orcamentoId e detailType "${detailType}"`, () => {
     const evento = criar();
-    expect(evento.schemaVersion).toBe(1);
+    expect(evento.schemaVersion).toBe(2);
     expect(evento.orcamentoId).toBe(orcamentoId);
     expect(evento.detailType).toBe(detailType);
     expect(() => new Date(evento.ocorreuEm)).not.toThrow();
