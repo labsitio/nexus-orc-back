@@ -120,6 +120,13 @@
       "when": 1785682366152,
       "tag": "0016_t015b_rls_indices_orcamento_tenant_isolation",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785849634670,
+      "tag": "0017_t648_extracoes_orcamento_tenant_id",
+      "breakpoints": true
     }
   ]
 }

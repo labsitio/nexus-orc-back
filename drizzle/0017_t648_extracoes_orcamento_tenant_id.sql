@@ -1,0 +1,1 @@
+ALTER TABLE "extracao"."extracoes_orcamento" ADD COLUMN "tenant_id" uuid;

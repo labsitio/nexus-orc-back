@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   ExtracaoOrcamento,
   ReferenciaImutavelError,
+  TenantIdImutavelError,
   TransicaoInvalidaExtracaoError,
 } from '../../../../src/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import { CampoExtraido } from '../../../../src/bounded-contexts/extracao/domain/value-objects/campo-extraido.vo.js';
 import { CondicoesComerciais } from '../../../../src/bounded-contexts/extracao/domain/value-objects/condicoes-comerciais.vo.js';
 import { DescricaoProduto } from '../../../../src/bounded-contexts/extracao/domain/value-objects/descricao-produto.vo.js';
@@ -73,6 +75,29 @@ describe('ExtracaoOrcamento.criar', () => {
     expect(extracao.status).toBe('PENDENTE');
     expect(extracao.itens).toHaveLength(0);
     expect(extracao.historico).toHaveLength(0);
+  });
+
+  it('(issue #648) nasce sem tenantId quando omitido — estado normal pré-#632 (ADR-008)', () => {
+    expect(novaExtracao().tenantId).toBeUndefined();
+  });
+
+  it('(issue #648) nasce com o tenantId informado', () => {
+    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+    const extracao = ExtracaoOrcamento.criar(
+      OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8057'),
+      ReferenciaClassificacao.de({
+        fornecedorIdentificado: 'Fornecedor X',
+        formatoIdentificado: 'PDF',
+        agenteOrigem: 'CLASSIFICADOR',
+      }),
+      ReferenciaS3.de({
+        bucket: 'nexo-orcamentos-raw',
+        key: 'portal/arquivo.pdf',
+        versionId: 'v1',
+      }),
+      tenantId,
+    );
+    expect(extracao.tenantId?.toString()).toBe(tenantId.toString());
   });
 });
 
@@ -152,5 +177,9 @@ describe('ExtracaoOrcamento — imutabilidade de referências', () => {
 
   it('atualizarReferenciaBrutaS3 sempre lança erro de domínio', () => {
     expect(() => novaExtracao().atualizarReferenciaBrutaS3()).toThrow(ReferenciaImutavelError);
+  });
+
+  it('(issue #648) atualizarTenantId sempre lança erro de domínio', () => {
+    expect(() => novaExtracao().atualizarTenantId()).toThrow(TenantIdImutavelError);
   });
 });

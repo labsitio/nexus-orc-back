@@ -30,6 +30,7 @@ import {
   extracoesOrcamento,
   extracoesOrcamentoHistorico,
 } from '../../../../../src/bounded-contexts/extracao/infrastructure/persistence/schema/extracao-orcamento.schema.js';
+import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -60,7 +61,11 @@ function referenciaBruta(key: string): ReferenciaS3 {
 
 function itemCompleto(agente: 'EXTRATOR' | 'HUMANO' = 'EXTRATOR'): ItemOrcamento {
   return ItemOrcamento.de({
-    descricao: CampoExtraido.extraido(DescricaoProduto.de('Parafuso M6', 'SKU-1'), confiancaAlta, agente),
+    descricao: CampoExtraido.extraido(
+      DescricaoProduto.de('Parafuso M6', 'SKU-1'),
+      confiancaAlta,
+      agente,
+    ),
     quantidade: CampoExtraido.extraido(Quantidade.de(100), confiancaAlta, agente),
     precoUnitario: CampoExtraido.extraido(Dinheiro.de(1050, 'BRL'), confiancaAlta, agente),
   });
@@ -68,7 +73,11 @@ function itemCompleto(agente: 'EXTRATOR' | 'HUMANO' = 'EXTRATOR'): ItemOrcamento
 
 function itemIncompleto(): ItemOrcamento {
   return ItemOrcamento.de({
-    descricao: CampoExtraido.extraido(DescricaoProduto.de('Parafuso M6'), confiancaAlta, 'EXTRATOR'),
+    descricao: CampoExtraido.extraido(
+      DescricaoProduto.de('Parafuso M6'),
+      confiancaAlta,
+      'EXTRATOR',
+    ),
     quantidade: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
     precoUnitario: CampoExtraido.extraido(Dinheiro.de(1050, 'BRL'), confiancaAlta, 'EXTRATOR'),
   });
@@ -77,7 +86,11 @@ function itemIncompleto(): ItemOrcamento {
 function condicoesCompletas(agente: 'EXTRATOR' | 'HUMANO' = 'EXTRATOR'): CondicoesComerciais {
   return CondicoesComerciais.de({
     condicoesPagamento: CampoExtraido.extraido('30 dias', confiancaAlta, agente),
-    prazoValidade: CampoExtraido.extraido(PeriodoValidade.de(new Date('2026-12-31T00:00:00.000Z')), confiancaAlta, agente),
+    prazoValidade: CampoExtraido.extraido(
+      PeriodoValidade.de(new Date('2026-12-31T00:00:00.000Z')),
+      confiancaAlta,
+      agente,
+    ),
     condicoesEntrega: CampoExtraido.extraido('FOB', confiancaAlta, agente),
   });
 }
@@ -109,9 +122,10 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
     try {
       while (idsParaLimpar.length > 0) {
         const id = idsParaLimpar.pop()!;
-        await client.query('delete from extracao.extracoes_orcamento_historico where extracao_orcamento_id = $1', [
-          id,
-        ]);
+        await client.query(
+          'delete from extracao.extracoes_orcamento_historico where extracao_orcamento_id = $1',
+          [id],
+        );
         await client.query('delete from extracao.extracoes_orcamento where id = $1', [id]);
       }
     } finally {
@@ -123,11 +137,47 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
     await expect(repo.buscarPorOrcamentoId(orcamentoIdDeTeste())).resolves.toBeUndefined();
   });
 
+  it('(issue #648) roundtrip do tenantId opcional — persiste e recarrega o mesmo valor', async () => {
+    const id = orcamentoIdDeTeste();
+    idsParaLimpar.push(id.toString());
+    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+
+    const extracao = ExtracaoOrcamento.criar(
+      id,
+      referenciaClassificacao(),
+      referenciaBruta('doc-tenant.pdf'),
+      tenantId,
+    );
+    await repo.salvar(extracao);
+
+    const carregado = await repo.buscarPorOrcamentoId(id);
+    expect(carregado?.tenantId?.toString()).toBe(tenantId.toString());
+  });
+
+  it('(issue #648) tenantId ausente na criação é persistido e recarregado como undefined', async () => {
+    const id = orcamentoIdDeTeste();
+    idsParaLimpar.push(id.toString());
+
+    const extracao = ExtracaoOrcamento.criar(
+      id,
+      referenciaClassificacao(),
+      referenciaBruta('doc-sem-tenant.pdf'),
+    );
+    await repo.salvar(extracao);
+
+    const carregado = await repo.buscarPorOrcamentoId(id);
+    expect(carregado?.tenantId).toBeUndefined();
+  });
+
   it('salva PENDENTE e recarrega EXTRAIDO com itens/condições completos e 1 entrada de histórico', async () => {
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
 
-    const extracao = ExtracaoOrcamento.criar(id, referenciaClassificacao(), referenciaBruta('doc-1.pdf'));
+    const extracao = ExtracaoOrcamento.criar(
+      id,
+      referenciaClassificacao(),
+      referenciaBruta('doc-1.pdf'),
+    );
     await repo.salvar(extracao);
 
     const pendente = await repo.buscarPorOrcamentoId(id);
@@ -153,7 +203,11 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
 
-    const extracao = ExtracaoOrcamento.criar(id, referenciaClassificacao(), referenciaBruta('doc-2.pdf'));
+    const extracao = ExtracaoOrcamento.criar(
+      id,
+      referenciaClassificacao(),
+      referenciaBruta('doc-2.pdf'),
+    );
     extracao.registrarTentativaExtrator([itemIncompleto()], condicoesCompletas());
     expect(extracao.status).toBe('PENDENTE_REVISAO_HUMANA');
     await repo.salvar(extracao);
@@ -177,7 +231,11 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
 
-    const extracao = ExtracaoOrcamento.criar(id, referenciaClassificacao(), referenciaBruta('doc-3.pdf'));
+    const extracao = ExtracaoOrcamento.criar(
+      id,
+      referenciaClassificacao(),
+      referenciaBruta('doc-3.pdf'),
+    );
     extracao.registrarTentativaExtrator([itemCompleto()], condicoesCompletas());
     await repo.salvar(extracao);
 
@@ -197,10 +255,18 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
     const repoB = new DrizzleExtracaoOrcamentoRepository(drizzle(clienteB));
 
     try {
-      const agregadoA = ExtracaoOrcamento.criar(id, referenciaClassificacao(), referenciaBruta('doc-4.pdf'));
+      const agregadoA = ExtracaoOrcamento.criar(
+        id,
+        referenciaClassificacao(),
+        referenciaBruta('doc-4.pdf'),
+      );
       agregadoA.registrarTentativaExtrator([itemCompleto()], condicoesCompletas());
 
-      const agregadoB = ExtracaoOrcamento.criar(id, referenciaClassificacao(), referenciaBruta('doc-4.pdf'));
+      const agregadoB = ExtracaoOrcamento.criar(
+        id,
+        referenciaClassificacao(),
+        referenciaBruta('doc-4.pdf'),
+      );
       agregadoB.registrarTentativaExtrator([itemCompleto()], condicoesCompletas());
 
       await Promise.all([repo.salvar(agregadoA), repoB.salvar(agregadoB)]);
