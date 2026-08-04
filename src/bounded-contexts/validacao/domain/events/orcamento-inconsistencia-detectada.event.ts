@@ -23,6 +23,7 @@ export class OrcamentoInconsistenciaDetectada implements OrcamentoInconsistencia
   constructor(
     readonly orcamentoId: string,
     readonly inconsistencias: readonly InconsistenciaDetectadaPayload[],
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();
