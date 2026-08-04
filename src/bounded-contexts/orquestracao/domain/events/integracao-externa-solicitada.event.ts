@@ -22,6 +22,7 @@ export class IntegracaoExternaSolicitada implements IntegracaoExternaSolicitadaP
   constructor(
     readonly orcamentoId: string,
     readonly acaoOrigem: AcaoRoteamento,
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

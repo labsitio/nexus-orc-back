@@ -70,7 +70,7 @@ describe('IntegracaoExternaSolicitada', () => {
   it('payload restrito a orcamentoId/acaoOrigem/ocorreuEm — nenhum campo de protocolo específico', () => {
     const evento = new IntegracaoExternaSolicitada(orcamentoId, 'SOLICITAR_REENVIO');
     expect(Object.keys(evento).sort()).toEqual(
-      ['acaoOrigem', 'detailType', 'ocorreuEm', 'orcamentoId', 'schemaVersion'].sort(),
+      ['acaoOrigem', 'detailType', 'ocorreuEm', 'orcamentoId', 'schemaVersion', 'tenantId'].sort(),
     );
     expect(evento.acaoOrigem).toBe('SOLICITAR_REENVIO');
   });

@@ -33,6 +33,7 @@ export class OrcamentoReenvioSolicitado implements OrcamentoReenvioSolicitadoPay
     readonly criterio: string,
     readonly nivelConfianca: number | null,
     readonly motivoDadoAusente: string,
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();
