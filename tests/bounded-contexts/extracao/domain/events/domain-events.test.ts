@@ -42,7 +42,12 @@ describe.each([
         orcamentoId,
         '1+ campo obrigatório sem confiança suficiente',
       ),
-    criarComTenant: undefined,
+    criarComTenant: (tenantId: string) =>
+      new ExtracaoEscalonadaParaRevisaoHumana(
+        orcamentoId,
+        '1+ campo obrigatório sem confiança suficiente',
+        tenantId,
+      ),
   },
   {
     nome: 'OrcamentoExtraidoComPendenciaConfirmada',
