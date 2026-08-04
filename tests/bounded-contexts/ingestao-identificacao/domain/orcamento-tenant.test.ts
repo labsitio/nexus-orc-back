@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Orcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
+import {
+  Orcamento,
+  TenantIdImutavelError,
+} from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
 import { Canal } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/canal.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
@@ -37,6 +40,6 @@ describe('Orcamento — imutabilidade de tenantId (T012)', () => {
     expect(orcamento.tenantId).toBe(tenantOriginal);
     expect(() => {
       orcamento.atualizarTenantId(tenantForjado);
-    }).toThrow('TenantIdImutavelError');
+    }).toThrow(TenantIdImutavelError);
   });
 });

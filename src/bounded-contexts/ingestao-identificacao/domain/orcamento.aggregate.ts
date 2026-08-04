@@ -32,7 +32,7 @@ export class TransicaoInvalidaError extends ErroDominio {
  */
 export class TenantIdImutavelError extends ErroDominio {
   constructor() {
-    super('TenantIdImutavelError: tenantId não pode ser sobrescrito após a criação do orçamento');
+    super('tenantId não pode ser sobrescrito após a criação do orçamento');
   }
 }
 
@@ -46,11 +46,11 @@ export interface OrcamentoProps {
   readonly resultadoAtual?: ResultadoClassificacao;
   readonly historico: readonly TentativaClassificacao[];
   /**
-   * (spec 007, T014 — expand/contract) Opcional nesta PR: torná-lo
+   * (spec 007, T014 — expand/contract, issue #277) Opcional nesta PR: torná-lo
    * obrigatório aqui quebraria a compilação de todos os sites de construção
    * de `Orcamento` (#279, #280, #281), que ainda não preenchem o campo. Uma
    * PR de contrato futura torna `tenantId` obrigatório nos 4 BCs de uma vez
-   * (título da issue #277) — ver ADR-008.
+   * (título da issue #277).
    */
   readonly tenantId?: TenantId;
 }
