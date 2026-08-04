@@ -224,4 +224,29 @@ describe('ValidarOrcamento', () => {
     const evento = publisher.eventosPublicados[0] as OrcamentoValidado;
     expect(evento.tenantId).toBe(tenantId.toString());
   });
+
+  it('(achado MAJOR do backend-reviewer, #632) retry com tenantId divergente nunca sobrescreve o tenantId já persistido no agregado existente', async () => {
+    const tenantOriginal = TenantId.novo();
+    const tenantDivergente = TenantId.novo();
+    const existente = OrcamentoValidacao.criar(ORCAMENTO_ID, dadosConsistentes(), tenantOriginal);
+    const repositorio = new OrcamentoValidacaoRepositoryFake(existente);
+    const publisher = new EventPublisherFake();
+    const useCase = new ValidarOrcamento(
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        dadosExtraidos: dadosConsistentes(),
+        tenantId: tenantDivergente,
+      }),
+      repositorio,
+      new FornecedorCadastradoGatewayFake(true),
+      new ParametroFaixaPrecoGatewayFake(),
+      publisher,
+    );
+
+    await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+    expect(repositorio.salvos[0]?.tenantId?.toString()).toBe(tenantOriginal.toString());
+    const evento = publisher.eventosPublicados[0] as OrcamentoValidado;
+    expect(evento.tenantId).toBe(tenantOriginal.toString());
+  });
 });

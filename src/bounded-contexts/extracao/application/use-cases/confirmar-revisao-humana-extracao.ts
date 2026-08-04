@@ -1,5 +1,6 @@
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import { ErroDominio } from '../../domain/errors/erro-dominio.js';
+import { ExtracaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 import type {
   ExtracaoOrcamento,
   StatusExtracao,
@@ -59,23 +60,6 @@ export class ExtracaoSemCondicoesComerciaisError extends ErroDominio {
   constructor(orcamentoId: string) {
     super(
       `ExtracaoOrcamento ${orcamentoId} está PENDENTE_REVISAO_HUMANA sem condicoesComerciais — invariante do agregado violada`,
-    );
-  }
-}
-
-/**
- * (spec 007, ADR-008 — cutover de contract, #632) Este endpoint não recebe
- * `tenantId` via `TenantContext` (nenhuma issue wireou isso ainda para 002 —
- * gap registrado na #632, não improvisado aqui). O `tenantId` publicado no
- * evento vem sempre do agregado (preenchido na criação, via
- * `ExtrairDadosOrcamento`/T022) — nunca deveria faltar dado o baseline de
- * zero tenant real em produção (#587/#297); fail-fast em vez de publicar
- * evento com `tenantId` inventado ou ausente.
- */
-export class ExtracaoSemTenantIdError extends ErroDominio {
-  constructor(orcamentoId: string) {
-    super(
-      `ExtracaoOrcamento ${orcamentoId} não possui tenantId — registro pré-retrofit incompatível com o envelope de evento obrigatório (ADR-008)`,
     );
   }
 }

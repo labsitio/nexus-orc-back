@@ -6,6 +6,7 @@ import type { MarkItDownConversaoExtracaoACL } from '../../domain/gateways/marki
 import { ExtracaoEscalonadaParaRevisaoHumana } from '../../domain/events/extracao-escalonada-revisao-humana.event.js';
 import { OrcamentoExtraido } from '../../domain/events/orcamento-extraido.event.js';
 import { ErroDominio } from '../../domain/errors/erro-dominio.js';
+import { ExtracaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 import { ExtracaoOrcamento } from '../../domain/extracao-orcamento.aggregate.js';
 import type { ExtracaoOrcamentoRepository } from '../../domain/repositories/extracao-orcamento.repository.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
@@ -38,20 +39,6 @@ export class ExtracaoInconsistenteError extends ErroDominio {
   constructor(orcamentoId: string) {
     super(
       `ExtracaoOrcamento ${orcamentoId} está EXTRAIDO sem condicoesComerciais — invariante do agregado violada`,
-    );
-  }
-}
-
-/**
- * (spec 007, ADR-008 — cutover de contract, #632) Nunca deveria ocorrer: todo
- * `ExtracaoOrcamento.criar` neste caso de uso recebe `params.tenantId`
- * (obrigatório). Guarda de fail-fast contra reentrega de fila com um
- * agregado legado (pré-retrofit) sem `tenantId` persistido.
- */
-export class ExtracaoSemTenantIdError extends ErroDominio {
-  constructor(orcamentoId: string) {
-    super(
-      `ExtracaoOrcamento ${orcamentoId} não possui tenantId — registro pré-retrofit incompatível com o envelope de evento obrigatório (ADR-008)`,
     );
   }
 }

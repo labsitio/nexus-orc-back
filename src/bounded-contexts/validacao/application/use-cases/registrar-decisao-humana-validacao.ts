@@ -3,7 +3,7 @@ import type {
   DecisaoHumanaValidacao,
   OrcamentoValidacao,
 } from '../../domain/orcamento-validacao.aggregate.js';
-import { ErroDominio } from '../../domain/errors/erro-dominio.js';
+import { OrcamentoValidacaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 import { OrcamentoValidado } from '../../domain/events/orcamento-validado.event.js';
 import { OrcamentoValidadoComRessalva } from '../../domain/events/orcamento-validado-com-ressalva.event.js';
 import {
@@ -16,22 +16,6 @@ import { DadosExtraidosParaValidacao } from '../../domain/value-objects/dados-ex
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { PeriodoValidade } from '../../domain/value-objects/periodo-validade.vo.js';
 import { OrcamentoValidacaoNaoEncontradoError } from './consultar-status-validacao.js';
-
-/**
- * (spec 007, ADR-008 — cutover de contract, #632) Este endpoint não recebe
- * `tenantId` via `TenantContext` (gap de wiring, não improvisado aqui — mesmo
- * racional de `ExtracaoSemTenantIdError`). O `tenantId` publicado no evento
- * vem sempre do agregado (preenchido na criação via `ValidarOrcamento`) —
- * nunca deveria faltar dado o baseline de zero tenant real em produção
- * (#587/#297); fail-fast em vez de publicar evento com `tenantId` ausente.
- */
-export class OrcamentoValidacaoSemTenantIdError extends ErroDominio {
-  constructor(orcamentoId: string) {
-    super(
-      `OrcamentoValidacao ${orcamentoId} não possui tenantId — registro pré-retrofit incompatível com o envelope de evento obrigatório (ADR-008)`,
-    );
-  }
-}
 
 export interface DecisaoHumanaValidacaoInput {
   readonly decisao: 'CORRECAO_APLICADA' | 'ACEITE_COM_RESSALVA';
