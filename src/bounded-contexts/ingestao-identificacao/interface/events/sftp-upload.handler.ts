@@ -1,6 +1,8 @@
 import type { S3Event, S3Handler } from 'aws-lambda';
+import type { Logger } from 'pino';
 import type { ReceberOrcamento } from '../../application/use-cases/receber-orcamento.js';
 import type { SftpTenantResolverGateway } from '../../domain/gateways/sftp-tenant-resolver.gateway.js';
+import { criarLogger } from '../../infrastructure/observability/logger.js';
 import { ReferenciaS3 } from '../../domain/value-objects/referencia-s3.vo.js';
 
 /** Prefixo do canal SFTP — o mesmo usado pela regra de notificação S3/Transfer Family (plan.md). */
@@ -23,13 +25,15 @@ const PREFIXO_SFTP = 'sftp-incoming/';
  * usuário/servidor AWS Transfer Family, nunca do conteúdo do arquivo.
  * `ReceberOrcamento` exige `tenantId` (T016, spec 007, formaliza a exigência
  * para todos os canais uniformemente): mapeamento ausente é registrado via
- * `console.warn` e o registro é pulado (sem lançar, sem bloquear o resto do
- * lote) — fica para reprocessamento quando o onboarding do par
- * usuário/servidor em `sftp_tenant_mapping` existir.
+ * logger estruturado (T017/#020, campos bucket/key/versionId estruturados para
+ * consulta em CloudWatch Logs Insights) e o registro é pulado (sem lançar, sem
+ * bloquear o resto do lote) — fica para reprocessamento quando o onboarding do
+ * par usuário/servidor em `sftp_tenant_mapping` existir.
  */
 export function criarHandlerSftpUpload(
   receberOrcamento: ReceberOrcamento,
   resolverTenant: SftpTenantResolverGateway,
+  logger: Logger = criarLogger({ handler: 'sftp-upload' }),
 ): S3Handler {
   return async (event: S3Event) => {
     for (const record of event.Records) {
@@ -49,9 +53,11 @@ export function criarHandlerSftpUpload(
       const referenciaBruta = ReferenciaS3.de({ bucket, key, versionId });
       const tenantId = await resolverTenant.resolver(referenciaBruta);
       if (!tenantId) {
-        console.warn(
-          `TenantId não resolvido para s3://${bucket}/${key} — mapeamento usuário/servidor ausente em sftp_tenant_mapping (onboarding pendente?), registro pulado`,
-        );
+        logger
+          .child({ bucket, key, versionId })
+          .warn(
+            'TenantId não resolvido — mapeamento usuário/servidor ausente em sftp_tenant_mapping (onboarding pendente?), registro pulado',
+          );
         continue;
       }
 
