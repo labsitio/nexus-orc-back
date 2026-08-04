@@ -156,4 +156,58 @@ describe('OrcamentoExtraidoEventACL', () => {
       OrcamentoExtraidoEventACLInvalidoError,
     );
   });
+
+  // (issue #650) tenantId — envelope de 002 ainda opcional (expand/contract, ADR-008).
+  const TENANT_ID_VALIDO = '01912e2e-7f3a-7c3a-89ab-0123456789cd';
+
+  it('extrai tenantId como TenantId quando presente no envelope', () => {
+    const acl = new OrcamentoExtraidoEventACL();
+
+    const resultado = acl.traduzir({
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      detailType: 'OrcamentoExtraido',
+      itens: [ITEM_COMPLETO],
+      condicoesComerciais: CONDICOES_COMERCIAIS_COMPLETAS,
+      tenantId: TENANT_ID_VALIDO,
+    });
+
+    expect(resultado.tenantId?.toString()).toBe(TENANT_ID_VALIDO);
+  });
+
+  it('nunca rejeita quando tenantId está ausente — resultado.tenantId é undefined', () => {
+    const acl = new OrcamentoExtraidoEventACL();
+
+    const resultado = acl.traduzir({
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      detailType: 'OrcamentoExtraido',
+      itens: [ITEM_COMPLETO],
+      condicoesComerciais: CONDICOES_COMERCIAIS_COMPLETAS,
+    });
+
+    expect(resultado.tenantId).toBeUndefined();
+  });
+
+  it('lança OrcamentoExtraidoEventACLInvalidoError para tenantId com shape inválido (não string)', () => {
+    expect(() =>
+      new OrcamentoExtraidoEventACL().traduzir({
+        orcamentoId: ORCAMENTO_ID_VALIDO,
+        detailType: 'OrcamentoExtraido',
+        itens: [ITEM_COMPLETO],
+        condicoesComerciais: CONDICOES_COMERCIAIS_COMPLETAS,
+        tenantId: 42,
+      }),
+    ).toThrow(OrcamentoExtraidoEventACLInvalidoError);
+  });
+
+  it('propaga o erro de TenantId.de para tenantId malformado (string que não é UUID v7)', () => {
+    expect(() =>
+      new OrcamentoExtraidoEventACL().traduzir({
+        orcamentoId: ORCAMENTO_ID_VALIDO,
+        detailType: 'OrcamentoExtraido',
+        itens: [ITEM_COMPLETO],
+        condicoesComerciais: CONDICOES_COMERCIAIS_COMPLETAS,
+        tenantId: 'nao-eh-uuid',
+      }),
+    ).toThrow(/TenantId inválido/);
+  });
 });

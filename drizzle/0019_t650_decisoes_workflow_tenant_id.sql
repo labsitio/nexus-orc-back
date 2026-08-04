@@ -1,0 +1,1 @@
+ALTER TABLE "orquestracao"."decisoes_workflow" ADD COLUMN "tenant_id" uuid;

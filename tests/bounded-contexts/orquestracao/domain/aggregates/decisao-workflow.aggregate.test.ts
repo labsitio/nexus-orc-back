@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import {
   ContextoImutavelError,
   ContextoIncompletoError,
   DecisaoWorkflow,
   JustificativaHumanaAusenteError,
+  TenantIdDivergenteError,
   TransicaoInvalidaDecisaoWorkflowError,
 } from '../../../../../src/bounded-contexts/orquestracao/domain/aggregates/decisao-workflow.aggregate.js';
 import { ContextoClassificacao } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/contexto-classificacao.vo.js';
@@ -124,6 +126,67 @@ describe('DecisaoWorkflow', () => {
         ContextoImutavelError,
       );
       expect(decisao.contextoValidacao).toBe(contextoValidacaoAprovavel);
+    });
+  });
+
+  describe('tenantId (issue #650 — consolidação entre os 3 upstreams)', () => {
+    const tenantIdA = TenantId.de('01912e2e-7f3a-7c3a-89ab-0123456789ab');
+    const tenantIdB = TenantId.de('01912e2e-7f3a-7c3a-89ab-0123456789cd');
+
+    it('permanece undefined quando nenhum upstream traz tenantId — ausência nunca rejeitada', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      decisao.registrarContextoClassificacao(contextoClassificacao);
+      decisao.registrarContextoExtracao(contextoExtracao);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
+
+      expect(decisao.tenantId).toBeUndefined();
+    });
+
+    it('consolida o tenantId do primeiro upstream que o traz, mesmo que os demais não tragam', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
+      decisao.registrarContextoExtracao(contextoExtracao);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
+
+      expect(decisao.tenantId?.equals(tenantIdA)).toBe(true);
+    });
+
+    it('aceita o mesmo tenantId vindo de mais de um upstream — idempotente, nunca diverge', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
+
+      expect(() =>
+        decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdA),
+      ).not.toThrow();
+      expect(decisao.tenantId?.equals(tenantIdA)).toBe(true);
+    });
+
+    it('rejeita com TenantIdDivergenteError quando um segundo upstream traz tenantId diferente', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
+
+      expect(() =>
+        decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdB),
+      ).toThrow(TenantIdDivergenteError);
+    });
+
+    it('não registra o contexto quando o tenantId diverge — fail fast, nenhuma mutação parcial', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
+
+      expect(() =>
+        decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdB),
+      ).toThrow(TenantIdDivergenteError);
+      expect(decisao.contextoValidacao).toBeUndefined();
+      expect(decisao.tenantId?.equals(tenantIdA)).toBe(true);
+    });
+
+    it('tenantId ausente num upstream posterior nunca sobrescreve o já consolidado', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
+
+      expect(decisao.tenantId?.equals(tenantIdA)).toBe(true);
     });
   });
 

@@ -26,6 +26,7 @@ import { NivelConfianca } from '../../domain/value-objects/nivel-confianca.vo.js
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { TentativaDecisaoWorkflow } from '../../domain/value-objects/tentativa-decisao-workflow.vo.js';
 import type { DecisaoWorkflowRepository } from '../../domain/repositories/decisao-workflow.repository.js';
+import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import { decisoesWorkflow, decisoesWorkflowHistorico } from './schema/decisao-workflow.schema.js';
 
 /** Linha de `decisoes_workflow`/histórico — nunca cruza para fora deste arquivo (T016). */
@@ -130,6 +131,7 @@ function agregadoDaLinha(
     ...(contextoExtracao !== undefined ? { contextoExtracao } : {}),
     ...(contextoValidacao !== undefined ? { contextoValidacao } : {}),
     ...(decisaoAtual !== undefined ? { decisaoAtual } : {}),
+    ...(linha.tenantId !== null ? { tenantId: TenantId.de(linha.tenantId) } : {}),
   };
   return DecisaoWorkflow.reconstituir(props);
 }
@@ -159,6 +161,15 @@ export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowReposito
     const decisaoAtualPayload = decisaoWorkflow.decisaoAtual
       ? decisaoRoteamentoParaPayload(decisaoWorkflow.decisaoAtual)
       : null;
+    // (issue #650) Diferente de `extracoes_orcamento`/`validacoes_orcamento`
+    // (specs 002/003, tenantId sempre conhecido na criação, nunca sai do
+    // `set` do onConflictDoUpdate): aqui o agregado é salvo várias vezes
+    // conforme os 3 upstreams chegam em qualquer ordem, então o primeiro
+    // `salvar` pode não conhecer `tenantId` ainda. `tenantIdPayload` só entra
+    // no `set` quando definido — nunca regride um valor já persistido para
+    // null, e divergência entre upstreams já foi rejeitada no Domain
+    // (`registrarTenantId`) antes de chegar aqui.
+    const tenantIdPayload = decisaoWorkflow.tenantId?.toString();
 
     await this.db.transaction(async (tx) => {
       // Serializa `salvar` concorrente do mesmo agregado — sem este lock, duas
@@ -176,6 +187,7 @@ export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowReposito
           contextoExtracao: contextoExtracaoPayload,
           contextoValidacao: contextoValidacaoPayload,
           decisaoAtual: decisaoAtualPayload,
+          tenantId: tenantIdPayload ?? null,
         })
         .onConflictDoUpdate({
           target: decisoesWorkflow.id,
@@ -185,6 +197,7 @@ export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowReposito
             contextoExtracao: contextoExtracaoPayload,
             contextoValidacao: contextoValidacaoPayload,
             decisaoAtual: decisaoAtualPayload,
+            ...(tenantIdPayload !== undefined ? { tenantId: tenantIdPayload } : {}),
           },
         });
 

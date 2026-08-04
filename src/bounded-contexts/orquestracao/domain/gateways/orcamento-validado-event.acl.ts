@@ -1,9 +1,16 @@
+import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import type { ContextoValidacao } from '../value-objects/contexto-validacao.vo.js';
 import type { OrcamentoId } from '../value-objects/orcamento-id.vo.js';
 
 export interface OrcamentoValidadoEventACLResultado {
   readonly orcamentoId: OrcamentoId;
   readonly contextoValidacao: ContextoValidacao;
+  /**
+   * (issue #650 — expand/contract, ADR-008) Extraído do envelope de 003, que
+   * ainda publica `tenantId` opcional. `undefined` nunca é rejeitado aqui —
+   * propagado como tal até a #632 tornar o campo obrigatório nos 4 BCs.
+   */
+  readonly tenantId?: TenantId;
 }
 
 /**

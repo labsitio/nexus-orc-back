@@ -86,4 +86,54 @@ describe('OrcamentoClassificadoEventACL', () => {
       }),
     ).toThrow();
   });
+
+  // (issue #650) tenantId — envelope de 001 ainda opcional (expand/contract, ADR-008).
+  const TENANT_ID_VALIDO = '01912e2e-7f3a-7c3a-89ab-0123456789cd';
+
+  it('extrai tenantId como TenantId quando presente no envelope', () => {
+    const acl = new OrcamentoClassificadoEventACL();
+
+    const resultado = acl.traduzir({
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      detailType: 'OrcamentoClassificado',
+      resultado: { fornecedorIdentificado: 'Fornecedor XPTO', formatoIdentificado: 'PDF' },
+      tenantId: TENANT_ID_VALIDO,
+    });
+
+    expect(resultado.tenantId?.toString()).toBe(TENANT_ID_VALIDO);
+  });
+
+  it('nunca rejeita quando tenantId está ausente — resultado.tenantId é undefined', () => {
+    const acl = new OrcamentoClassificadoEventACL();
+
+    const resultado = acl.traduzir({
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      detailType: 'OrcamentoClassificado',
+      resultado: { fornecedorIdentificado: 'Fornecedor XPTO', formatoIdentificado: 'PDF' },
+    });
+
+    expect(resultado.tenantId).toBeUndefined();
+  });
+
+  it('lança OrcamentoClassificadoEventACLInvalidoError para tenantId com shape inválido (não string)', () => {
+    expect(() =>
+      new OrcamentoClassificadoEventACL().traduzir({
+        orcamentoId: ORCAMENTO_ID_VALIDO,
+        detailType: 'OrcamentoClassificado',
+        resultado: { fornecedorIdentificado: 'Fornecedor XPTO', formatoIdentificado: 'PDF' },
+        tenantId: 42,
+      }),
+    ).toThrow(OrcamentoClassificadoEventACLInvalidoError);
+  });
+
+  it('propaga o erro de TenantId.de para tenantId malformado (string que não é UUID v7)', () => {
+    expect(() =>
+      new OrcamentoClassificadoEventACL().traduzir({
+        orcamentoId: ORCAMENTO_ID_VALIDO,
+        detailType: 'OrcamentoClassificado',
+        resultado: { fornecedorIdentificado: 'Fornecedor XPTO', formatoIdentificado: 'PDF' },
+        tenantId: 'nao-eh-uuid',
+      }),
+    ).toThrow(/TenantId inválido/);
+  });
 });

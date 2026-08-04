@@ -23,13 +23,13 @@ export class RegistrarContextoClassificacao {
   ) {}
 
   async executar(payloadBruto: unknown): Promise<void> {
-    const { orcamentoId, contextoClassificacao } = this.acl.traduzir(payloadBruto);
+    const { orcamentoId, contextoClassificacao, tenantId } = this.acl.traduzir(payloadBruto);
 
     const decisaoWorkflow =
       (await this.repositorio.buscarPorOrcamentoId(orcamentoId)) ??
       DecisaoWorkflow.criar(orcamentoId);
 
-    decisaoWorkflow.registrarContextoClassificacao(contextoClassificacao);
+    decisaoWorkflow.registrarContextoClassificacao(contextoClassificacao, tenantId);
 
     await this.repositorio.salvar(decisaoWorkflow);
   }

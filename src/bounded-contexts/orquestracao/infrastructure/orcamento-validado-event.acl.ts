@@ -1,3 +1,4 @@
+import { TenantId } from '../../../shared-kernel/tenant/tenant-id.vo.js';
 import { OrcamentoValidadoEventACLInvalidoError } from '../domain/errors/evento-upstream-acl.errors.js';
 import type {
   OrcamentoValidadoEventACL as OrcamentoValidadoEventACLPort,
@@ -36,6 +37,12 @@ interface OrcamentoValidadoPayloadBruto {
   readonly orcamentoId: string;
   readonly detailType: DetailTypeOrcamentoValidado;
   readonly inconsistencias?: readonly InconsistenciaDetectadaBruta[];
+  /**
+   * (issue #650 — expand/contract, ADR-008) Ainda opcional no envelope de
+   * origem (spec 003). `undefined` nunca é rejeitado aqui — ver
+   * `OrcamentoValidadoEventACLResultado.tenantId`.
+   */
+  readonly tenantId?: string;
 }
 
 function ehInconsistenciaDetectadaBruta(valor: unknown): valor is InconsistenciaDetectadaBruta {
@@ -58,6 +65,9 @@ function ehOrcamentoValidadoPayloadBruto(valor: unknown): valor is OrcamentoVali
     typeof objeto.detailType !== 'string' ||
     !(DETAIL_TYPES_ORCAMENTO_VALIDADO as readonly string[]).includes(objeto.detailType)
   ) {
+    return false;
+  }
+  if (objeto.tenantId !== undefined && typeof objeto.tenantId !== 'string') {
     return false;
   }
   if (objeto.detailType === 'OrcamentoValidadoComRessalva') {
@@ -97,6 +107,10 @@ export class OrcamentoValidadoEventACL implements OrcamentoValidadoEventACLPort 
             : 'VALIDADO',
         inconsistenciasAceitas,
       }),
+      // (issue #650) Nunca rejeitado quando ausente — ver
+      // `OrcamentoValidadoEventACLResultado.tenantId`.
+      tenantId:
+        payloadBruto.tenantId !== undefined ? TenantId.de(payloadBruto.tenantId) : undefined,
     };
   }
 }
