@@ -99,7 +99,7 @@ describe('ClassificarOrcamento', () => {
     const repositorio = new RepositorioFake(orcamento);
     const publisher = new EventPublisherFake();
     const useCase = new ClassificarOrcamento(
-      repositorio,
+      () => repositorio,
       new ArmazenamentoBrutoFake(),
       new ConversorFake(),
       new AgenteClassificadorFake({
@@ -123,7 +123,7 @@ describe('ClassificarOrcamento', () => {
     const repositorio = new RepositorioFake(orcamento);
     const publisher = new EventPublisherFake();
     const useCase = new ClassificarOrcamento(
-      repositorio,
+      () => repositorio,
       new ArmazenamentoBrutoFake(),
       new ConversorFake(),
       new AgenteClassificadorFake({
@@ -146,7 +146,7 @@ describe('ClassificarOrcamento', () => {
     const repositorio = new RepositorioFake(undefined);
     const publisher = new EventPublisherFake();
     const useCase = new ClassificarOrcamento(
-      repositorio,
+      () => repositorio,
       new ArmazenamentoBrutoFake(),
       new ConversorFake(),
       new AgenteClassificadorFake({
@@ -176,7 +176,7 @@ describe('ClassificarOrcamento', () => {
     const repositorio = new RepositorioFake(orcamento);
     const publisher = new EventPublisherFake();
     const useCase = new ClassificarOrcamento(
-      repositorio,
+      () => repositorio,
       new ArmazenamentoBrutoFake(),
       new ConversorFake(),
       new AgenteClassificadorFake({
@@ -196,7 +196,7 @@ describe('ClassificarOrcamento', () => {
     const repositorio = new RepositorioFake(orcamento);
     const publisher = new EventPublisherFake();
     const useCase = new ClassificarOrcamento(
-      repositorio,
+      () => repositorio,
       new ArmazenamentoBrutoFake(),
       new ConversorFake(),
       new AgenteClassificadorFake({

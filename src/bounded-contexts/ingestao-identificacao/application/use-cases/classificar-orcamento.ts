@@ -11,7 +11,7 @@ import { AssinaturaEstrutural } from '../../domain/value-objects/assinatura-estr
 import { NivelConfianca } from '../../domain/value-objects/nivel-confianca.vo.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { ResultadoClassificacao } from '../../domain/value-objects/resultado-classificacao.vo.js';
-import type { OrcamentoRepository } from '../../domain/repositories/orcamento.repository.js';
+import type { CriarOrcamentoRepositorio } from '../../domain/repositories/orcamento.repository.js';
 import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 
 export class OrcamentoNaoEncontradoParaClassificacaoError extends ErroDominio {
@@ -59,7 +59,7 @@ export class TenantDivergenciaError extends ErroDominio {
  */
 export class ClassificarOrcamento {
   constructor(
-    private readonly repositorio: OrcamentoRepository,
+    private readonly criarRepositorio: CriarOrcamentoRepositorio,
     private readonly armazenamentoBruto: ArmazenamentoBrutoGateway,
     private readonly conversor: MarkItDownConversaoACL,
     private readonly agenteClassificador: AgenteClassificadorGateway,
@@ -74,8 +74,19 @@ export class ClassificarOrcamento {
    * (legado pré-retrofit) ou diverge do solicitante (cross-tenant). 404, não 403.
    */
   async executar(orcamentoIdBruto: string, tenantId?: TenantId): Promise<void> {
+    // (spec 007, T018) Sem `tenantId` real não há `TenantContext` legítimo para
+    // construir o repositório (`CriarOrcamentoRepositorio` exige `TenantId`) —
+    // rejeita como divergência ANTES de qualquer acesso ao banco, em vez de
+    // abrir uma transação com um tenant "provisório" só para decidir depois.
+    // Resultado final idêntico ao caminho anterior (404, nunca revela
+    // existência cross-tenant), só que sem tocar RLS com dado forjado.
+    if (!tenantId) {
+      throw new TenantDivergenciaError(orcamentoIdBruto, 'DIVERGENTE', undefined, undefined);
+    }
+
     const id = OrcamentoId.de(orcamentoIdBruto);
-    const orcamento = await this.repositorio.buscarPorId(id);
+    const repositorio = this.criarRepositorio(tenantId);
+    const orcamento = await repositorio.buscarPorId(id);
     if (!orcamento) {
       throw new OrcamentoNaoEncontradoParaClassificacaoError(orcamentoIdBruto);
     }
@@ -92,15 +103,15 @@ export class ClassificarOrcamento {
         orcamentoIdBruto,
         'AUSENTE',
         undefined,
-        tenantId?.toString(),
+        tenantId.toString(),
       );
     }
-    if (!tenantId || orcamento.tenantId.toString() !== tenantId.toString()) {
+    if (orcamento.tenantId.toString() !== tenantId.toString()) {
       throw new TenantDivergenciaError(
         orcamentoIdBruto,
         'DIVERGENTE',
         orcamento.tenantId.toString(),
-        tenantId?.toString(),
+        tenantId.toString(),
       );
     }
 
@@ -133,7 +144,7 @@ export class ClassificarOrcamento {
     });
 
     orcamento.registrarTentativaClassificador(resultado);
-    await this.repositorio.salvar(orcamento);
+    await repositorio.salvar(orcamento);
 
     const evento =
       orcamento.status === 'CLASSIFICADO'

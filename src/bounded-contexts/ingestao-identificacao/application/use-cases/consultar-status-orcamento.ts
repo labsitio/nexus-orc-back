@@ -1,6 +1,6 @@
 import { ErroDominio } from '../../domain/errors/erro-dominio.js';
 import type { Orcamento } from '../../domain/orcamento.aggregate.js';
-import type { OrcamentoRepository } from '../../domain/repositories/orcamento.repository.js';
+import type { CriarOrcamentoRepositorio } from '../../domain/repositories/orcamento.repository.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 
@@ -29,11 +29,14 @@ export class TenantDivergenciaError extends ErroDominio {
  * (T047/#52, `interface/http/status.schema.ts`).
  */
 export class ConsultarStatusOrcamento {
-  constructor(private readonly repositorio: OrcamentoRepository) {}
+  constructor(private readonly criarRepositorio: CriarOrcamentoRepositorio) {}
 
   async executar(orcamentoId: string, tenantId: TenantId): Promise<Orcamento> {
     const id = OrcamentoId.de(orcamentoId);
-    const orcamento = await this.repositorio.buscarPorId(id);
+    // (spec 007, T018) Repositório construído por chamada a partir do
+    // `tenantId` já validado do parâmetro — nunca reaproveitado como campo
+    // fixo entre chamadas (ver `CriarOrcamentoRepositorio`).
+    const orcamento = await this.criarRepositorio(tenantId).buscarPorId(id);
     if (!orcamento) {
       throw new OrcamentoNaoEncontradoError(orcamentoId);
     }

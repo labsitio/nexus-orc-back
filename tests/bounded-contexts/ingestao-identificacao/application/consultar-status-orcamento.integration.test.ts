@@ -42,7 +42,7 @@ function criarReferenciaBruta(): ReferenciaS3 {
 describe('ConsultarStatusOrcamento — integração com escalonamento (T045)', () => {
   it('orçamento classificado com confiança <80% fica PENDENTE_REVISAO_HUMANA e consultável, histórico preservado', async () => {
     const repositorio = new OrcamentoRepositoryFake();
-    const consultar = new ConsultarStatusOrcamento(repositorio);
+    const consultar = new ConsultarStatusOrcamento(() => repositorio);
 
     const id = OrcamentoId.novo();
     const tenantId = TenantId.novo();
@@ -72,7 +72,7 @@ describe('ConsultarStatusOrcamento — integração com escalonamento (T045)', (
 
   it('propaga a tentativa do Classificador sem sobrescrever após confirmação humana', async () => {
     const repositorio = new OrcamentoRepositoryFake();
-    const consultar = new ConsultarStatusOrcamento(repositorio);
+    const consultar = new ConsultarStatusOrcamento(() => repositorio);
 
     const id = OrcamentoId.novo();
     const tenantId = TenantId.novo();
@@ -112,11 +112,11 @@ describe('ConsultarStatusOrcamento — integração com escalonamento (T045)', (
 
   it('lança OrcamentoNaoEncontradoError para orcamentoId inexistente', async () => {
     const repositorio = new OrcamentoRepositoryFake();
-    const consultar = new ConsultarStatusOrcamento(repositorio);
+    const consultar = new ConsultarStatusOrcamento(() => repositorio);
     const tenantId = TenantId.novo();
 
-    await expect(
-      consultar.executar(OrcamentoId.novo().toString(), tenantId),
-    ).rejects.toThrow(OrcamentoNaoEncontradoError);
+    await expect(consultar.executar(OrcamentoId.novo().toString(), tenantId)).rejects.toThrow(
+      OrcamentoNaoEncontradoError,
+    );
   });
 });

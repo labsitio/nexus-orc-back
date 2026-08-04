@@ -5,7 +5,7 @@ import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import { NivelConfianca } from '../../domain/value-objects/nivel-confianca.vo.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { ResultadoClassificacao } from '../../domain/value-objects/resultado-classificacao.vo.js';
-import type { OrcamentoRepository } from '../../domain/repositories/orcamento.repository.js';
+import type { CriarOrcamentoRepositorio } from '../../domain/repositories/orcamento.repository.js';
 import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 
 /** Confiança fixa de confirmação humana explícita — não é uma estimativa, é decisão humana direta. */
@@ -53,13 +53,17 @@ export interface ConfirmarRevisaoHumanaParams {
  */
 export class ConfirmarRevisaoHumana {
   constructor(
-    private readonly repositorio: OrcamentoRepository,
+    private readonly criarRepositorio: CriarOrcamentoRepositorio,
     private readonly eventPublisher: EventPublisher,
   ) {}
 
   async executar(params: ConfirmarRevisaoHumanaParams): Promise<Orcamento> {
     const id = OrcamentoId.de(params.orcamentoId);
-    const orcamento = await this.repositorio.buscarPorId(id);
+    // (spec 007, T018) Repositório construído por chamada a partir do
+    // `tenantId` já validado do parâmetro — nunca reaproveitado como campo
+    // fixo entre chamadas (ver `CriarOrcamentoRepositorio`).
+    const repositorio = this.criarRepositorio(params.tenantId);
+    const orcamento = await repositorio.buscarPorId(id);
     if (!orcamento) {
       throw new OrcamentoNaoEncontradoParaRevisaoHumanaError(params.orcamentoId);
     }
@@ -79,7 +83,7 @@ export class ConfirmarRevisaoHumana {
     });
 
     orcamento.registrarConfirmacaoHumana(resultado);
-    await this.repositorio.salvar(orcamento);
+    await repositorio.salvar(orcamento);
 
     await this.eventPublisher.publicar(
       new OrcamentoReclassificadoPorRevisaoHumana(orcamento.id.toString(), resultado.paraPayload()),

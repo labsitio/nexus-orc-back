@@ -63,7 +63,7 @@ describe('ConfirmarRevisaoHumana', () => {
     const orcamento = novoOrcamentoEscalonado();
     const repositorio = new RepositorioFake(orcamento);
     const publisher = new EventPublisherFake();
-    const useCase = new ConfirmarRevisaoHumana(repositorio, publisher);
+    const useCase = new ConfirmarRevisaoHumana(() => repositorio, publisher);
 
     const resultado = await useCase.executar({
       orcamentoId: orcamento.id.toString(),
@@ -85,7 +85,7 @@ describe('ConfirmarRevisaoHumana', () => {
   it('preserva o histórico do Classificador — nunca apaga, apenas anexa a confirmação humana', async () => {
     const orcamento = novoOrcamentoEscalonado();
     const repositorio = new RepositorioFake(orcamento);
-    const useCase = new ConfirmarRevisaoHumana(repositorio, new EventPublisherFake());
+    const useCase = new ConfirmarRevisaoHumana(() => repositorio, new EventPublisherFake());
 
     const resultado = await useCase.executar({
       orcamentoId: orcamento.id.toString(),
@@ -102,7 +102,7 @@ describe('ConfirmarRevisaoHumana', () => {
   it('lança OrcamentoNaoEncontradoParaRevisaoHumanaError e nunca publica evento se o orçamento não existir', async () => {
     const repositorio = new RepositorioFake(undefined);
     const publisher = new EventPublisherFake();
-    const useCase = new ConfirmarRevisaoHumana(repositorio, publisher);
+    const useCase = new ConfirmarRevisaoHumana(() => repositorio, publisher);
     const tenantId = TenantId.novo();
 
     await expect(
@@ -130,7 +130,7 @@ describe('ConfirmarRevisaoHumana', () => {
     });
     const repositorio = new RepositorioFake(orcamento);
     const publisher = new EventPublisherFake();
-    const useCase = new ConfirmarRevisaoHumana(repositorio, publisher);
+    const useCase = new ConfirmarRevisaoHumana(() => repositorio, publisher);
 
     await expect(
       useCase.executar({
@@ -140,6 +140,24 @@ describe('ConfirmarRevisaoHumana', () => {
         tenantId,
       }),
     ).rejects.toThrow(TransicaoInvalidaError);
+    expect(publisher.eventosPublicados).toHaveLength(0);
+    expect(repositorio.salvos).toHaveLength(0);
+  });
+
+  it('(spec 007, T018) lança TenantDivergenciaError e nunca publica evento quando o tenantId da requisição diverge do agregado', async () => {
+    const orcamento = novoOrcamentoEscalonado(TenantId.novo());
+    const repositorio = new RepositorioFake(orcamento);
+    const publisher = new EventPublisherFake();
+    const useCase = new ConfirmarRevisaoHumana(() => repositorio, publisher);
+
+    await expect(
+      useCase.executar({
+        orcamentoId: orcamento.id.toString(),
+        fornecedorIdentificado: 'X',
+        formatoIdentificado: 'PDF',
+        tenantId: TenantId.novo(), // tenant diferente do que criou o agregado
+      }),
+    ).rejects.toThrow(TenantDivergenciaError);
     expect(publisher.eventosPublicados).toHaveLength(0);
     expect(repositorio.salvos).toHaveLength(0);
   });

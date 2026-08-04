@@ -40,10 +40,14 @@ describe('ReceberOrcamento', () => {
     const repositorio = repositorioFake();
     const publisher = publisherFake();
     const idempotencia = idempotenciaFake();
-    const useCase = new ReceberOrcamento(repositorio, publisher, idempotencia);
+    const useCase = new ReceberOrcamento(() => repositorio, publisher, idempotencia);
     const tenantId = TenantId.novo();
 
-    const orcamentoId = await useCase.executar({ canal: 'SFTP', referenciaBruta: referencia, tenantId });
+    const orcamentoId = await useCase.executar({
+      canal: 'SFTP',
+      referenciaBruta: referencia,
+      tenantId,
+    });
 
     expect(repositorio.salvar).toHaveBeenCalledTimes(1);
     const salvo = vi.mocked(repositorio.salvar).mock.calls[0]?.[0] as Orcamento;
@@ -68,7 +72,7 @@ describe('ReceberOrcamento', () => {
     const repositorio = repositorioFake();
     const publisher = publisherFake();
     const idempotencia = idempotenciaFake();
-    const useCase = new ReceberOrcamento(repositorio, publisher, idempotencia);
+    const useCase = new ReceberOrcamento(() => repositorio, publisher, idempotencia);
 
     const orcamentoId = await useCase.executar({
       canal: 'PORTAL_WEB',
@@ -85,7 +89,7 @@ describe('ReceberOrcamento', () => {
     const repositorio = repositorioFake();
     const publisher = publisherFake();
     const idempotencia = idempotenciaFake(existente);
-    const useCase = new ReceberOrcamento(repositorio, publisher, idempotencia);
+    const useCase = new ReceberOrcamento(() => repositorio, publisher, idempotencia);
 
     const orcamentoId = await useCase.executar({
       canal: 'API_REST',
@@ -104,7 +108,7 @@ describe('ReceberOrcamento', () => {
     const repositorio = repositorioFake();
     const publisher = publisherFake();
     const idempotencia = idempotenciaFake(undefined);
-    const useCase = new ReceberOrcamento(repositorio, publisher, idempotencia);
+    const useCase = new ReceberOrcamento(() => repositorio, publisher, idempotencia);
 
     const orcamentoId = await useCase.executar({
       canal: 'PORTAL_WEB',
@@ -126,7 +130,7 @@ describe('ReceberOrcamento', () => {
     const repositorio = repositorioFake();
     const publisher = publisherFake();
     const idempotencia = idempotenciaFake();
-    const useCase = new ReceberOrcamento(repositorio, publisher, idempotencia);
+    const useCase = new ReceberOrcamento(() => repositorio, publisher, idempotencia);
 
     await expect(
       useCase.executar({

@@ -20,6 +20,8 @@ import { registrarRotaRevisaoHumana } from '../bounded-contexts/ingestao-identif
 import type { RotaOpts } from '../bounded-contexts/ingestao-identificacao/interface/http/route-opts.js';
 import { registrarRotaStatusOrcamento } from '../bounded-contexts/ingestao-identificacao/interface/http/status.controller.js';
 import { registrarRotaUploadUrl } from '../bounded-contexts/ingestao-identificacao/interface/http/upload-url.controller.js';
+import { criarTenantContext } from '../shared-kernel/tenant/tenant-context.js';
+import type { TenantId } from '../shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * Composition root do BC Ingestão & Identificação — o único lugar que conhece
@@ -54,24 +56,35 @@ export interface IngestaoIdentificacao {
 }
 
 export function criarIngestaoIdentificacao(deps: IngestaoIdentificacaoDeps): IngestaoIdentificacao {
-  const repositorio = new DrizzleOrcamentoRepository(deps.db);
+  // (spec 007, T018) `DrizzleOrcamentoRepository` estende
+  // `DrizzleTenantScopedRepositoryBase` (T008): o `TenantContext` é fixado no
+  // construtor e MUST NUNCA ser reaproveitado entre tenants. Por isso esta
+  // composition root nunca constrói uma instância pronta — só uma fábrica
+  // `(tenantId) => repo`, injetada nos 4 casos de uso abaixo (que permanecem
+  // singletons de longa duração; só o repositório é per-call). Cobre
+  // uniformemente HTTP (1 tenant por requisição) e o lote SQS/S3 de
+  // `classificador-queue.handler.ts`/`sftp-upload.handler.ts` (N tenants por
+  // invocação de warm start), sem exigir reconstruir os casos de uso a cada
+  // chamada.
+  const criarRepositorioOrcamento = (tenantId: TenantId) =>
+    new DrizzleOrcamentoRepository(deps.db, criarTenantContext(tenantId));
   const idempotencia = new DrizzleIdempotencyKeyRepository(deps.db);
   const publisher = new EventBridgePublisher(deps.eventBridge, deps.eventBusName);
   const armazenamento = new S3ArmazenamentoBrutoGateway(deps.s3, deps.bucket);
 
   return {
     armazenamento,
-    receberOrcamento: new ReceberOrcamento(repositorio, publisher, idempotencia),
+    receberOrcamento: new ReceberOrcamento(criarRepositorioOrcamento, publisher, idempotencia),
     classificarOrcamento: new ClassificarOrcamento(
-      repositorio,
+      criarRepositorioOrcamento,
       armazenamento,
       deps.conversor,
       deps.classificador,
       publisher,
       deps.cacheIdentificacao,
     ),
-    consultarStatusOrcamento: new ConsultarStatusOrcamento(repositorio),
-    confirmarRevisaoHumana: new ConfirmarRevisaoHumana(repositorio, publisher),
+    consultarStatusOrcamento: new ConsultarStatusOrcamento(criarRepositorioOrcamento),
+    confirmarRevisaoHumana: new ConfirmarRevisaoHumana(criarRepositorioOrcamento, publisher),
   };
 }
 

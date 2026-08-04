@@ -41,7 +41,11 @@ function receberOrcamentoFake(): {
   const publisher: EventPublisher = { publicar: vi.fn().mockResolvedValue(undefined) };
   const reservar = vi.fn(async (_chave, orcamentoId) => ({ reservado: true, orcamentoId }));
   const idempotencia: IdempotencyKeyRepository = { reservar };
-  return { useCase: new ReceberOrcamento(repositorio, publisher, idempotencia), salvar, reservar };
+  return {
+    useCase: new ReceberOrcamento(() => repositorio, publisher, idempotencia),
+    salvar,
+    reservar,
+  };
 }
 
 /** Simula `IdempotencyKeyRepository` de verdade — reserva atômica, chave reutilizada não passa de novo. */
@@ -62,7 +66,7 @@ function receberOrcamentoComReservaReal(): {
       return { reservado: true, orcamentoId };
     }),
   };
-  return { useCase: new ReceberOrcamento(repositorio, publisher, idempotencia), salvar };
+  return { useCase: new ReceberOrcamento(() => repositorio, publisher, idempotencia), salvar };
 }
 
 describe('criarHandlerSftpUpload', () => {
@@ -120,7 +124,9 @@ describe('criarHandlerSftpUpload', () => {
 
   it('não lança erro quando o mapeamento usuário/servidor está ausente — registra e pula o registro, sem chamar ReceberOrcamento (T016 formaliza a exigência de tenantId)', async () => {
     const { useCase, salvar } = receberOrcamentoFake();
-    const resolverTenant: SftpTenantResolverGateway = { resolver: vi.fn().mockResolvedValue(undefined) };
+    const resolverTenant: SftpTenantResolverGateway = {
+      resolver: vi.fn().mockResolvedValue(undefined),
+    };
     const handler = criarHandlerSftpUpload(useCase, resolverTenant);
 
     await expect(
@@ -199,7 +205,9 @@ describe('criarHandlerSftpUpload', () => {
 
   it('registra descarte em log estruturado quando o mapeamento usuário/servidor está ausente, com bucket/key/versionId como campos consultáveis', async () => {
     const { useCase, salvar } = receberOrcamentoFake();
-    const resolverTenant: SftpTenantResolverGateway = { resolver: vi.fn().mockResolvedValue(undefined) };
+    const resolverTenant: SftpTenantResolverGateway = {
+      resolver: vi.fn().mockResolvedValue(undefined),
+    };
     const childLogger = { warn: vi.fn(), child: vi.fn() };
     const logger = { child: vi.fn().mockReturnValue(childLogger) };
     const handler = criarHandlerSftpUpload(
@@ -223,7 +231,9 @@ describe('criarHandlerSftpUpload', () => {
       versionId: 'v-1',
     });
     expect(childLogger.warn).toHaveBeenCalledOnce();
-    expect(childLogger.warn).toHaveBeenCalledWith(expect.stringContaining('TenantId não resolvido'));
+    expect(childLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('TenantId não resolvido'),
+    );
     expect(salvar).not.toHaveBeenCalled();
   });
 });
