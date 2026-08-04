@@ -80,8 +80,7 @@ export function criarIngestaoIdentificacao(deps: IngestaoIdentificacaoDeps): Ing
  * Cognito (T025/#30): sem ele as rotas ficam abertas — aceitável apenas em
  * teste de contrato e execução local, nunca em produção.
  *
- * `registrarRotaRevisaoHumana` não aceita `RotaOpts` hoje (assinatura mergeada
- * em T053/#58); quando aceitar, passar `opts` aqui também.
+ * Todas as 4 rotas aceitam `opts` e devem recebê-lo para ter o preHandler.
  */
 export function registrarRotasIngestaoIdentificacao(
   app: FastifyInstance,
@@ -91,5 +90,5 @@ export function registrarRotasIngestaoIdentificacao(
   registrarRotaUploadUrl(app, modulo.armazenamento, opts);
   registrarRotaConfirmarUpload(app, modulo.armazenamento, modulo.receberOrcamento, opts);
   registrarRotaStatusOrcamento(app, modulo.consultarStatusOrcamento, opts);
-  registrarRotaRevisaoHumana(app, modulo.confirmarRevisaoHumana);
+  registrarRotaRevisaoHumana(app, modulo.confirmarRevisaoHumana, opts);
 }

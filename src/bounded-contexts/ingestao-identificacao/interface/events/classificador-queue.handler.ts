@@ -120,6 +120,16 @@ export function criarClassificadorQueueHandler(
           );
           continue;
         }
+        // (spec 007, T017) TenantDivergenciaError é permanente (tenantId undefined ou
+        // cross-tenant) — retry nunca vai resolver. Tratar como o TransicaoInvalidaError:
+        // log info, continue, nunca batch item failure/DLQ/alarme.
+        if (erro instanceof TenantDivergenciaError) {
+          logDaMensagem.info(
+            { orcamentoId },
+            'Orçamento rejeitado por divergência/ausência de tenantId — ignorado como sucesso idempotente',
+          );
+          continue;
+        }
         logDaMensagem.error({ orcamentoId, err: erro }, 'Falha ao classificar orçamento');
         falhas.push({ itemIdentifier: record.messageId });
       }
