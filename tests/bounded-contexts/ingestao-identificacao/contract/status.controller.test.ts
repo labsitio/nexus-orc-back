@@ -1,3 +1,4 @@
+import type { preHandlerHookHandler } from 'fastify';
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ConsultarStatusOrcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/consultar-status-orcamento.js';
@@ -8,6 +9,8 @@ import { NivelConfianca } from '../../../../src/bounded-contexts/ingestao-identi
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
 import { ResultadoClassificacao } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/resultado-classificacao.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
+import { criarTenantContext } from '../../../../src/shared-kernel/tenant/tenant-context.js';
 import { registrarRotaStatusOrcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/http/status.controller.js';
 
 /** Contract test do controller real (T047/#52), fake repository (sem Drizzle/#16). */
@@ -31,14 +34,25 @@ function criarReferenciaBruta(): ReferenciaS3 {
   });
 }
 
+/** (spec 007, T017) PreHandler fake que injeta tenantContext nos testes. */
+function criarPreHandlerFakeTenant(tenantId: TenantId): preHandlerHookHandler {
+  return async (request) => {
+    request.tenantContext = criarTenantContext(tenantId);
+  };
+}
+
 describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
   let app: ReturnType<typeof Fastify>;
   let repositorio: OrcamentoRepositoryFake;
+  let tenantIdTeste: TenantId;
 
   beforeEach(() => {
     repositorio = new OrcamentoRepositoryFake();
+    tenantIdTeste = TenantId.novo();
     app = Fastify();
-    registrarRotaStatusOrcamento(app, new ConsultarStatusOrcamento(repositorio));
+    registrarRotaStatusOrcamento(app, new ConsultarStatusOrcamento(repositorio), {
+      preHandler: criarPreHandlerFakeTenant(tenantIdTeste),
+    });
   });
 
   afterEach(async () => {
@@ -52,6 +66,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
         id,
         canal: Canal.de('PORTAL_WEB'),
         referenciaBruta: criarReferenciaBruta(),
+        tenantId: tenantIdTeste,
       }),
     );
 
@@ -106,6 +121,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
       id,
       canal: Canal.de('SFTP'),
       referenciaBruta: criarReferenciaBruta(),
+      tenantId: tenantIdTeste,
     });
     orcamento.registrarTentativaClassificador(
       ResultadoClassificacao.criar({
@@ -142,6 +158,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
       id,
       canal: Canal.de('API_REST'),
       referenciaBruta: criarReferenciaBruta(),
+      tenantId: tenantIdTeste,
     });
     orcamento.registrarTentativaClassificador(
       ResultadoClassificacao.criar({
