@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ConfirmarRevisaoHumana,
   OrcamentoNaoEncontradoParaRevisaoHumanaError,
+  TenantDivergenciaError,
 } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/confirmar-revisao-humana.js';
 import {
   Orcamento,
