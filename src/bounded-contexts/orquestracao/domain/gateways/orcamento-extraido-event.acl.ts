@@ -1,9 +1,19 @@
+import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import type { ContextoExtracao } from '../value-objects/contexto-extracao.vo.js';
 import type { OrcamentoId } from '../value-objects/orcamento-id.vo.js';
 
 export interface OrcamentoExtraidoEventACLResultado {
   readonly orcamentoId: OrcamentoId;
   readonly contextoExtracao: ContextoExtracao;
+  /**
+   * (issue #650 — expand/contract, ADR-008) Extraído do envelope de 002, que
+   * ainda publica `tenantId` opcional. `undefined` nunca é rejeitado aqui —
+   * propagado como tal até a #632 tornar o campo obrigatório nos 4 BCs.
+   * Sem consumidor de application ainda (`RegistrarContextoExtracao` não
+   * existe, #235/T029): campo extraído e disponível, aguardando o caso de
+   * uso que o consumirá.
+   */
+  readonly tenantId?: TenantId;
 }
 
 /**

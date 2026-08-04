@@ -21,6 +21,7 @@ import { NivelConfianca } from '../../../../../src/bounded-contexts/orquestracao
 import { OrcamentoId } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/orcamento-id.vo.js';
 import { DrizzleDecisaoWorkflowRepository } from '../../../../../src/bounded-contexts/orquestracao/infrastructure/persistence/drizzle-decisao-workflow.repository.js';
 import { decisoesWorkflowHistorico } from '../../../../../src/bounded-contexts/orquestracao/infrastructure/persistence/schema/decisao-workflow.schema.js';
+import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -233,5 +234,35 @@ describe.skipIf(!DATABASE_URL)('DrizzleDecisaoWorkflowRepository (Postgres real)
     } finally {
       await clienteB.end();
     }
+  });
+
+  it('(issue #650) tenantId ausente no primeiro save é persistido e recarregado quando um upstream posterior o traz', async () => {
+    const id = orcamentoIdDeTeste();
+    idsParaLimpar.push(id.toString());
+    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+
+    const decisao = DecisaoWorkflow.criar(id);
+    decisao.registrarContextoClassificacao(contextoClassificacao); // sem tenantId
+    await repo.salvar(decisao);
+
+    const aguardando = await repo.buscarPorOrcamentoId(id);
+    expect(aguardando?.tenantId).toBeUndefined();
+
+    aguardando!.registrarContextoValidacao(contextoValidacao, tenantId);
+    await repo.salvar(aguardando!);
+
+    const final = await repo.buscarPorOrcamentoId(id);
+    expect(final?.tenantId?.toString()).toBe(tenantId.toString());
+  });
+
+  it('(issue #650) tenantId ausente em todos os 3 upstreams é persistido e recarregado como undefined', async () => {
+    const id = orcamentoIdDeTeste();
+    idsParaLimpar.push(id.toString());
+
+    const decisao = decisaoConsolidada(id);
+    await repo.salvar(decisao);
+
+    const final = await repo.buscarPorOrcamentoId(id);
+    expect(final?.tenantId).toBeUndefined();
   });
 });

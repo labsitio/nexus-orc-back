@@ -1,3 +1,4 @@
+import { TenantId } from '../../../shared-kernel/tenant/tenant-id.vo.js';
 import { OrcamentoExtraidoEventACLInvalidoError } from '../domain/errors/evento-upstream-acl.errors.js';
 import type {
   OrcamentoExtraidoEventACL as OrcamentoExtraidoEventACLPort,
@@ -43,6 +44,12 @@ interface OrcamentoExtraidoPayloadBruto {
   readonly detailType: DetailTypeOrcamentoExtraido;
   readonly itens: readonly ItemOrcamentoBruto[];
   readonly condicoesComerciais: CondicoesComerciaisBruto;
+  /**
+   * (issue #650 — expand/contract, ADR-008) Ainda opcional no envelope de
+   * origem (spec 002). `undefined` nunca é rejeitado aqui — ver
+   * `OrcamentoExtraidoEventACLResultado.tenantId`.
+   */
+  readonly tenantId?: string;
 }
 
 /**
@@ -121,7 +128,8 @@ function ehOrcamentoExtraidoPayloadBruto(valor: unknown): valor is OrcamentoExtr
     (DETAIL_TYPES_ORCAMENTO_EXTRAIDO as readonly string[]).includes(objeto.detailType) &&
     Array.isArray(objeto.itens) &&
     objeto.itens.every(ehItemOrcamentoBruto) &&
-    ehCondicoesComerciaisBruto(objeto.condicoesComerciais)
+    ehCondicoesComerciaisBruto(objeto.condicoesComerciais) &&
+    (objeto.tenantId === undefined || typeof objeto.tenantId === 'string')
   );
 }
 
@@ -174,6 +182,10 @@ export class OrcamentoExtraidoEventACL implements OrcamentoExtraidoEventACLPort 
         houvePendenciaConfirmada:
           payloadBruto.detailType === 'OrcamentoExtraidoComPendenciaConfirmada',
       }),
+      // (issue #650) Nunca rejeitado quando ausente — ver
+      // `OrcamentoExtraidoEventACLResultado.tenantId`.
+      tenantId:
+        payloadBruto.tenantId !== undefined ? TenantId.de(payloadBruto.tenantId) : undefined,
     };
   }
 }

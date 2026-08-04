@@ -43,13 +43,13 @@ export class ConsolidarEDecidirWorkflow {
   ) {}
 
   async executar(payloadBruto: unknown): Promise<void> {
-    const { orcamentoId, contextoValidacao } = this.acl.traduzir(payloadBruto);
+    const { orcamentoId, contextoValidacao, tenantId } = this.acl.traduzir(payloadBruto);
 
     const decisaoWorkflow =
       (await this.repositorio.buscarPorOrcamentoId(orcamentoId)) ??
       DecisaoWorkflow.criar(orcamentoId);
 
-    decisaoWorkflow.registrarContextoValidacao(contextoValidacao);
+    decisaoWorkflow.registrarContextoValidacao(contextoValidacao, tenantId);
 
     try {
       decisaoWorkflow.consolidarContexto();
@@ -78,22 +78,27 @@ export class ConsolidarEDecidirWorkflow {
     decisaoWorkflow.registrarTentativaOrquestrador(resultado);
     await this.repositorio.salvar(decisaoWorkflow);
 
+    const tenantIdParaEventos = decisaoWorkflow.tenantId?.toString();
+
     if (decisaoWorkflow.status === 'PENDENTE_REVISAO_HUMANA') {
       await this.publisher.publicar(
         new DecisaoWorkflowEscalonadaParaComprador(
           orcamentoId.toString(),
           resultado.nivelConfianca.valor,
+          tenantIdParaEventos,
         ),
       );
       return;
     }
 
     const decisao = decisaoWorkflow.decisaoAtual!;
-    await this.publisher.publicar(this.criarEventoDesfecho(orcamentoId.toString(), decisao));
+    await this.publisher.publicar(
+      this.criarEventoDesfecho(orcamentoId.toString(), decisao, tenantIdParaEventos),
+    );
 
     if (decisao.requerIntegracaoExterna) {
       await this.publisher.publicar(
-        new IntegracaoExternaSolicitada(orcamentoId.toString(), decisao.acao),
+        new IntegracaoExternaSolicitada(orcamentoId.toString(), decisao.acao, tenantIdParaEventos),
       );
     }
   }
@@ -107,6 +112,7 @@ export class ConsolidarEDecidirWorkflow {
       readonly nivelConfianca: { readonly valor: number } | null;
       readonly motivoDadoAusente?: string;
     },
+    tenantId: string | undefined,
   ): DomainEventEnvelope {
     const nivelConfianca = decisao.nivelConfianca?.valor ?? null;
 
@@ -117,6 +123,7 @@ export class ConsolidarEDecidirWorkflow {
           decisao.agenteOrigem,
           decisao.criterio,
           nivelConfianca,
+          tenantId,
         );
       case 'ENCAMINHAR_COMPRADOR':
         return new OrcamentoEncaminhadoParaComprador(
@@ -124,6 +131,7 @@ export class ConsolidarEDecidirWorkflow {
           decisao.agenteOrigem,
           decisao.criterio,
           nivelConfianca,
+          tenantId,
         );
       case 'SOLICITAR_REENVIO':
         return new OrcamentoReenvioSolicitado(
@@ -132,6 +140,7 @@ export class ConsolidarEDecidirWorkflow {
           decisao.criterio,
           nivelConfianca,
           decisao.motivoDadoAusente!,
+          tenantId,
         );
     }
   }

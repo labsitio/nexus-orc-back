@@ -45,6 +45,11 @@ export const decisoesWorkflow = orquestracaoSchema.table(
     contextoValidacao: jsonb('contexto_validacao'),
     // DecisaoRoteamento — presente só a partir de `DECIDIDO`.
     decisaoAtual: jsonb('decisao_atual'),
+    // (issue #650) `tenantId` obrigatório nos 4 BCs de uma vez (mesmo padrão de
+    // `extracoes_orcamento.tenant_id`/`validacoes_orcamento.tenant_id`, specs
+    // 002/003, #648/#649) — imutável após o primeiro upstream que o traz
+    // (`DrizzleDecisaoWorkflowRepository.salvar`, fora do `set` de update).
+    tenantId: uuid('tenant_id'),
   },
   () => [
     check('decisoes_workflow_status_valido', emValoresValidos('status', STATUS_DECISAO_WORKFLOW)),

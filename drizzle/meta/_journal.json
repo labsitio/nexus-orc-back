@@ -134,6 +134,13 @@
       "when": 1785866676930,
       "tag": "0018_t649_validacoes_orcamento_tenant_id",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785870654330,
+      "tag": "0019_t650_decisoes_workflow_tenant_id",
+      "breakpoints": true
     }
   ]
 }

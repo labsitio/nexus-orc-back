@@ -1,3 +1,4 @@
+import { TenantId } from '../../../shared-kernel/tenant/tenant-id.vo.js';
 import { OrcamentoClassificadoEventACLInvalidoError } from '../domain/errors/evento-upstream-acl.errors.js';
 import type {
   OrcamentoClassificadoEventACL as OrcamentoClassificadoEventACLPort,
@@ -23,6 +24,12 @@ interface OrcamentoClassificadoPayloadBruto {
     readonly fornecedorIdentificado: string;
     readonly formatoIdentificado: string;
   };
+  /**
+   * (issue #650 — expand/contract, ADR-008) Ainda opcional no envelope de
+   * origem (spec 001). `undefined` nunca é rejeitado aqui — ver
+   * `OrcamentoClassificadoEventACLResultado.tenantId`.
+   */
+  readonly tenantId?: string;
 }
 
 /**
@@ -49,10 +56,13 @@ function ehOrcamentoClassificadoPayloadBruto(
     return false;
   }
   const resultadoObjeto = resultado as Record<string, unknown>;
-  return (
-    typeof resultadoObjeto.fornecedorIdentificado === 'string' &&
-    typeof resultadoObjeto.formatoIdentificado === 'string'
-  );
+  if (
+    typeof resultadoObjeto.fornecedorIdentificado !== 'string' ||
+    typeof resultadoObjeto.formatoIdentificado !== 'string'
+  ) {
+    return false;
+  }
+  return objeto.tenantId === undefined || typeof objeto.tenantId === 'string';
 }
 
 /**
@@ -76,6 +86,10 @@ export class OrcamentoClassificadoEventACL implements OrcamentoClassificadoEvent
         fornecedorIdentificado: payloadBruto.resultado.fornecedorIdentificado,
         formatoIdentificado: payloadBruto.resultado.formatoIdentificado,
       }),
+      // (issue #650) Nunca rejeitado quando ausente — ver
+      // `OrcamentoClassificadoEventACLResultado.tenantId`.
+      tenantId:
+        payloadBruto.tenantId !== undefined ? TenantId.de(payloadBruto.tenantId) : undefined,
     };
   }
 }

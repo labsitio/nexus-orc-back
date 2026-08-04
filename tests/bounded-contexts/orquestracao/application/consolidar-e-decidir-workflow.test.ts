@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import { ConsolidarEDecidirWorkflow } from '../../../../src/bounded-contexts/orquestracao/application/use-cases/consolidar-e-decidir-workflow.js';
 import {
   ContextoIncompletoError,
@@ -111,6 +112,28 @@ describe('ConsolidarEDecidirWorkflow', () => {
     expect(existente.status).toBe('DECIDIDO');
     expect(publisher.publicados).toHaveLength(1);
     expect(publisher.publicados[0]).toBeInstanceOf(OrcamentoAprovadoParaProcessamento);
+  });
+
+  it('(issue #650) propaga tenantId consolidado do agregado ao evento de desfecho publicado', async () => {
+    const tenantId = TenantId.de('01912e2e-7f3a-7c3a-89ab-0123456789ab');
+    const existente = agregadoComContextoConsolidado();
+    const repositorio = new DecisaoWorkflowRepositoryFake(existente);
+    const publisher = new EventPublisherFake();
+    const useCase = new ConsolidarEDecidirWorkflow(
+      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO, tenantId }),
+      repositorio,
+      new AgenteOrquestradorGatewayFake({
+        acao: 'APROVAR',
+        nivelConfianca: NivelConfianca.de(90),
+        criterio: 'Fornecedor recorrente, itens e condições consistentes',
+        requerIntegracaoExterna: false,
+      }),
+      publisher,
+    );
+
+    await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+    expect(publisher.publicados[0]?.tenantId).toBe(tenantId.toString());
   });
 
   it('T040 — confiança insuficiente: publica DecisaoWorkflowEscalonadaParaComprador, nunca o desfecho', async () => {
@@ -234,7 +257,9 @@ describe('ConsolidarEDecidirWorkflow', () => {
       publisher,
     );
 
-    await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).resolves.toBeUndefined();
+    await expect(
+      useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() }),
+    ).resolves.toBeUndefined();
 
     expect(publisher.publicados).toHaveLength(0);
   });
@@ -265,7 +290,9 @@ describe('ConsolidarEDecidirWorkflow', () => {
       publisher,
     );
 
-    await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).resolves.toBeUndefined();
+    await expect(
+      useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() }),
+    ).resolves.toBeUndefined();
 
     expect(publisher.publicados).toHaveLength(0);
   });

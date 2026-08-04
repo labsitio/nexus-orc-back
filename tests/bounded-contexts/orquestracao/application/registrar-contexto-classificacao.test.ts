@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import { RegistrarContextoClassificacao } from '../../../../src/bounded-contexts/orquestracao/application/use-cases/registrar-contexto-classificacao.js';
 import { DecisaoWorkflow } from '../../../../src/bounded-contexts/orquestracao/domain/aggregates/decisao-workflow.aggregate.js';
 import { ContextoImutavelError } from '../../../../src/bounded-contexts/orquestracao/domain/aggregates/decisao-workflow.aggregate.js';
@@ -108,5 +109,18 @@ describe('RegistrarContextoClassificacao', () => {
       ContextoImutavelError,
     );
     expect(repositorio.salvos).toHaveLength(0);
+  });
+
+  it('(issue #650) propaga tenantId extraído pela ACL para o agregado', async () => {
+    const tenantId = TenantId.de('01912e2e-7f3a-7c3a-89ab-0123456789ab');
+    const repositorio = new DecisaoWorkflowRepositoryFake();
+    const useCase = new RegistrarContextoClassificacao(
+      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoClassificacao: contexto(), tenantId }),
+      repositorio,
+    );
+
+    await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+    expect(repositorio.salvos[0]!.tenantId?.equals(tenantId)).toBe(true);
   });
 });

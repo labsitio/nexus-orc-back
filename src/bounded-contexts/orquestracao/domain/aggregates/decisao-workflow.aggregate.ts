@@ -1,3 +1,4 @@
+import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import { ErroDominio } from '../errors/erro-dominio.js';
 import type { ContextoClassificacao } from '../value-objects/contexto-classificacao.vo.js';
 import type { ContextoExtracao } from '../value-objects/contexto-extracao.vo.js';
@@ -48,6 +49,27 @@ export class JustificativaHumanaAusenteError extends ErroDominio {
   }
 }
 
+/**
+ * (spec 007, issue #650) Disparado quando um dos 3 eventos upstream
+ * (classificação/extração/validação) traz `tenantId` diferente do já
+ * registrado por outro upstream para o mesmo `orcamentoId` — sinal de
+ * corrupção ou roteamento errado (nenhum caso legítimo produz isso: os 3
+ * eventos descrevem o mesmo orçamento). `tenantId` ausente (`undefined`)
+ * nunca diverge — só dois valores concretos e diferentes divergem (mesma
+ * distinção AUSENTE/DIVERGENTE do fix #640).
+ */
+export class TenantIdDivergenteError extends ErroDominio {
+  constructor(
+    orcamentoId: string,
+    readonly tenantIdAtual: string,
+    readonly tenantIdRecebido: string,
+  ) {
+    super(
+      `DecisaoWorkflow: tenantId divergente entre eventos upstream para orcamentoId ${orcamentoId} (atual: ${tenantIdAtual}, recebido: ${tenantIdRecebido})`,
+    );
+  }
+}
+
 /** Resultado reportado pelo `AgenteOrquestradorGateway` — ainda não é uma `DecisaoRoteamento` válida (depende do limiar de confiança ser atingido). */
 export interface ResultadoOrquestrador {
   readonly acao: AcaoRoteamento;
@@ -73,6 +95,8 @@ export interface DecisaoWorkflowProps {
   readonly status: StatusDecisaoWorkflow;
   readonly decisaoAtual?: DecisaoRoteamento;
   readonly historico: readonly TentativaDecisaoWorkflow[];
+  /** (issue #650) `tenantId` consolidado dos 3 upstreams — ver `registrarTenantId`. */
+  readonly tenantId?: TenantId;
 }
 
 /**
@@ -99,6 +123,7 @@ export class DecisaoWorkflow {
   private _status: StatusDecisaoWorkflow;
   private _decisaoAtual: DecisaoRoteamento | undefined;
   private readonly _historico: TentativaDecisaoWorkflow[];
+  private _tenantId: TenantId | undefined;
 
   private constructor(
     readonly orcamentoId: OrcamentoId,
@@ -110,6 +135,7 @@ export class DecisaoWorkflow {
     this._status = props.status;
     this._decisaoAtual = props.decisaoAtual;
     this._historico = [...props.historico];
+    this._tenantId = props.tenantId;
   }
 
   /** Cria o agregado no momento em que o primeiro dos 3 eventos upstream chega. */
@@ -146,13 +172,40 @@ export class DecisaoWorkflow {
     return this._decisaoAtual;
   }
 
+  get tenantId(): TenantId | undefined {
+    return this._tenantId;
+  }
+
   /** Histórico append-only — cópia defensiva, nunca expõe o array mutável interno. */
   get historico(): readonly TentativaDecisaoWorkflow[] {
     return [...this._historico];
   }
 
+  /**
+   * (issue #650) Consolida `tenantId` entre os 3 upstreams — ausência
+   * (`undefined`) nunca é rejeitada nem sobrescreve o já registrado; só um
+   * valor concreto divergente do já consolidado lança
+   * `TenantIdDivergenteError`. Chamado antes de qualquer mutação de contexto
+   * pelos 3 `registrarContexto*` (fail fast: divergência nunca deixa o
+   * contexto parcialmente registrado).
+   */
+  private registrarTenantId(tenantId: TenantId | undefined): void {
+    if (!tenantId) {
+      return;
+    }
+    if (this._tenantId && !this._tenantId.equals(tenantId)) {
+      throw new TenantIdDivergenteError(
+        this.orcamentoId.toString(),
+        this._tenantId.toString(),
+        tenantId.toString(),
+      );
+    }
+    this._tenantId = tenantId;
+  }
+
   /** Idempotente: reaplicar o mesmo contexto não duplica nem sobrescreve; nunca dispara decisão por si só. */
-  registrarContextoClassificacao(contexto: ContextoClassificacao): void {
+  registrarContextoClassificacao(contexto: ContextoClassificacao, tenantId?: TenantId): void {
+    this.registrarTenantId(tenantId);
     if (this._contextoClassificacao && !this._contextoClassificacao.equals(contexto)) {
       throw new ContextoImutavelError('contextoClassificacao');
     }
@@ -160,7 +213,8 @@ export class DecisaoWorkflow {
   }
 
   /** Idempotente: reaplicar o mesmo contexto não duplica nem sobrescreve; nunca dispara decisão por si só. */
-  registrarContextoExtracao(contexto: ContextoExtracao): void {
+  registrarContextoExtracao(contexto: ContextoExtracao, tenantId?: TenantId): void {
+    this.registrarTenantId(tenantId);
     if (this._contextoExtracao && !this._contextoExtracao.equals(contexto)) {
       throw new ContextoImutavelError('contextoExtracao');
     }
@@ -168,7 +222,8 @@ export class DecisaoWorkflow {
   }
 
   /** Idempotente: reaplicar o mesmo contexto não duplica nem sobrescreve; nunca dispara decisão por si só. */
-  registrarContextoValidacao(contexto: ContextoValidacao): void {
+  registrarContextoValidacao(contexto: ContextoValidacao, tenantId?: TenantId): void {
+    this.registrarTenantId(tenantId);
     if (this._contextoValidacao && !this._contextoValidacao.equals(contexto)) {
       throw new ContextoImutavelError('contextoValidacao');
     }
