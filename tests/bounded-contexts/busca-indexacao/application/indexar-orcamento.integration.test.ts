@@ -17,12 +17,15 @@
 //
 // GATE (#190/ADR-008): o handler Lambda consumidor de `indexador-queue`
 // (T030) que chamaria `IndexarOrcamento.executar` em produção ainda não
-// existe — extrair `tenantId` do envelope do evento upstream depende de
-// spec-007 T042 (ainda não mergeada). Este teste não implementa esse
-// handler: fornece `tenantId` diretamente ao caso de uso, do mesmo modo que
-// o unit test de T029 (`indexar-orcamento.test.ts`) já faz — é o próprio
-// contrato de `IndexarOrcamento.executar(tenantId, detailType, payloadBruto)`
-// hoje, nenhum contrato novo inventado.
+// existe — spec-007 T042 (mergeada) apenas fez `OrcamentoValidadoEventACL`
+// extrair/validar `tenantId` do envelope de 003 no seu resultado; nenhum
+// caller de produção decide ainda daí para `executar`. Este teste não
+// implementa esse handler: fornece `tenantId` diretamente ao caso de uso, do
+// mesmo modo que o unit test de T029 (`indexar-orcamento.test.ts`) já faz —
+// é o próprio contrato de
+// `IndexarOrcamento.executar(tenantId, detailType, payloadBruto)` hoje,
+// nenhum contrato novo inventado. `payloadOrcamentoValidadoDeTeste` inclui
+// `tenantId` porque a ACL real (não fake) agora rejeita payload sem ele.
 //
 // Requer DATABASE_URL (ver .env.example / docker-compose.yml, serviço
 // `postgres`) apontando para um banco já migrado. Sem DATABASE_URL, a suíte
@@ -60,6 +63,7 @@ function orcamentoIdDeTeste(): string {
 function payloadOrcamentoValidadoDeTeste(orcamentoId: string) {
   return {
     orcamentoId,
+    tenantId: TENANT_ID.toString(),
     itens: [
       {
         descricao: 'Notebook 15 polegadas',

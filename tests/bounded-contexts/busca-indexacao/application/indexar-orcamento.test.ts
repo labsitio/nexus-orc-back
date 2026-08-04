@@ -142,6 +142,7 @@ function montarCaso() {
     orcamentoId: ORCAMENTO_ID,
     conteudoIndexavel: conteudoFixture(),
     origemValidacao: OrigemValidacao.de('VALIDADO'),
+    tenantId: TENANT_ID,
   };
   const acl = new AclFake(aclResultado);
   const embeddingGateway = new EmbeddingGatewayFake();

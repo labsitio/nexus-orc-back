@@ -5,12 +5,15 @@ import {
   OrcamentoValidadoEventACL,
   OrcamentoValidadoEventACLInvalidaError,
 } from '../../../../src/bounded-contexts/busca-indexacao/infrastructure/orcamento-validado-event.acl.js';
+import { TenantIdInvalidoError } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const ORCAMENTO_ID = '018f2e2a-7b3c-7c3d-8a1b-0123456789ab';
+const TENANT_ID = '018f5b3a-9999-7abc-89ab-0123456789ab';
 
 function payloadValido(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     orcamentoId: ORCAMENTO_ID,
+    tenantId: TENANT_ID,
     itens: [
       {
         descricao: 'Cimento CP-II 50kg',
@@ -39,6 +42,7 @@ describe('OrcamentoValidadoEventACL', () => {
     const resultado = acl.traduzir('OrcamentoValidado', payloadValido());
 
     expect(resultado.orcamentoId.toString()).toBe(ORCAMENTO_ID);
+    expect(resultado.tenantId.toString()).toBe(TENANT_ID);
     expect(resultado.origemValidacao.valor).toBe('VALIDADO');
     expect(resultado.conteudoIndexavel.itensDescricao).toEqual([
       'Cimento CP-II 50kg',
@@ -149,5 +153,21 @@ describe('OrcamentoValidadoEventACL', () => {
     expect(() => acl.traduzir('OrcamentoValidado', payload)).toThrow(
       ConteudoIndexavelInvalidoError,
     );
+  });
+
+  it('rejeita evento sem tenantId (opção estrita, spec-007 T042/ADR-008) — 003 ainda publica opcional', () => {
+    const acl = new OrcamentoValidadoEventACL();
+    const payload = payloadValido({ tenantId: undefined });
+
+    expect(() => acl.traduzir('OrcamentoValidado', payload)).toThrow(
+      OrcamentoValidadoEventACLInvalidaError,
+    );
+  });
+
+  it('lança erro de TenantId inválido quando tenantId não é UUID v7', () => {
+    const acl = new OrcamentoValidadoEventACL();
+    const payload = payloadValido({ tenantId: 'não-é-uuid' });
+
+    expect(() => acl.traduzir('OrcamentoValidado', payload)).toThrow(TenantIdInvalidoError);
   });
 });
