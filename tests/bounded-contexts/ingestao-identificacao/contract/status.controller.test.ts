@@ -91,6 +91,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
       id,
       canal: Canal.de('API_REST'),
       referenciaBruta: criarReferenciaBruta(),
+      tenantId: tenantIdTeste,
     });
     orcamento.registrarTentativaClassificador(
       ResultadoClassificacao.criar({
@@ -233,6 +234,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
     registrarRotaStatusOrcamento(
       appComRepositorioQuebrado,
       new ConsultarStatusOrcamento(repositorioQuebrado),
+      { preHandler: criarPreHandlerFakeTenant(tenantIdTeste) },
     );
 
     const resposta = await appComRepositorioQuebrado.inject({

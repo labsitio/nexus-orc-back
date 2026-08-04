@@ -7,6 +7,7 @@ import {
   TenantDivergenciaError,
 } from '../../application/use-cases/confirmar-revisao-humana.js';
 import type { ProblemDetails } from './status.schema.js';
+import type { RotaOpts } from './route-opts.js';
 import { orcamentoIdParamSchema } from './status.schema.js';
 import { paraResposta } from './status.controller.js';
 import { revisaoHumanaBodySchema } from './revisao-humana.schema.js';
@@ -24,8 +25,9 @@ import { revisaoHumanaBodySchema } from './revisao-humana.schema.js';
 export function registrarRotaRevisaoHumana(
   app: FastifyInstance,
   confirmarRevisaoHumana: ConfirmarRevisaoHumana,
+  opts: RotaOpts = {},
 ): void {
-  app.post('/v1/orcamentos/:orcamentoId/revisao-humana', async (request, reply) => {
+  app.post('/v1/orcamentos/:orcamentoId/revisao-humana', { preHandler: opts.preHandler }, async (request, reply) => {
     const params = orcamentoIdParamSchema.safeParse(request.params);
     if (!params.success) {
       const problema: ProblemDetails = {

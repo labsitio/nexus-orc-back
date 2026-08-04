@@ -1,3 +1,4 @@
+import type { preHandlerHookHandler } from 'fastify';
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ConfirmarRevisaoHumana } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/confirmar-revisao-humana.js';
@@ -10,6 +11,8 @@ import { NivelConfianca } from '../../../../src/bounded-contexts/ingestao-identi
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
 import { ResultadoClassificacao } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/resultado-classificacao.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
+import { criarTenantContext } from '../../../../src/shared-kernel/tenant/tenant-context.js';
 import { registrarRotaRevisaoHumana } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/http/revisao-humana.controller.js';
 
 class OrcamentoRepositoryFake implements OrcamentoRepository {
@@ -37,16 +40,26 @@ function criarReferenciaBruta(): ReferenciaS3 {
   });
 }
 
+function criarPreHandlerFakeTenant(tenantId: TenantId): preHandlerHookHandler {
+  return async (request) => {
+    request.tenantContext = criarTenantContext(tenantId);
+  };
+}
+
 describe('POST /v1/orcamentos/{orcamentoId}/revisao-humana — controller', () => {
   let app: ReturnType<typeof Fastify>;
   let repositorio: OrcamentoRepositoryFake;
   let publisher: EventPublisherFake;
+  let tenantIdTeste: TenantId;
 
   beforeEach(() => {
     repositorio = new OrcamentoRepositoryFake();
     publisher = new EventPublisherFake();
+    tenantIdTeste = TenantId.novo();
     app = Fastify();
-    registrarRotaRevisaoHumana(app, new ConfirmarRevisaoHumana(repositorio, publisher));
+    registrarRotaRevisaoHumana(app, new ConfirmarRevisaoHumana(repositorio, publisher), {
+      preHandler: criarPreHandlerFakeTenant(tenantIdTeste),
+    });
   });
 
   afterEach(async () => {
@@ -59,6 +72,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/revisao-humana — controller', () =
       id,
       canal: Canal.de('PORTAL_WEB'),
       referenciaBruta: criarReferenciaBruta(),
+      tenantId: tenantIdTeste,
     });
     orcamento.registrarTentativaClassificador(
       ResultadoClassificacao.criar({
@@ -94,6 +108,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/revisao-humana — controller', () =
         id,
         canal: Canal.de('PORTAL_WEB'),
         referenciaBruta: criarReferenciaBruta(),
+        tenantId: tenantIdTeste,
       }),
     );
 
