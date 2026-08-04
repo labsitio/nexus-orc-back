@@ -1,3 +1,4 @@
+import { TenantId } from '../../../shared-kernel/tenant/tenant-id.vo.js';
 import { ErroDominio } from '../domain/errors/erro-dominio.js';
 import { ConteudoIndexavel } from '../domain/value-objects/conteudo-indexavel.vo.js';
 import { OrcamentoId } from '../domain/value-objects/orcamento-id.vo.js';
@@ -33,6 +34,13 @@ interface OrcamentoValidadoPayloadBruto {
   readonly orcamentoId: string;
   readonly itens: readonly ItemPayloadBruto[];
   readonly condicoesComerciais: string;
+  /**
+   * Ainda opcional no envelope de origem (003, T041 — expand/contract).
+   * Checagem estrutural do type guard não confunde "ausente" com "shape
+   * errado": `undefined` passa aqui, e é `traduzir` quem decide rejeitar
+   * (spec-007 T042/ADR-008).
+   */
+  readonly tenantId?: string;
 }
 
 function ehItemPayloadBruto(valor: unknown): valor is ItemPayloadBruto {
@@ -59,7 +67,8 @@ function ehOrcamentoValidadoPayloadBruto(valor: unknown): valor is OrcamentoVali
     typeof payload.orcamentoId === 'string' &&
     typeof payload.condicoesComerciais === 'string' &&
     Array.isArray(payload.itens) &&
-    payload.itens.every(ehItemPayloadBruto)
+    payload.itens.every(ehItemPayloadBruto) &&
+    (payload.tenantId === undefined || typeof payload.tenantId === 'string')
   );
 }
 
@@ -83,6 +92,19 @@ function origemValidacaoDe(detailType: OrcamentoValidadoEventDetailType): Origem
  * `ConteudoIndexavel.de` ainda assim é válido enquanto `itensDescricao`/
  * `condicoesResumo`/`categorias` tiverem algum conteúdo (invariante "nunca
  * inteiramente vazio", ver `conteudo-indexavel.vo.ts`).
+ *
+ * **Amendment spec-007 T042 (ADR-008)**: extrai `tenantId` do envelope de
+ * 003 e o valida via `TenantId.de` (Shared Kernel — único VO cujo import
+ * direto entre BCs é autorizado). Decisão vinculante (opção estrita): evento
+ * sem `tenantId` é rejeitado aqui — `OrcamentoValidadoEventACLInvalidaError`,
+ * nunca indexado sem isolamento de tenant. 003 ainda publica `tenantId`
+ * opcional (T041, expand/contract); enquanto os sites de emissão de 003 não
+ * preencherem o campo, qualquer evento recebido aqui será rejeitado — essa
+ * lacuna é rastreada como dependência pendente na issue #584 (fora do
+ * escopo de T042, que é só a tradução na ACL). Base para a decisão: zero
+ * tenant real em produção (#587/#297/T045) e nenhum handler Lambda
+ * implantado — falhar rápido na fronteira de tradução entre BCs é seguro
+ * hoje e não interrompe nenhum pipeline real.
  */
 export class OrcamentoValidadoEventACL implements OrcamentoValidadoEventACLPort {
   traduzir(
@@ -96,6 +118,14 @@ export class OrcamentoValidadoEventACL implements OrcamentoValidadoEventACLPort 
           'descricao?, categoria? })',
       );
     }
+
+    if (payloadBruto.tenantId === undefined) {
+      throw new OrcamentoValidadoEventACLInvalidaError(
+        'tenantId ausente no envelope — evento de 003 sem tenantId é rejeitado ' +
+          '(spec-007 T042/ADR-008, isolamento multitenant obrigatório)',
+      );
+    }
+    const tenantId = TenantId.de(payloadBruto.tenantId);
 
     const categorias = [
       ...new Set(
@@ -116,6 +146,7 @@ export class OrcamentoValidadoEventACL implements OrcamentoValidadoEventACLPort 
       orcamentoId: OrcamentoId.de(payloadBruto.orcamentoId),
       conteudoIndexavel,
       origemValidacao: origemValidacaoDe(detailType),
+      tenantId,
     };
   }
 }
