@@ -95,3 +95,35 @@ PR #627, branch `feat/277-tenantid-agregado`, commit `3285164` (issue #277).
 Cobertura (`npx vitest run --coverage`, escopo restrito a `orcamento.aggregate.ts`): 91,89% statements/lines, 100% branches, 89,47% functions. As 3 linhas não cobertas (111, 123, 131 — getters `referenciaExterna`/`resultadoAtual`/`historico`) são pré-existentes, não tocadas por este diff, e não relacionadas a `tenantId` (o caminho de `tenantId`/`atualizarTenantId`/`TenantIdImutavelError` está 100% coberto pelo teste promovido). Nenhuma redução de cobertura introduzida.
 
 Nenhum defeito de produção encontrado em T014. A opcionalidade de `tenantId` é decisão de estratégia (expand/contract) documentada no código, na PR e na issue #277 — confirmada com o dev-back-end antes desta validação, não é lacuna a reportar como bug.
+
+## T015 — `tenantId` opcional nos Domain Events de 001 (envelope + 4 eventos)
+
+PR #629, branch `feat/278-tenantid-eventos`, commits `ad6c19c` + `cb99bf9` (issue #278).
+
+| Task | Critério de aceite | Nível | Cenário | Arquivo de teste | Resultado | Evidência |
+|---|---|---|---|---|---|---|
+| T015 | `tenantId?: string` presente no payload serializado dos 4 eventos (`OrcamentoRecebido`, `OrcamentoClassificado`, `OrcamentoEscalonadoParaRevisaoHumana`, `OrcamentoReclassificadoPorRevisaoHumana`) | unitário/manual (script `tsx`) | instancia `OrcamentoRecebido` com `tenantId` explícito e serializa via `JSON.stringify` | `src/bounded-contexts/ingestao-identificacao/domain/events/orcamento-recebido.event.ts` | PASS | `{"tenantId":"tenant-abc", ..., "schemaVersion":1}` — campo presente quando informado |
+| T015 | `schemaVersion` permanece `1` nos 4 eventos e no envelope (`DomainEventEnvelope.schemaVersion: 1`) | estático/inspeção | leitura de `readonly schemaVersion = 1 as const` nos 4 arquivos | os 4 arquivos de evento + `domain-event.ts` | PASS | `grep schemaVersion` confirma `= 1 as const` em todos, sem alteração |
+| T015 | Testes existentes que cobrem os 4 eventos continuam passando sem alteração de asserção | regressão | suíte completa + subset dos 4 arquivos de teste citados no handoff | `domain-events.test.ts`, `eventbridge.publisher.test.ts`, `classificar-orcamento.integration.test.ts` | PASS | `16 passed \| 1 expected fail` (subset) |
+| T015 | Teste de contrato T011 (cross-tenant 404) segue RED por desenho, não vira verde com esta mudança (aguarda #280/#281) | regressão | suíte completa + execução isolada | `tests/bounded-contexts/ingestao-identificacao/contract/tenant-isolation.test.ts` | PASS (1 `it.fails` esperado, não regrediu) | `2 passed \| 1 expected fail` na execução isolada; `909 passed \| 1 expected fail \| 99 skipped` na suíte completa |
+| T015 | Nenhuma regressão no restante do BC nem no monorepo | regressão | suíte completa | — | PASS | `909 passed \| 1 expected fail \| 99 skipped` (157 arquivos passaram, 19 skip) — idêntico ao baseline pré-mudança |
+| T015 | `npx tsc --noEmit` sem erro nos 5 arquivos do diff | estático/typecheck | typecheck completo do monorepo | — | PASS (erros restantes são pré-existentes em `src/dev/`, módulo `@aws-sdk/client-sqs` ausente, não relacionados a este diff) | saída sem novos erros |
+| T015 | `npx eslint` limpo nos 5 arquivos do diff | estático/lint | lint restrito aos arquivos alterados | `domain-event.ts` + os 4 eventos | PASS | saída vazia, exit 0 |
+
+**Achado de atenção (não bloqueante, registrado para rastreabilidade):** o parâmetro
+`tenantId?: string` foi inserido na posição do construtor **antes** de `ocorreuEm`
+(que tem valor padrão), deslocando a assinatura posicional. Nenhum call site de
+produção ou de teste hoje passa `ocorreuEm` explicitamente (todos usam o valor
+padrão `new Date()`), então não há quebra observável nesta PR. Risco residual: um
+futuro call site que passe `ocorreuEm` explicitamente por posição, sem também passar
+`tenantId`, cairia no parâmetro `tenantId` em vez de `ocorreuEm` — mas o TypeScript
+acusa erro de tipo nesse caso (`Date` não é atribuível a `string`), então o compilador
+protege este cenário específico e a inversão não passaria despercebida em build.
+Confirmado por verificação manual (`npx tsc --noEmit`, sem novos erros nos 5 arquivos).
+Não é defeito de produção nesta PR; registrado apenas como ponto de atenção para as
+PRs de #279/#280/#281, que devem confirmar a ordem de argumentos ao integrar.
+
+Nenhum defeito de produção encontrado em T015. A opcionalidade de `tenantId` e a
+manutenção de `schemaVersion: 1` são decisão de estratégia (expand/contract, ADR-008)
+documentada no código, em `tasks.md` (T015, T034/#297) e no corpo da PR #629 — não é
+lacuna a reportar como bug.

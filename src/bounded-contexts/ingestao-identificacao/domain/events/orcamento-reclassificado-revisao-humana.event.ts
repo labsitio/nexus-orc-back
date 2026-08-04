@@ -23,6 +23,7 @@ export class OrcamentoReclassificadoPorRevisaoHumana
   constructor(
     readonly orcamentoId: string,
     readonly resultado: ResultadoClassificacaoPayload,
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();
