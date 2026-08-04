@@ -31,6 +31,8 @@ describe.each([
     nome: 'OrcamentoExtraido',
     detailType: 'OrcamentoExtraido',
     criar: () => new OrcamentoExtraido(orcamentoId, itens, condicoesComerciaisPayload),
+    criarComTenant: (tenantId: string) =>
+      new OrcamentoExtraido(orcamentoId, itens, condicoesComerciaisPayload, tenantId),
   },
   {
     nome: 'ExtracaoEscalonadaParaRevisaoHumana',
@@ -40,14 +42,22 @@ describe.each([
         orcamentoId,
         '1+ campo obrigatório sem confiança suficiente',
       ),
+    criarComTenant: undefined,
   },
   {
     nome: 'OrcamentoExtraidoComPendenciaConfirmada',
     detailType: 'OrcamentoExtraidoComPendenciaConfirmada',
     criar: () =>
       new OrcamentoExtraidoComPendenciaConfirmada(orcamentoId, itens, condicoesComerciaisPayload),
+    criarComTenant: (tenantId: string) =>
+      new OrcamentoExtraidoComPendenciaConfirmada(
+        orcamentoId,
+        itens,
+        condicoesComerciaisPayload,
+        tenantId,
+      ),
   },
-])('$nome', ({ detailType, criar }) => {
+])('$nome', ({ detailType, criar, criarComTenant }) => {
   it(`schemaVersion 1, orcamentoId e detailType "${detailType}"`, () => {
     const evento = criar();
     expect(evento.schemaVersion).toBe(1);
@@ -56,4 +66,18 @@ describe.each([
     expect(() => new Date(evento.ocorreuEm)).not.toThrow();
     expect(new Date(evento.ocorreuEm).toISOString()).toBe(evento.ocorreuEm);
   });
+
+  if (criarComTenant) {
+    it('tenantId ausente por padrão (compatibilidade com sites de emissão atuais)', () => {
+      const evento = criar();
+      expect(evento.tenantId).toBeUndefined();
+    });
+
+    it('tenantId presente é preservado quando informado', () => {
+      const tenantId = '018f4b1a-tenant-0000-000000000000';
+      const evento = criarComTenant(tenantId);
+      expect(evento.tenantId).toBe(tenantId);
+      expect(evento.schemaVersion).toBe(1);
+    });
+  }
 });

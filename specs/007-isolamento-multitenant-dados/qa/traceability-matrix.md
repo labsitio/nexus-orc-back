@@ -127,3 +127,23 @@ Nenhum defeito de produção encontrado em T015. A opcionalidade de `tenantId` e
 manutenção de `schemaVersion: 1` são decisão de estratégia (expand/contract, ADR-008)
 documentada no código, em `tasks.md` (T015, T034/#297) e no corpo da PR #629 — não é
 lacuna a reportar como bug.
+
+## T040 — `tenantId` opcional nos Domain Events de 002 (envelope + 2 eventos)
+
+PR #630, branch `feat/582-tenantid-eventos-002`, commits `30f31ea` + `7085e35` (issue #582).
+
+| Task | Critério de aceite | Nível | Cenário | Arquivo de teste | Resultado | Evidência |
+|---|---|---|---|---|---|---|
+| T040 | `tenantId?: string` ausente por padrão nos 2 eventos (`OrcamentoExtraido`, `OrcamentoExtraidoComPendenciaConfirmada`) | unitário | instancia cada evento sem `tenantId` e verifica `undefined` | `tests/bounded-contexts/extracao/domain/events/domain-events.test.ts` | PASS | `evento.tenantId` é `undefined` nos 2 casos |
+| T040 | `tenantId?: string` presente e preservado quando informado | unitário | instancia cada evento com `tenantId` explícito e verifica o valor e `schemaVersion` | `tests/bounded-contexts/extracao/domain/events/domain-events.test.ts` | PASS | `evento.tenantId` == valor informado; `schemaVersion` continua `1` |
+| T040 | `schemaVersion` permanece `1` nos 2 eventos e no envelope | estático/inspeção + unitário | leitura de `readonly schemaVersion = 1 as const` + asserção existente em `domain-events.test.ts` | `domain-event.ts`, `orcamento-extraido.event.ts`, `orcamento-extraido-pendencia-confirmada.event.ts` | PASS | teste existente `schemaVersion 1` continua verde sem alteração de asserção |
+| T040 | Nenhum call site de produção afetado (`extrair-dados-orcamento.ts`, `confirmar-revisao-humana-extracao.ts` continuam com 3 args posicionais) | regressão | grep dos 2 únicos call sites + suíte completa | — | PASS | grep confirma 3 args (`orcamentoId`, `itens`, `condicoesComerciais`); suíte completa sem regressão |
+| T040 | Teste de contrato T011 (cross-tenant 404, BC 001) segue RED por desenho, não vira verde com esta mudança | regressão | suíte completa | `tests/bounded-contexts/ingestao-identificacao/contract/tenant-isolation.test.ts` | PASS (1 `it.fails` esperado, não regrediu) | `909 passed \| 1 expected fail \| 99 skipped` (baseline) → `913 passed \| 1 expected fail \| 99 skipped` (pós 4 testes novos); nenhum "expected to fail but passed" |
+| T040 | Nenhuma regressão no restante do BC Extração nem no monorepo | regressão | suíte completa | — | PASS | delta de exatamente +4 testes (os adicionados), 157 arquivos passaram, 19 skip |
+| T040 | `npm run typecheck` sem erro | estático/typecheck | typecheck completo do monorepo | — | PASS | saída vazia, exit 0 |
+| T040 | `npx eslint` limpo no arquivo de teste alterado | estático/lint | lint restrito ao arquivo alterado | `domain-events.test.ts` | PASS | saída vazia, exit 0 |
+
+Nenhum defeito de produção encontrado em T040. A opcionalidade de `tenantId` e a
+manutenção de `schemaVersion: 1` são decisão de estratégia (expand/contract, ADR-008),
+mesmo padrão de T014/T015, documentada no código e no corpo da PR #630 — não é
+lacuna a reportar como bug.

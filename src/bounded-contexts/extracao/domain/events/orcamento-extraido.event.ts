@@ -22,6 +22,7 @@ export class OrcamentoExtraido implements OrcamentoExtraidoPayload {
     readonly orcamentoId: string,
     readonly itens: readonly ItemOrcamentoPayload[],
     readonly condicoesComerciais: CondicoesComerciaisPayload,
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();
