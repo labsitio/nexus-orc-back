@@ -24,6 +24,7 @@ export class DecisaoWorkflowEscalonadaParaComprador implements DecisaoWorkflowEs
   constructor(
     readonly orcamentoId: string,
     readonly nivelConfianca: number,
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();
