@@ -19,6 +19,7 @@ export class ExtracaoEscalonadaParaRevisaoHumana implements ExtracaoEscalonadaPa
   constructor(
     readonly orcamentoId: string,
     readonly motivo: string,
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();
