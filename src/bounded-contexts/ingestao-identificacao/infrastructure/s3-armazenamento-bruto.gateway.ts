@@ -117,7 +117,7 @@ export class S3ArmazenamentoBrutoGateway implements ArmazenamentoBrutoGateway {
    * checksum do corpo vazio que o SDK conhece no momento da assinatura —
    * quem envia os bytes reais é o cliente, numa requisição HTTP posterior.
    * O S3 recusa o `PUT` real com 400 por divergência de checksum. Ver
-   * `docs/.../bugs/BUG-001.md`.
+   * `specs/001-ingestao-classificacao-orcamentos/bugs/BUG-001.md`.
    */
   async gerarUrlUpload(orcamentoId: OrcamentoId, nomeArquivo: string): Promise<string> {
     const key = chaveUploadPendente(orcamentoId, nomeArquivo);
