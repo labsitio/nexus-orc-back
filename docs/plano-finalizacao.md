@@ -133,7 +133,7 @@ preenchido quando confirmei ausência real no board.
 
 | Caso de uso | Status | Issues que o fecham | Sem issue |
 |---|---|---|---|
-| Retrofit `tenantId` no agregado/eventos de 001 | ABERTO — verificado: `schemaVersion` ainda `1` em `domain-event.ts:7` | #277 (T014, atributo no agregado), #278 (T015, eventos + `schemaVersion: 2`), #280 (T017, casos de uso propagam/validam), #281 (T018, `DrizzleOrcamentoRepository` estende `DrizzleTenantScopedRepositoryBase`) | — |
+| Retrofit `tenantId` no agregado/eventos de 001 | ABERTO — verificado: `schemaVersion` ainda `1` em `domain-event.ts:7` | #277 (T014, atributo no agregado), #278 (T015, eventos + `schemaVersion: 2`), #279 (T016, `ReceberOrcamento` recebe `tenantId` obrigatório), #280 (T017, casos de uso propagam/validam), #281 (T018, `DrizzleOrcamentoRepository` estende `DrizzleTenantScopedRepositoryBase`) | — |
 | Retrofit `tenantId` em eventos de 002 | ABERTO | #582 (T040) | — |
 | Retrofit `tenantId` em eventos de 003 | ABERTO | #583 (T041) | — |
 | Retrofit `tenantId` em ACL de 004 (gate do handler SQS #190) | ABERTO | #584 (T042) | — |
@@ -163,7 +163,7 @@ crítico → P3.
 |---|---|---|
 | **P0** | ~~#592 (BUG-001)~~ **CONCLUÍDA** — fechada por #618 (PR #625, merged) | Já não é mais item de trabalho; mantido na tabela só para registrar que o P0 foi zerado nesta revisão. |
 | **P1** | #234, #246, #248, #250, #252, #253, #254, #255, #256, #229, #236, #235, #237, #238, #251 (005 application/interface) | Fecha o BC de maior risco financeiro e menor cobertura; sem ele não há decisão de workflow, ponta a ponta nunca fecha. |
-| **P1** | #277, #278, #280, #281 (007 retrofit 001), #582, #583, #584, #586, #297, #587 (007 retrofit 002-005) | #584 é gate explícito (#585) do handler SQS de 004; sem retrofit completo (001 incluso — ainda não iniciado), produção roda sem isolamento multi-tenant — risco de segurança/negócio. |
+| **P1** | #277, #278, #279, #280, #281 (007 retrofit 001), #582, #583, #584, #586, #297, #587 (007 retrofit 002-005) | #584 é gate explícito (#585) do handler SQS de 004; sem retrofit completo (001 incluso — ainda não iniciado), produção roda sem isolamento multi-tenant — risco de segurança/negócio. |
 | **P1** | #190 (004 handler SQS, bloqueado por #584) | Único handler de consumo faltante no caminho 003→004. |
 | **P1** | #149-#155 (003 categorização de item) | Regra de preço hoje não é confiável sem isso — risco de corretude de negócio. |
 | **P2** | #613, #614, #615, #616, #623, #624 (handlers Lambda de produção 001-005, IAM `events:PutEvents` associado) | Corrige inconsistência da versão anterior deste documento (que os colocava em P0): critério (c) — necessário para deploy de produção, não bloqueia progresso local/de código, já que 001/002 rodam localmente via `src/dev/local.ts`. |
@@ -181,7 +181,7 @@ crítico → P3.
 
 **Caminho crítico — cabeça reavaliada nesta revisão.** Na primeira execução
 a cabeça era #592/BUG-001; com #618 mergeada (PR #625) esse item saiu do
-caminho. **Nova cabeça: 007 (retrofit 001), #277→#278→#280→#281.** Motivo,
+caminho. **Nova cabeça: 007 (retrofit 001), #277→#278→#279→#280→#281.** Motivo,
 por evidência de código: `schemaVersion` ainda é `1` em
 `ingestao-identificacao/domain/events/domain-event.ts:7` — 007 não terminou
 nem 001, e #584 (007/004, retrofit do ACL de 004) é **gate formal e
@@ -211,7 +211,7 @@ e `schemaVersion: 2` (007); uma decisão de workflow completa (aprovar/
 escalonar/reenviar/integração externa) é produzível chamando os casos de
 uso de 005 diretamente (sem handler Lambda ainda); item sem `categoria` é
 classificado pelo agente antes da regra de preço (003).
-- 007: #277, #278, #280, #281 (001), #582 (002), #583 (003), #584 (004,
+- 007: #277, #278, #279, #280, #281 (001), #582 (002), #583 (003), #584 (004,
   gate #585), #586 (005), #297/#587 (confirmação pré-cutover).
 - 005: #234, #246, #248, #250, #252, #253, #254, #255, #256, #229, #236,
   #235, #237, #238, #251 (mais os testes #230, #239, #241-#244).
