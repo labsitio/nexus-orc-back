@@ -18,4 +18,12 @@ export interface DomainEventEnvelope {
   readonly schemaVersion: 1 | 2;
   readonly orcamentoId: string;
   readonly ocorreuEm: string;
+  /**
+   * Tenant dono do orçamento (spec-007, T041 — expand/contract).
+   * Opcional e `schemaVersion` de cada evento mantido de propósito: os sites de
+   * emissão deste BC ainda não preenchem este campo. Uma PR de contract
+   * futura torna `tenantId` obrigatório (uniforme entre v1/v2, via ADR-008 —
+   * cutover único, sem suporte dual publicado).
+   */
+  readonly tenantId?: string;
 }

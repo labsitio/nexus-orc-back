@@ -30,6 +30,7 @@ export class OrcamentoValidadoComRessalva implements OrcamentoValidadoComRessalv
     readonly inconsistencias: readonly InconsistenciaDetectadaPayload[],
     readonly itens: readonly ItemParaValidacaoPayload[],
     readonly condicoesComerciais: string,
+    readonly tenantId?: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();
