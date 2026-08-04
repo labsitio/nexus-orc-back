@@ -11,6 +11,17 @@ import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identifi
 import { registrarRotaConfirmarUpload } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/http/confirmar-upload.controller.js';
 import type { SftpTenantResolverGateway } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/sftp-tenant-resolver.gateway.js';
 import { criarHandlerSftpUpload } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/events/sftp-upload.handler.js';
+import { criarTenantContextMiddleware } from '../../../../src/interface/shared/tenant-context.middleware.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
+
+const { mockVerify, mockCreate } = vi.hoisted(() => {
+  const mockVerify = vi.fn();
+  return { mockVerify, mockCreate: vi.fn(() => ({ verify: mockVerify })) };
+});
+
+vi.mock('aws-jwt-verify', () => ({
+  CognitoJwtVerifier: { create: mockCreate },
+}));
 
 /**
  * Integration test (T018/#23): os 4 canais fixos — 3 via `confirmar-upload`
@@ -60,12 +71,15 @@ async function receberViaConfirmarUpload(
   };
   const receberOrcamento = new ReceberOrcamento(repositorioFake(), publisher, idempotenciaFake());
   const app = Fastify();
-  registrarRotaConfirmarUpload(app, armazenamento, receberOrcamento);
+  const preHandler = criarTenantContextMiddleware({ userPoolId: 'us-east-1_teste', clientId: 'client-teste' });
+  registrarRotaConfirmarUpload(app, armazenamento, receberOrcamento, { preHandler });
 
+  mockVerify.mockResolvedValue({ sub: 'usuario-teste', 'custom:tenant_id': TenantId.novo().toString() });
   const resposta = await app.inject({
     method: 'POST',
     url: `/v1/orcamentos/${orcamentoId.toString()}/confirmar-upload`,
     payload: { canal, nomeArquivo: 'orcamento.pdf' },
+    headers: { authorization: 'Bearer token-teste' },
   });
   expect(resposta.statusCode).toBe(200);
   await app.close();
@@ -73,7 +87,7 @@ async function receberViaConfirmarUpload(
 
 async function receberViaTriggerSftp(publisher: EventPublisher): Promise<void> {
   const receberOrcamento = new ReceberOrcamento(repositorioFake(), publisher, idempotenciaFake());
-  const resolverTenant: SftpTenantResolverGateway = { resolver: vi.fn().mockResolvedValue(undefined) };
+  const resolverTenant: SftpTenantResolverGateway = { resolver: vi.fn().mockResolvedValue(TenantId.novo()) };
   const handler = criarHandlerSftpUpload(receberOrcamento, resolverTenant);
 
   await handler(

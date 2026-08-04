@@ -25,6 +25,9 @@ function idempotencyKeyDoHeader(valor: string | string[] | undefined): string | 
  * enviado via a URL presigned de `upload-url` (T021/#26, mesma chave
  * determinística) e só então cria/persiste o agregado e publica o evento.
  * 409 Problem Details se o upload nunca foi concluído (objeto não existe).
+ * `tenantId` (T016, spec 007) vem exclusivamente de `request.tenantContext`
+ * (populado pelo `TenantContextMiddleware` a partir do claim JWT já
+ * validado) — nunca do body; 401 Problem Details se ausente.
  */
 export function registrarRotaConfirmarUpload(
   app: FastifyInstance,
@@ -60,6 +63,17 @@ export function registrarRotaConfirmarUpload(
         return;
       }
 
+      const tenantContext = request.tenantContext;
+      if (!tenantContext) {
+        const problema: ProblemDetails = {
+          type: 'https://nexo.internal/problems/nao-autenticado',
+          title: 'Contexto de tenant ausente — TenantContextMiddleware não aplicado',
+          status: 401,
+        };
+        await reply.status(401).type('application/problem+json').send(problema);
+        return;
+      }
+
       const idempotencyKey = idempotencyKeyDoHeader(request.headers['idempotency-key']);
 
       const orcamentoId = OrcamentoId.de(params.data.orcamentoId);
@@ -84,6 +98,7 @@ export function registrarRotaConfirmarUpload(
         referenciaExterna: body.data.referenciaExterna,
         orcamentoId,
         idempotencyKey,
+        tenantId: tenantContext.tenantId,
       });
 
       await reply

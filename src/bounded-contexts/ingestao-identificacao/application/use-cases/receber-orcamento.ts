@@ -6,6 +6,7 @@ import type { OrcamentoRepository } from '../../domain/repositories/orcamento.re
 import { Canal } from '../../domain/value-objects/canal.vo.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import type { ReferenciaS3 } from '../../domain/value-objects/referencia-s3.vo.js';
+import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 
 /** TTL da chave de idempotência (plan.md, ADR de idempotência). */
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
@@ -30,6 +31,13 @@ export interface ReceberOrcamentoParams {
    * Omitido nos canais que não passam por upload-url (ex. SFTP, T023/#28).
    */
   readonly orcamentoId?: OrcamentoId;
+  /**
+   * (spec 007, T016) Vem sempre do `TenantContext` já validado (JWT Cognito
+   * nos 3 canais HTTP; mapeamento usuário/servidor SFTP via
+   * `SftpTenantResolverGateway`) — NUNCA do body da requisição, isso seria
+   * escalonamento de privilégio (cliente escolheria o próprio tenant).
+   */
+  readonly tenantId: TenantId;
 }
 
 /**
@@ -69,6 +77,7 @@ export class ReceberOrcamento {
       canal,
       referenciaBruta: params.referenciaBruta,
       referenciaExterna: params.referenciaExterna,
+      tenantId: params.tenantId,
     });
     await this.repositorio.salvar(orcamento);
 

@@ -21,10 +21,11 @@ const PREFIXO_SFTP = 'sftp-incoming/';
  *
  * `resolverTenant` (T006, spec 007): resolve `tenantId` do mapeamento
  * usuário/servidor AWS Transfer Family, nunca do conteúdo do arquivo.
- * Apenas resolvido/logado aqui — `ReceberOrcamento` ainda não exige
- * `tenantId` (T016, Phase 3 desta spec, formaliza a exigência para todos os
- * canais uniformemente); mapeamento ausente é registrado, não bloqueia o
- * processamento nesta fase Foundational.
+ * `ReceberOrcamento` exige `tenantId` (T016, spec 007, formaliza a exigência
+ * para todos os canais uniformemente): mapeamento ausente é registrado via
+ * `console.warn` e o registro é pulado (sem lançar, sem bloquear o resto do
+ * lote) — fica para reprocessamento quando o onboarding do par
+ * usuário/servidor em `sftp_tenant_mapping` existir.
  */
 export function criarHandlerSftpUpload(
   receberOrcamento: ReceberOrcamento,
@@ -49,14 +50,16 @@ export function criarHandlerSftpUpload(
       const tenantId = await resolverTenant.resolver(referenciaBruta);
       if (!tenantId) {
         console.warn(
-          `TenantId não resolvido para s3://${bucket}/${key} — mapeamento usuário/servidor ausente em sftp_tenant_mapping (onboarding pendente?)`,
+          `TenantId não resolvido para s3://${bucket}/${key} — mapeamento usuário/servidor ausente em sftp_tenant_mapping (onboarding pendente?), registro pulado`,
         );
+        continue;
       }
 
       await receberOrcamento.executar({
         canal: 'SFTP',
         referenciaBruta,
         idempotencyKey: `${bucket}/${key}#${versionId}`,
+        tenantId,
       });
     }
   };

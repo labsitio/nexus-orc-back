@@ -10,6 +10,7 @@ import type {
 import type { OrcamentoRepository } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/repositories/orcamento.repository.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 function repositorioFake(): OrcamentoRepository {
   return { salvar: vi.fn().mockResolvedValue(undefined), buscarPorId: vi.fn() };
@@ -40,13 +41,15 @@ describe('ReceberOrcamento', () => {
     const publisher = publisherFake();
     const idempotencia = idempotenciaFake();
     const useCase = new ReceberOrcamento(repositorio, publisher, idempotencia);
+    const tenantId = TenantId.novo();
 
-    const orcamentoId = await useCase.executar({ canal: 'SFTP', referenciaBruta: referencia });
+    const orcamentoId = await useCase.executar({ canal: 'SFTP', referenciaBruta: referencia, tenantId });
 
     expect(repositorio.salvar).toHaveBeenCalledTimes(1);
     const salvo = vi.mocked(repositorio.salvar).mock.calls[0]?.[0] as Orcamento;
     expect(salvo.id.toString()).toBe(orcamentoId.toString());
     expect(salvo.status).toBe('RECEBIDO');
+    expect(salvo.tenantId?.equals(tenantId)).toBe(true);
 
     expect(publisher.publicar).toHaveBeenCalledTimes(1);
     const evento = vi.mocked(publisher.publicar).mock.calls[0]?.[0] as OrcamentoRecebido;
@@ -71,6 +74,7 @@ describe('ReceberOrcamento', () => {
       canal: 'PORTAL_WEB',
       referenciaBruta: ReferenciaS3.de({ bucket: 'b', key: 'k', versionId: 'v' }),
       orcamentoId: provisorio,
+      tenantId: TenantId.novo(),
     });
 
     expect(orcamentoId.toString()).toBe(provisorio.toString());
@@ -87,6 +91,7 @@ describe('ReceberOrcamento', () => {
       canal: 'API_REST',
       referenciaBruta: ReferenciaS3.de({ bucket: 'b', key: 'k', versionId: 'v' }),
       idempotencyKey: 'chave-repetida',
+      tenantId: TenantId.novo(),
     });
 
     expect(orcamentoId.toString()).toBe(existente.toString());
@@ -105,6 +110,7 @@ describe('ReceberOrcamento', () => {
       canal: 'PORTAL_WEB',
       referenciaBruta: referencia,
       idempotencyKey: 'chave-nova',
+      tenantId: TenantId.novo(),
     });
 
     expect(idempotencia.reservar).toHaveBeenCalledTimes(1);
@@ -127,6 +133,7 @@ describe('ReceberOrcamento', () => {
         canal: 'FAX',
         referenciaBruta: ReferenciaS3.de({ bucket: 'b', key: 'k', versionId: 'v' }),
         idempotencyKey: 'chave-x',
+        tenantId: TenantId.novo(),
       }),
     ).rejects.toThrow(/Canal inválido/);
     expect(idempotencia.reservar).not.toHaveBeenCalled();
