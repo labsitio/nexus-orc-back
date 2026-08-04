@@ -6,6 +6,7 @@ import { NivelConfianca } from '../../domain/value-objects/nivel-confianca.vo.js
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { ResultadoClassificacao } from '../../domain/value-objects/resultado-classificacao.vo.js';
 import type { OrcamentoRepository } from '../../domain/repositories/orcamento.repository.js';
+import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 
 /** Confiança fixa de confirmação humana explícita — não é uma estimativa, é decisão humana direta. */
 const CONFIANCA_CONFIRMACAO_HUMANA = 100;
@@ -16,10 +17,28 @@ export class OrcamentoNaoEncontradoParaRevisaoHumanaError extends ErroDominio {
   }
 }
 
+/**
+ * (spec 007, T017) Disparado quando `tenantId` do agregado é ausente/undefined
+ * (registro legado pré-retrofit) ou não corresponde ao `tenantId` da requisição
+ * (tentativa de acesso cross-tenant). Retornado como 404 nunca 403, para não
+ * revelar ao cliente a existência de um orçamento pertencente a outro tenant.
+ */
+export class TenantDivergenciaError extends ErroDominio {
+  constructor(orcamentoId: string) {
+    super(`Acesso negado ao orçamento: ${orcamentoId}`);
+  }
+}
+
 export interface ConfirmarRevisaoHumanaParams {
   readonly orcamentoId: string;
   readonly fornecedorIdentificado: string;
   readonly formatoIdentificado: string;
+  /**
+   * (spec 007, T017) Vem sempre do `TenantContext` já validado (JWT Cognito
+   * no controller HTTP) — NUNCA do body da requisição, isso seria escalação
+   * de privilégio (cliente escolheria acessar outro tenant).
+   */
+  readonly tenantId: TenantId;
 }
 
 /**
@@ -43,6 +62,13 @@ export class ConfirmarRevisaoHumana {
     const orcamento = await this.repositorio.buscarPorId(id);
     if (!orcamento) {
       throw new OrcamentoNaoEncontradoParaRevisaoHumanaError(params.orcamentoId);
+    }
+
+    // (spec 007, T017) Validação explícita de tenant: rejeita se agregado não tem
+    // tenantId (legado pré-retrofit) ou diverge do solicitante (cross-tenant). 404,
+    // não 403 — não revela existência a outro tenant.
+    if (!orcamento.tenantId || orcamento.tenantId.toString() !== params.tenantId.toString()) {
+      throw new TenantDivergenciaError(params.orcamentoId);
     }
 
     const resultado = ResultadoClassificacao.criar({

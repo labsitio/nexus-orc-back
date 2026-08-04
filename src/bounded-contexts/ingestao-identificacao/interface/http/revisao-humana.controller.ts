@@ -4,6 +4,7 @@ import { OrcamentoIdInvalidoError } from '../../domain/value-objects/orcamento-i
 import {
   ConfirmarRevisaoHumana,
   OrcamentoNaoEncontradoParaRevisaoHumanaError,
+  TenantDivergenciaError,
 } from '../../application/use-cases/confirmar-revisao-humana.js';
 import type { ProblemDetails } from './status.schema.js';
 import { orcamentoIdParamSchema } from './status.schema.js';
@@ -50,16 +51,33 @@ export function registrarRotaRevisaoHumana(
     }
 
     try {
+      // (spec 007, T017) `request.tenantContext` é populado por `TenantContextMiddleware`
+      // a partir do JWT Cognito. Nunca vem de query/path/body — isso seria escalação
+      // de privilégio. Middleware retorna 401 se ausente/inválido antes de chegar aqui.
+      const tenantId = request.tenantContext?.tenantId;
+      if (!tenantId) {
+        // Não deveria acontecer: TenantContextMiddleware já rejeitou. Fallback defensivo.
+        const problema: ProblemDetails = {
+          type: 'https://nexo.internal/problems/nao-autenticado',
+          title: 'Contexto de tenant ausente',
+          status: 401,
+        };
+        await reply.status(401).type('application/problem+json').send(problema);
+        return;
+      }
+
       const orcamento = await confirmarRevisaoHumana.executar({
         orcamentoId: params.data.orcamentoId,
         fornecedorIdentificado: body.data.fornecedorIdentificado,
         formatoIdentificado: body.data.formatoIdentificado,
+        tenantId,
       });
       await reply.status(200).send(paraResposta(orcamento));
     } catch (erro) {
       if (
         erro instanceof OrcamentoNaoEncontradoParaRevisaoHumanaError ||
-        erro instanceof OrcamentoIdInvalidoError
+        erro instanceof OrcamentoIdInvalidoError ||
+        erro instanceof TenantDivergenciaError
       ) {
         const problema: ProblemDetails = {
           type: 'https://nexo.internal/problems/nao-encontrado',

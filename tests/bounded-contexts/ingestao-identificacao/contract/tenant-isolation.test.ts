@@ -80,21 +80,25 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — isolamento multitenant (T0
     mockCreate.mockClear();
   });
 
-  it.fails(
-    'JWT de Tenant A + orcamentoId de Tenant B retorna 404 (RED — aguarda T014-T018: agregado ainda não carrega tenantId)',
+  it(
+    'JWT de Tenant A + orcamentoId de Tenant B retorna 404 (spec 007, T017)',
     async () => {
-      const tenantA = TenantId.novo().toString();
+      const tenantA = TenantId.novo();
+      const tenantB = TenantId.novo();
       const repositorio = new OrcamentoRepositoryFake();
       const idDoOrcamentoDeTenantB = OrcamentoId.novo();
+      // (spec 007, T017) Agregado tem tenantId de Tenant B
       await repositorio.salvar(
         Orcamento.receber({
           id: idDoOrcamentoDeTenantB,
           canal: Canal.de('PORTAL_WEB'),
           referenciaBruta: criarReferenciaBruta(),
+          tenantId: tenantB,
         }),
       );
 
-      mockVerify.mockResolvedValue({ sub: 'usuario-tenant-a', 'custom:tenant_id': tenantA });
+      // JWT autentica Tenant A
+      mockVerify.mockResolvedValue({ sub: 'usuario-tenant-a', 'custom:tenant_id': tenantA.toString() });
       const app = appComIsolamentoMultitenant(repositorio);
 
       const resposta = await app.inject({
@@ -103,6 +107,8 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — isolamento multitenant (T0
         headers: { authorization: 'Bearer token-tenant-a' },
       });
 
+      // (spec 007, T017) Tenant A tentando acessar orcamento de Tenant B → 404,
+      // nunca 403 (não revela existência cross-tenant)
       expect(resposta.statusCode).toBe(404);
       expect(resposta.statusCode).not.toBe(403);
       expect(resposta.headers['content-type']).toContain('application/problem+json');
@@ -137,7 +143,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — isolamento multitenant (T0
   });
 
   it('JWT válido de Tenant A consultando o próprio orcamentoId ainda funciona (200) — middleware não quebra o fluxo de mesmo tenant', async () => {
-    const tenantA = TenantId.novo().toString();
+    const tenantA = TenantId.novo();
     const repositorio = new OrcamentoRepositoryFake();
     const idDoTenantA = OrcamentoId.novo();
     await repositorio.salvar(
@@ -145,10 +151,11 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — isolamento multitenant (T0
         id: idDoTenantA,
         canal: Canal.de('PORTAL_WEB'),
         referenciaBruta: criarReferenciaBruta(),
+        tenantId: tenantA,
       }),
     );
 
-    mockVerify.mockResolvedValue({ sub: 'usuario-tenant-a', 'custom:tenant_id': tenantA });
+    mockVerify.mockResolvedValue({ sub: 'usuario-tenant-a', 'custom:tenant_id': tenantA.toString() });
     const app = appComIsolamentoMultitenant(repositorio);
 
     const resposta = await app.inject({

@@ -12,10 +12,23 @@ import { NivelConfianca } from '../../domain/value-objects/nivel-confianca.vo.js
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { ResultadoClassificacao } from '../../domain/value-objects/resultado-classificacao.vo.js';
 import type { OrcamentoRepository } from '../../domain/repositories/orcamento.repository.js';
+import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 
 export class OrcamentoNaoEncontradoParaClassificacaoError extends ErroDominio {
   constructor(orcamentoId: string) {
     super(`Orçamento não encontrado para classificação: ${orcamentoId}`);
+  }
+}
+
+/**
+ * (spec 007, T017) Disparado quando `tenantId` do agregado é ausente/undefined
+ * (registro legado pré-retrofit) ou não corresponde ao `tenantId` da requisição
+ * (tentativa de acesso cross-tenant). Retornado como 404 nunca 403, para não
+ * revelar ao cliente a existência de um orçamento pertencente a outro tenant.
+ */
+export class TenantDivergenciaError extends ErroDominio {
+  constructor(orcamentoId: string) {
+    super(`Acesso negado ao orçamento: ${orcamentoId}`);
   }
 }
 
@@ -38,11 +51,28 @@ export class ClassificarOrcamento {
     private readonly cacheIdentificacao?: CacheIdentificacaoGateway,
   ) {}
 
-  async executar(orcamentoIdBruto: string): Promise<void> {
+  /**
+   * (spec 007, T017) Parâmetro `tenantId` é opcional durante transição (T015 não
+   * implementado ainda; handlers podem passar undefined). Depois do cutover completo
+   * de T015, tornará obrigatório. Validação: rejeita se agregado não tem tenantId
+   * (legado pré-retrofit) ou diverge do solicitante (cross-tenant). 404, não 403.
+   */
+  async executar(orcamentoIdBruto: string, tenantId?: TenantId): Promise<void> {
     const id = OrcamentoId.de(orcamentoIdBruto);
     const orcamento = await this.repositorio.buscarPorId(id);
     if (!orcamento) {
       throw new OrcamentoNaoEncontradoParaClassificacaoError(orcamentoIdBruto);
+    }
+
+    // (spec 007, T017) Validação explícita de tenant: rejeita se agregado não tem
+    // tenantId (legado pré-retrofit) ou diverge do solicitante (cross-tenant). 404,
+    // não 403 — não revela existência a outro tenant. Durante transição (tenantId
+    // do parâmetro pode ser undefined se evento v1), o comportamento é:
+    // - se agregado tem tenantId e parâmetro não: divergência, 404
+    // - se agregado não tem tenantId (legado): divergência, 404
+    // - se ambos têm e coincidem: sucesso
+    if (!orcamento.tenantId || !tenantId || orcamento.tenantId.toString() !== tenantId.toString()) {
+      throw new TenantDivergenciaError(orcamentoIdBruto);
     }
 
     const conteudoBruto = await this.armazenamentoBruto.lerConteudoBruto(orcamento.referenciaBruta);
