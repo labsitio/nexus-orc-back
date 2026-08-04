@@ -100,9 +100,7 @@ export function criarClassificadorQueueHandler(
         try {
           tenantId = tenantIdStr ? TenantId.de(tenantIdStr) : undefined;
         } catch {
-          throw new Error(
-            `Mensagem ${record.messageId} contém tenantId inválido: ${tenantIdStr}`,
-          );
+          throw new Error(`Mensagem ${record.messageId} contém tenantId inválido: ${tenantIdStr}`);
         }
 
         const logDoOrcamento = logDaMensagem.child({
@@ -120,14 +118,37 @@ export function criarClassificadorQueueHandler(
           );
           continue;
         }
-        // (spec 007, T017) TenantDivergenciaError é permanente (tenantId undefined ou
-        // cross-tenant) — retry nunca vai resolver. Tratar como o TransicaoInvalidaError:
-        // log info, continue, nunca batch item failure/DLQ/alarme.
+        // (fix #640) TenantDivergenciaError é permanente (tenantId ausente ou
+        // cross-tenant) — retry nunca vai resolver, então continua sem
+        // batchItemFailures/DLQ/alarme de reprocessamento em ambos os casos
+        // (decisão da #280/T017, mantida). O que muda aqui é apenas nível e
+        // mensagem de log — os dois casos NÃO são a mesma coisa:
         if (erro instanceof TenantDivergenciaError) {
-          logDaMensagem.info(
-            { orcamentoId },
-            'Orçamento rejeitado por divergência/ausência de tenantId — ignorado como sucesso idempotente',
-          );
+          if (erro.motivo === 'AUSENTE') {
+            // Registro pré-retrofit (ADR-008, fase de expand) — estado normal
+            // até o cutover de #632, depois do qual este ramo deixa de ocorrer.
+            logDaMensagem.warn(
+              {
+                orcamentoId,
+                motivo: erro.motivo,
+                tenantIdSolicitante: erro.tenantIdSolicitante,
+              },
+              'Orçamento sem tenantId no agregado (registro pré-retrofit) — ignorado como sucesso idempotente',
+            );
+          } else {
+            // Cross-tenant: tenantId da requisição ausente ou diferente do agregado.
+            // Nunca esperado em operação normal — sinal de isolamento (ver #299).
+            // Métrica/alarme dedicados ficam para #641 (convenção ainda inexistente).
+            logDaMensagem.error(
+              {
+                orcamentoId,
+                motivo: erro.motivo,
+                tenantIdAgregado: erro.tenantIdAgregado,
+                tenantIdSolicitante: erro.tenantIdSolicitante,
+              },
+              'Divergência de tenantId ao classificar orçamento — possível acesso cross-tenant',
+            );
+          }
           continue;
         }
         logDaMensagem.error({ orcamentoId, err: erro }, 'Falha ao classificar orçamento');

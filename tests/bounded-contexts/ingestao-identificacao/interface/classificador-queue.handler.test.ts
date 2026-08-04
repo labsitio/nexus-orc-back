@@ -2,9 +2,14 @@ import { pino } from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { criarClassificadorQueueHandler } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/events/classificador-queue.handler.js';
 import { TransicaoInvalidaError } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
-import type { ClassificarOrcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/classificar-orcamento.js';
+import {
+  TenantDivergenciaError,
+  type ClassificarOrcamento,
+} from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/classificar-orcamento.js';
 
-function useCaseFake(executar: (orcamentoId: string, tenantId?: unknown) => Promise<void>): ClassificarOrcamento {
+function useCaseFake(
+  executar: (orcamentoId: string, tenantId?: unknown) => Promise<void>,
+): ClassificarOrcamento {
   return { executar } as unknown as ClassificarOrcamento;
 }
 
@@ -110,5 +115,58 @@ describe('criarClassificadorQueueHandler', () => {
 
     expect(resposta.batchItemFailures).toHaveLength(0);
     expect(linhas.some((linha) => linha.level === 50)).toBe(false);
+  });
+
+  it('trata TenantDivergenciaError (AUSENTE) como sucesso idempotente, logando warn (não info) com o motivo (fix #640)', async () => {
+    const tenantIdSolicitante = '018f0c1a-1111-7000-8000-000000000001';
+    const executar = vi
+      .fn()
+      .mockRejectedValue(
+        new TenantDivergenciaError('id-legado', 'AUSENTE', undefined, tenantIdSolicitante),
+      );
+    const { logger, linhas } = loggerDeTeste();
+    const handler = criarClassificadorQueueHandler(useCaseFake(executar), logger);
+
+    const resposta = await handler({
+      Records: [{ messageId: 'm1', body: envelopeEventBridge('id-legado', tenantIdSolicitante) }],
+    });
+
+    expect(resposta.batchItemFailures).toHaveLength(0);
+    const linhaDivergencia = linhas.find((linha) => linha.motivo === 'AUSENTE');
+    expect(linhaDivergencia?.level).toBe(40); // pino: nível "warn"
+    expect(linhaDivergencia?.orcamentoId).toBe('id-legado');
+    expect(linhaDivergencia?.tenantIdSolicitante).toBe(tenantIdSolicitante);
+    expect(linhaDivergencia?.level).not.toBe(30); // nunca info
+  });
+
+  it('trata TenantDivergenciaError (DIVERGENTE, cross-tenant) como sucesso idempotente, logando error com os dois tenantId (fix #640)', async () => {
+    const tenantIdAgregado = '018f0c1a-1111-7000-8000-000000000001';
+    const tenantIdSolicitante = '018f0c1a-2222-7000-8000-000000000002';
+    const executar = vi
+      .fn()
+      .mockRejectedValue(
+        new TenantDivergenciaError(
+          'id-cross-tenant',
+          'DIVERGENTE',
+          tenantIdAgregado,
+          tenantIdSolicitante,
+        ),
+      );
+    const { logger, linhas } = loggerDeTeste();
+    const handler = criarClassificadorQueueHandler(useCaseFake(executar), logger);
+
+    const resposta = await handler({
+      Records: [
+        { messageId: 'm1', body: envelopeEventBridge('id-cross-tenant', tenantIdSolicitante) },
+      ],
+    });
+
+    expect(resposta.batchItemFailures).toHaveLength(0);
+    const linhaDivergencia = linhas.find((linha) => linha.motivo === 'DIVERGENTE');
+    expect(linhaDivergencia?.level).toBe(50); // pino: nível "error"
+    expect(linhaDivergencia?.orcamentoId).toBe('id-cross-tenant');
+    expect(linhaDivergencia?.tenantIdAgregado).toBe(tenantIdAgregado);
+    expect(linhaDivergencia?.tenantIdSolicitante).toBe(tenantIdSolicitante);
+    expect(linhaDivergencia?.level).not.toBe(30); // nunca info
   });
 });
