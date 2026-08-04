@@ -25,6 +25,7 @@ import type { EventPublisher } from '../../../../src/bounded-contexts/extracao/d
 import type { DomainEventEnvelope } from '../../../../src/bounded-contexts/extracao/domain/events/domain-event.js';
 import { OrcamentoExtraido } from '../../../../src/bounded-contexts/extracao/domain/events/orcamento-extraido.event.js';
 import { OrcamentoExtraidoComPendenciaConfirmada } from '../../../../src/bounded-contexts/extracao/domain/events/orcamento-extraido-pendencia-confirmada.event.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const ORCAMENTO_ID = '01890a5d-ac96-774b-bcce-b302099a8057';
 const confiancaAlta = NivelConfianca.de(95);
@@ -63,7 +64,7 @@ function condicoesCompletas(): CondicoesComerciais {
 }
 
 /** Extração já escalada para PENDENTE_REVISAO_HUMANA — precoUnitario do item 0 pendente. */
-function extracaoPendente(): ExtracaoOrcamento {
+function extracaoPendente(tenantId?: TenantId): ExtracaoOrcamento {
   const extracao = ExtracaoOrcamento.criar(
     OrcamentoId.de(ORCAMENTO_ID),
     ReferenciaClassificacao.de({
@@ -72,6 +73,7 @@ function extracaoPendente(): ExtracaoOrcamento {
       agenteOrigem: 'CLASSIFICADOR',
     }),
     ReferenciaS3.de({ bucket: 'nexo-orcamentos-raw', key: 'portal/arquivo.pdf', versionId: 'v1' }),
+    tenantId,
   );
   const itemIncompleto = ItemOrcamento.de({
     descricao: CampoExtraido.extraido(
@@ -160,6 +162,43 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
     expect(repositorio.salvos).toHaveLength(1);
     expect(publisher.publicados).toHaveLength(1);
     expect(publisher.publicados[0]).toBeInstanceOf(OrcamentoExtraido);
+  });
+
+  it('(issue #648) propaga o tenantId já presente no agregado para OrcamentoExtraido publicado', async () => {
+    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+    const extracao = extracaoPendente(tenantId);
+    const repositorio = new RepositorioFake(extracao);
+    const publisher = new EventPublisherFake();
+    const caso = new ConfirmarRevisaoHumanaExtracao(repositorio, publisher);
+
+    await caso.executar({
+      orcamentoId: ORCAMENTO_ID,
+      camposConfirmados: [
+        {
+          caminho: 'itens[0].precoUnitario',
+          valor: { valorCentavos: 750, moeda: 'BRL' },
+          indisponivel: false,
+        },
+      ],
+    });
+
+    const evento = publisher.publicados[0] as OrcamentoExtraido;
+    expect(evento.tenantId).toBe(tenantId.toString());
+  });
+
+  it('(issue #648) propaga o tenantId já presente no agregado para OrcamentoExtraidoComPendenciaConfirmada publicado', async () => {
+    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+    const extracao = extracaoPendente(tenantId);
+    const publisher = new EventPublisherFake();
+    const caso = new ConfirmarRevisaoHumanaExtracao(new RepositorioFake(extracao), publisher);
+
+    await caso.executar({
+      orcamentoId: ORCAMENTO_ID,
+      camposConfirmados: [{ caminho: 'itens[0].precoUnitario', valor: null, indisponivel: true }],
+    });
+
+    const evento = publisher.publicados[0] as OrcamentoExtraidoComPendenciaConfirmada;
+    expect(evento.tenantId).toBe(tenantId.toString());
   });
 
   it('indisponibilidade confirmada → EXTRAIDO_COM_PENDENCIA_CONFIRMADA, publica OrcamentoExtraidoComPendenciaConfirmada', async () => {

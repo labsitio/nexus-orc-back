@@ -12,7 +12,7 @@ function useCaseFake(
   return { executar } as unknown as ExtrairDadosOrcamento;
 }
 
-function envelopeEventBridge(orcamentoId: string): string {
+function envelopeEventBridge(orcamentoId: string, tenantId?: string): string {
   return JSON.stringify({
     detail: {
       orcamentoId,
@@ -26,6 +26,7 @@ function envelopeEventBridge(orcamentoId: string): string {
         key: `portal-web/${orcamentoId}.pdf`,
         versionId: 'v1',
       },
+      tenantId,
     },
   });
 }
@@ -147,6 +148,45 @@ describe('criarExtratorQueueHandler', () => {
     expect(linhas).toHaveLength(1);
     expect(linhas[0]?.level).toBe(50); // pino: nível "error"
     expect(linhas[0]?.messageId).toBe('m1');
+  });
+
+  it('(issue #648) extrai tenantId do envelope e o propaga como TenantId ao caso de uso', async () => {
+    const executar = vi.fn().mockResolvedValue(undefined);
+    const handler = criarExtratorQueueHandler(useCaseFake(executar));
+    const tenantId = '01890a5d-ac96-774b-bcce-b302099a8057';
+
+    const resposta = await handler({
+      Records: [{ messageId: 'm1', body: envelopeEventBridge('id-1', tenantId) }],
+    });
+
+    expect(resposta.batchItemFailures).toHaveLength(0);
+    const params = executar.mock.calls[0]?.[0] as ExtrairDadosOrcamentoParams;
+    expect(params.tenantId?.toString()).toBe(tenantId);
+  });
+
+  it('(issue #648) tenantId ausente no envelope é propagado como undefined — nunca rejeitado (ADR-008, fase de expand)', async () => {
+    const executar = vi.fn().mockResolvedValue(undefined);
+    const handler = criarExtratorQueueHandler(useCaseFake(executar));
+
+    const resposta = await handler({
+      Records: [{ messageId: 'm1', body: envelopeEventBridge('id-1') }],
+    });
+
+    expect(resposta.batchItemFailures).toHaveLength(0);
+    const params = executar.mock.calls[0]?.[0] as ExtrairDadosOrcamentoParams;
+    expect(params.tenantId).toBeUndefined();
+  });
+
+  it('(issue #648) reporta falha (batch item failure) quando tenantId presente é malformado (não UUID v7)', async () => {
+    const executar = vi.fn();
+    const handler = criarExtratorQueueHandler(useCaseFake(executar));
+
+    const resposta = await handler({
+      Records: [{ messageId: 'm1', body: envelopeEventBridge('id-1', 'nao-e-um-uuid') }],
+    });
+
+    expect(executar).not.toHaveBeenCalled();
+    expect(resposta.batchItemFailures).toEqual([{ itemIdentifier: 'm1' }]);
   });
 
   it('entrega duplicada (at-least-once) é idempotente por design do caso de uso — handler não precisa de tratamento especial', async () => {

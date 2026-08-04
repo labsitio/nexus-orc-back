@@ -16,8 +16,14 @@ import {
   type CondicoesComerciaisPayload,
 } from '../../domain/value-objects/condicoes-comerciais.vo.js';
 import { Dinheiro, type DinheiroPayload } from '../../domain/value-objects/dinheiro.vo.js';
-import { DescricaoProduto, type DescricaoProdutoPayload } from '../../domain/value-objects/descricao-produto.vo.js';
-import { ItemOrcamento, type ItemOrcamentoPayload } from '../../domain/value-objects/item-orcamento.vo.js';
+import {
+  DescricaoProduto,
+  type DescricaoProdutoPayload,
+} from '../../domain/value-objects/descricao-produto.vo.js';
+import {
+  ItemOrcamento,
+  type ItemOrcamentoPayload,
+} from '../../domain/value-objects/item-orcamento.vo.js';
 import { NivelConfianca } from '../../domain/value-objects/nivel-confianca.vo.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { PeriodoValidade } from '../../domain/value-objects/periodo-validade.vo.js';
@@ -28,7 +34,11 @@ import {
 } from '../../domain/value-objects/referencia-classificacao.vo.js';
 import { ReferenciaS3 } from '../../domain/value-objects/referencia-s3.vo.js';
 import { TentativaExtracao } from '../../domain/value-objects/tentativa-extracao.vo.js';
-import { extracoesOrcamento, extracoesOrcamentoHistorico } from './schema/extracao-orcamento.schema.js';
+import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
+import {
+  extracoesOrcamento,
+  extracoesOrcamentoHistorico,
+} from './schema/extracao-orcamento.schema.js';
 
 /** Linha de `extracoes_orcamento`/histórico — nunca cruza para fora deste arquivo (T013). */
 type LinhaExtracaoOrcamento = typeof extracoesOrcamento.$inferSelect;
@@ -59,14 +69,18 @@ function itemDoPayload(payload: ItemOrcamentoPayload): ItemOrcamento {
   });
 }
 
-function condicoesComerciaisDaLinha(linha: LinhaExtracaoOrcamento): CondicoesComerciais | undefined {
+function condicoesComerciaisDaLinha(
+  linha: LinhaExtracaoOrcamento,
+): CondicoesComerciais | undefined {
   if (linha.condicoesComerciais === null) {
     return undefined;
   }
   const payload = linha.condicoesComerciais as CondicoesComerciaisPayload;
   return CondicoesComerciais.de({
     condicoesPagamento: campoDaPayload(payload.condicoesPagamento, (v) => v as string),
-    prazoValidade: campoDaPayload(payload.prazoValidade, (v) => PeriodoValidade.de(new Date(v as string))),
+    prazoValidade: campoDaPayload(payload.prazoValidade, (v) =>
+      PeriodoValidade.de(new Date(v as string)),
+    ),
     condicoesEntrega: campoDaPayload(payload.condicoesEntrega, (v) => v as string),
   });
 }
@@ -100,6 +114,7 @@ function agregadoDaLinha(
     itens: itensPayload.map(itemDoPayload),
     condicoesComerciais: condicoesComerciaisDaLinha(linha),
     historico,
+    tenantId: linha.tenantId !== null ? TenantId.de(linha.tenantId) : undefined,
   };
   return ExtracaoOrcamento.reconstituir(props);
 }
@@ -141,8 +156,13 @@ export class DrizzleExtracaoOrcamentoRepository implements ExtracaoOrcamentoRepo
         .insert(extracoesOrcamento)
         .values({
           id: extracao.orcamentoId.toString(),
+          // (issue #648) `tenantId` é imutável após a criação — nunca entra
+          // no `set` do onConflictDoUpdate abaixo (mesmo padrão de
+          // `DrizzleOrcamentoRepository`, spec 001, T011).
+          tenantId: extracao.tenantId?.toString() ?? null,
           status: extracao.status,
-          referenciaClassificacaoFornecedorIdentificado: referenciaClassificacao.fornecedorIdentificado,
+          referenciaClassificacaoFornecedorIdentificado:
+            referenciaClassificacao.fornecedorIdentificado,
           referenciaClassificacaoFormatoIdentificado: referenciaClassificacao.formatoIdentificado,
           referenciaClassificacaoAgenteOrigem: referenciaClassificacao.agenteOrigem,
           referenciaBrutaS3Bucket: referenciaBrutaS3.bucket,
@@ -163,7 +183,9 @@ export class DrizzleExtracaoOrcamentoRepository implements ExtracaoOrcamentoRepo
       const [contagem] = await tx
         .select({ jaPersistidas: count() })
         .from(extracoesOrcamentoHistorico)
-        .where(eq(extracoesOrcamentoHistorico.extracaoOrcamentoId, extracao.orcamentoId.toString()));
+        .where(
+          eq(extracoesOrcamentoHistorico.extracaoOrcamentoId, extracao.orcamentoId.toString()),
+        );
 
       const novasTentativas = extracao.historico.slice(contagem?.jaPersistidas ?? 0);
       if (novasTentativas.length === 0) {

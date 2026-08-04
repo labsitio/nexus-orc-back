@@ -24,6 +24,7 @@ import type { DomainEventEnvelope } from '../../../../src/bounded-contexts/extra
 import type { ExtracaoOrcamentoRepository } from '../../../../src/bounded-contexts/extracao/domain/repositories/extracao-orcamento.repository.js';
 import { OrcamentoExtraido } from '../../../../src/bounded-contexts/extracao/domain/events/orcamento-extraido.event.js';
 import { ExtracaoEscalonadaParaRevisaoHumana } from '../../../../src/bounded-contexts/extracao/domain/events/extracao-escalonada-revisao-humana.event.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const AGENTE_EXTRATOR_ORIGEM = 'EXTRATOR' as const;
 const ORCAMENTO_ID = '01890a5d-ac96-774b-bcce-b302099a8057';
@@ -237,5 +238,77 @@ describe('ExtrairDadosOrcamento', () => {
     expect(agenteExtrator.chamadas).toBe(0);
     expect(repositorio.salvos).toHaveLength(0);
     expect(publisher.eventosPublicados).toHaveLength(0);
+  });
+
+  it('(issue #648) propaga tenantId do params para o agregado criado e para OrcamentoExtraido publicado', async () => {
+    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+    const repositorio = new RepositorioFake();
+    const publisher = new EventPublisherFake();
+    const useCase = new ExtrairDadosOrcamento(
+      repositorio,
+      new LeituraBrutaGatewayFake(),
+      new MarkItDownConversaoExtracaoACLFake(),
+      new AgenteExtratorGatewayFake({
+        itens: [itemCompleto()],
+        condicoesComerciais: condicoesCompletas(),
+      }),
+      publisher,
+    );
+
+    await useCase.executar({ ...PARAMS_BASE, tenantId });
+
+    expect(repositorio.salvos[0]?.tenantId?.toString()).toBe(tenantId.toString());
+    const evento = publisher.eventosPublicados[0] as OrcamentoExtraido;
+    expect(evento.tenantId).toBe(tenantId.toString());
+  });
+
+  it('(issue #648) retry com tenantId divergente nunca sobrescreve o tenantId já persistido no agregado existente (PENDENTE)', async () => {
+    const tenantOriginal = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+    const tenantDivergente = TenantId.de('01890a5d-ac96-774b-bcce-b302099a9999');
+    const existente = ExtracaoOrcamento.criar(
+      OrcamentoId.de(ORCAMENTO_ID),
+      ReferenciaClassificacao.de(PARAMS_BASE.referenciaClassificacao),
+      ReferenciaS3.de(PARAMS_BASE.referenciaBrutaS3),
+      tenantOriginal,
+    );
+    const repositorio = new RepositorioFake(existente);
+    const publisher = new EventPublisherFake();
+    const useCase = new ExtrairDadosOrcamento(
+      repositorio,
+      new LeituraBrutaGatewayFake(),
+      new MarkItDownConversaoExtracaoACLFake(),
+      new AgenteExtratorGatewayFake({
+        itens: [itemCompleto()],
+        condicoesComerciais: condicoesCompletas(),
+      }),
+      publisher,
+    );
+
+    await useCase.executar({ ...PARAMS_BASE, tenantId: tenantDivergente });
+
+    expect(repositorio.salvos[0]?.tenantId?.toString()).toBe(tenantOriginal.toString());
+    const evento = publisher.eventosPublicados[0] as OrcamentoExtraido;
+    expect(evento.tenantId).toBe(tenantOriginal.toString());
+  });
+
+  it('(issue #648) tenantId ausente é propagado como undefined — nunca rejeitado (ADR-008, fase de expand)', async () => {
+    const repositorio = new RepositorioFake();
+    const publisher = new EventPublisherFake();
+    const useCase = new ExtrairDadosOrcamento(
+      repositorio,
+      new LeituraBrutaGatewayFake(),
+      new MarkItDownConversaoExtracaoACLFake(),
+      new AgenteExtratorGatewayFake({
+        itens: [itemCompleto()],
+        condicoesComerciais: condicoesCompletas(),
+      }),
+      publisher,
+    );
+
+    await useCase.executar(PARAMS_BASE);
+
+    expect(repositorio.salvos[0]?.tenantId).toBeUndefined();
+    const evento = publisher.eventosPublicados[0] as OrcamentoExtraido;
+    expect(evento.tenantId).toBeUndefined();
   });
 });

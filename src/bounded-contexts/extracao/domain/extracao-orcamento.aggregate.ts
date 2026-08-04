@@ -1,3 +1,4 @@
+import type { TenantId } from '../../../shared-kernel/tenant/tenant-id.vo.js';
 import { ErroDominio } from './errors/erro-dominio.js';
 import type { CondicoesComerciais } from './value-objects/condicoes-comerciais.vo.js';
 import type { ItemOrcamento } from './value-objects/item-orcamento.vo.js';
@@ -26,6 +27,17 @@ export class TransicaoInvalidaExtracaoError extends ErroDominio {
   }
 }
 
+/**
+ * (issue #648) `tenantId` é imutável fora do construtor de criação — mesmo
+ * padrão de `TenantIdImutavelError` do BC Ingestão & Identificação
+ * (`orcamento.aggregate.ts`).
+ */
+export class TenantIdImutavelError extends ErroDominio {
+  constructor() {
+    super('tenantId não pode ser sobrescrito após a criação de ExtracaoOrcamento');
+  }
+}
+
 export interface ExtracaoOrcamentoProps {
   readonly orcamentoId: OrcamentoId;
   readonly referenciaClassificacao: ReferenciaClassificacao;
@@ -34,6 +46,12 @@ export interface ExtracaoOrcamentoProps {
   readonly itens: readonly ItemOrcamento[];
   readonly condicoesComerciais?: CondicoesComerciais;
   readonly historico: readonly TentativaExtracao[];
+  /**
+   * (issue #648 — expand/contract, ADR-008) Opcional até a #632 tornar
+   * `tenantId` obrigatório nos 4 BCs de uma vez. Vem do envelope
+   * `OrcamentoClassificado` (spec 001), que ainda publica `tenantId` opcional.
+   */
+  readonly tenantId?: TenantId;
 }
 
 /** Todos os itens e as condições comerciais têm todo campo obrigatório extraído. */
@@ -63,6 +81,7 @@ export class ExtracaoOrcamento {
   private _itens: readonly ItemOrcamento[];
   private _condicoesComerciais: CondicoesComerciais | undefined;
   private readonly _historico: TentativaExtracao[];
+  private readonly _tenantId: TenantId | undefined;
 
   private constructor(props: ExtracaoOrcamentoProps) {
     this._orcamentoId = props.orcamentoId;
@@ -72,6 +91,7 @@ export class ExtracaoOrcamento {
     this._itens = props.itens;
     this._condicoesComerciais = props.condicoesComerciais;
     this._historico = [...props.historico];
+    this._tenantId = props.tenantId;
   }
 
   /** Cria o agregado no momento em que `OrcamentoClassificado` é consumido. */
@@ -79,6 +99,7 @@ export class ExtracaoOrcamento {
     orcamentoId: OrcamentoId,
     referenciaClassificacao: ReferenciaClassificacao,
     referenciaBrutaS3: ReferenciaS3,
+    tenantId?: TenantId,
   ): ExtracaoOrcamento {
     return new ExtracaoOrcamento({
       orcamentoId,
@@ -88,6 +109,7 @@ export class ExtracaoOrcamento {
       itens: [],
       condicoesComerciais: undefined,
       historico: [],
+      tenantId,
     });
   }
 
@@ -124,6 +146,14 @@ export class ExtracaoOrcamento {
     return [...this._historico];
   }
 
+  /**
+   * (issue #648 — expand/contract) `undefined` até a #632 tornar a ausência
+   * impossível nos 4 BCs de uma vez.
+   */
+  get tenantId(): TenantId | undefined {
+    return this._tenantId;
+  }
+
   /** Nenhum código deste contexto pode sobrescrever a referência à classificação (Princípio III). */
   atualizarReferenciaClassificacao(): never {
     throw new ReferenciaImutavelError('referenciaClassificacao');
@@ -132,6 +162,11 @@ export class ExtracaoOrcamento {
   /** Nenhum código deste contexto pode sobrescrever a referência ao dado bruto (Princípio III). */
   atualizarReferenciaBrutaS3(): never {
     throw new ReferenciaImutavelError('referenciaBrutaS3');
+  }
+
+  /** `tenantId` é imutável fora do construtor de criação — nunca há via legítima de atualização. */
+  atualizarTenantId(): never {
+    throw new TenantIdImutavelError();
   }
 
   /**

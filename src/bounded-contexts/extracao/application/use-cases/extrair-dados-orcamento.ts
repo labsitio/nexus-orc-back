@@ -1,3 +1,4 @@
+import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import type { AgenteExtratorGateway } from '../../domain/gateways/agente-extrator.gateway.js';
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import type { LeituraBrutaGateway } from '../../domain/gateways/leitura-bruta.gateway.js';
@@ -21,6 +22,14 @@ export interface ExtrairDadosOrcamentoParams {
   readonly orcamentoId: string;
   readonly referenciaClassificacao: ReferenciaClassificacaoParams;
   readonly referenciaBrutaS3: ReferenciaS3Params;
+  /**
+   * (issue #648 — expand/contract, ADR-008) Vem do envelope `OrcamentoClassificado`
+   * (spec 001), ainda opcional até a #632. Ausente aqui é o estado normal
+   * pré-cutover: propagado como `undefined` para o agregado, nunca rejeitado —
+   * não há estado anterior do agregado para divergir contra (`ExtracaoOrcamento`
+   * é sempre criado, nunca pré-existente por outro caminho de escrita).
+   */
+  readonly tenantId?: TenantId;
 }
 
 /** Motivo registrado em `ExtracaoEscalonadaParaRevisaoHumana` (plan.md/ADR-003). */
@@ -65,12 +74,22 @@ export class ExtrairDadosOrcamento {
       return;
     }
 
+    // ponytail: se `existente` já tiver tenantId e `params.tenantId` divergir
+    // (replay malformado/bug upstream — orcamentoId é UUID v7, colisão real
+    // entre tenants não é um cenário esperado), o novo valor é descartado
+    // silenciosamente aqui: `ExtracaoOrcamento` nunca sobrescreve tenantId
+    // (imutável, `atualizarTenantId` sempre lança). Seguro, mas sem log de
+    // anomalia — este use case não tem dependência de Logger hoje (nenhum
+    // caso de uso de application a tem no código-base). Se o backend-reviewer
+    // apontar necessidade real de observabilidade aqui, promover para
+    // parâmetro de Logger nesta issue de retrofit, não antes.
     const extracao =
       existente ??
       ExtracaoOrcamento.criar(
         orcamentoId,
         ReferenciaClassificacao.de(params.referenciaClassificacao),
         ReferenciaS3.de(params.referenciaBrutaS3),
+        params.tenantId,
       );
 
     const bruto = await this.leituraBruta.ler(extracao.referenciaBrutaS3);
@@ -95,11 +114,13 @@ export class ExtrairDadosOrcamento {
         extracao.orcamentoId.toString(),
         extracao.itens.map((item) => item.paraPayload()),
         condicoesComerciais.paraPayload(),
+        extracao.tenantId?.toString(),
       );
     } else {
       evento = new ExtracaoEscalonadaParaRevisaoHumana(
         extracao.orcamentoId.toString(),
         MOTIVO_CAMPO_SEM_CONFIANCA,
+        extracao.tenantId?.toString(),
       );
     }
     await this.eventPublisher.publicar(evento);

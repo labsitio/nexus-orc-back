@@ -1,6 +1,7 @@
 import type { Logger } from 'pino';
 import type { ExtrairDadosOrcamento } from '../../application/use-cases/extrair-dados-orcamento.js';
 import { criarLogger } from '../../infrastructure/observability/logger.js';
+import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * Shape mínimo do evento SQS relevante aqui (apenas os campos usados) —
@@ -35,6 +36,12 @@ interface EventBridgeEnvelope {
       readonly key: string;
       readonly versionId: string;
     };
+    /**
+     * (issue #648) `tenantId` ainda é opcional no envelope de 001 (T016,
+     * schemaVersion 1) — a #632 o torna obrigatório nos 4 BCs de uma vez.
+     * Ausente aqui é o estado normal pré-cutover (ADR-008, fase de expand).
+     */
+    readonly tenantId?: string;
   };
 }
 
@@ -62,13 +69,16 @@ function ehEventBridgeEnvelope(valor: unknown): valor is EventBridgeEnvelope {
     return false;
   }
   const referenciaBruta = d.referenciaBruta;
-  return (
-    typeof referenciaBruta === 'object' &&
-    referenciaBruta !== null &&
-    typeof (referenciaBruta as Record<string, unknown>).bucket === 'string' &&
-    typeof (referenciaBruta as Record<string, unknown>).key === 'string' &&
-    typeof (referenciaBruta as Record<string, unknown>).versionId === 'string'
-  );
+  if (
+    typeof referenciaBruta !== 'object' ||
+    referenciaBruta === null ||
+    typeof (referenciaBruta as Record<string, unknown>).bucket !== 'string' ||
+    typeof (referenciaBruta as Record<string, unknown>).key !== 'string' ||
+    typeof (referenciaBruta as Record<string, unknown>).versionId !== 'string'
+  ) {
+    return false;
+  }
+  return d.tenantId === undefined || typeof d.tenantId === 'string';
 }
 
 /**
@@ -91,6 +101,27 @@ function ehEventBridgeEnvelope(valor: unknown): valor is EventBridgeEnvelope {
  * processado — correlação ponta a ponta. O trace OpenTelemetry é propagado
  * automaticamente pela instrumentação de Lambda registrada em
  * `iniciarObservabilidade()` (T016/#81), sem código adicional aqui.
+ *
+ * **Issue #648 (tenantId)**: extraído inline aqui, sem ACL dedicada — decisão
+ * deliberada, diferente de 003/005 (`orcamento-*-event.acl.ts`). Esses BCs já
+ * tinham uma ACL de tradução cross-BC preexistente (payload de wire → VOs de
+ * domínio); 002 nunca teve uma, porque o envelope já mapeia 1:1 para
+ * `ExtrairDadosOrcamentoParams` (primitivos, sem tradução de conceito de
+ * domínio). Introduzir uma ACL só para validar um campo opcional seria
+ * abstração por simetria, não por necessidade (YAGNI) — o mesmo raciocínio já
+ * levou `classificador-queue.handler.ts` (spec 001, #280/T017) a extrair
+ * `tenantId` inline em vez de criar uma ACL só para isso.
+ *
+ * `tenantId` ausente no envelope é o estado normal pré-#632 (ADR-008, fase de
+ * expand) — nunca rejeitado, propagado como `undefined`. Diferente do
+ * padrão AUSENTE/DIVERGENTE de `classificador-queue.handler.ts` (#640):
+ * `ExtracaoOrcamento` é sempre *criado* aqui (nunca há um agregado
+ * pré-existente de outro tenant para divergir contra — `orcamentoId` é
+ * UUID v7, colisão entre tenants não é um cenário real), então não há
+ * distinção AUSENTE/DIVERGENTE a fazer nem `TenantDivergenciaError` a
+ * lançar. Só `tenantId` malformado (não UUID v7) é erro — dado de produtor
+ * corrompido, tratado como qualquer outro envelope inválido (bloco `catch`
+ * abaixo, nunca instância especial).
  */
 export function criarExtratorQueueHandler(
   extrairDadosOrcamento: ExtrairDadosOrcamento,
@@ -110,7 +141,22 @@ export function criarExtratorQueueHandler(
           );
         }
         orcamentoId = corpo.detail.orcamentoId;
-        const logDoOrcamento = logDaMensagem.child({ orcamentoId });
+
+        // (issue #648) `tenantId` malformado (não UUID v7) é dado de produtor
+        // corrompido, não ausência esperada — mesmo tratamento de erro
+        // genérico do envelope (batch item failure, retry, eventual DLQ).
+        const tenantIdStr = corpo.detail.tenantId;
+        let tenantId: TenantId | undefined;
+        try {
+          tenantId = tenantIdStr ? TenantId.de(tenantIdStr) : undefined;
+        } catch {
+          throw new Error(`Mensagem ${record.messageId} contém tenantId inválido: ${tenantIdStr}`);
+        }
+
+        const logDoOrcamento = logDaMensagem.child({
+          orcamentoId,
+          tenantId: tenantId?.toString(),
+        });
         logDoOrcamento.info('Extraindo dados do orçamento');
         await extrairDadosOrcamento.executar({
           orcamentoId: corpo.detail.orcamentoId,
@@ -120,6 +166,7 @@ export function criarExtratorQueueHandler(
             agenteOrigem: corpo.detail.resultado.agenteOrigem,
           },
           referenciaBrutaS3: corpo.detail.referenciaBruta,
+          tenantId,
         });
         logDoOrcamento.info('Dados do orçamento extraídos com sucesso');
       } catch (erro) {

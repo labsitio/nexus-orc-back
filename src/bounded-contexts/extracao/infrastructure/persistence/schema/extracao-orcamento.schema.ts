@@ -31,6 +31,10 @@ export const extracoesOrcamento = extracaoSchema.table(
   'extracoes_orcamento',
   {
     id: uuid('id').primaryKey(),
+    // (issue #648 — expand/contract, ADR-008) Nullable até a #632 tornar
+    // `tenantId` obrigatório nos 4 BCs de uma vez (mesmo padrão de
+    // `orcamentos.tenant_id`, spec 001, antes de #279/#280/#281).
+    tenantId: uuid('tenant_id'),
     status: text('status').notNull(),
     referenciaClassificacaoFornecedorIdentificado: text(
       'referencia_classificacao_fornecedor_identificado',

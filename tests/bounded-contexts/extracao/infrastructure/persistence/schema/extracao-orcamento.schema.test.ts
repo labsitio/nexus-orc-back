@@ -77,6 +77,13 @@ describe.skipIf(!DATABASE_URL)('schema extracao.extracoes_orcamento* (Postgres r
     );
     expect(indice.rows).toHaveLength(1);
 
+    // (issue #648 — expand/contract, ADR-008) `tenant_id` nullable até a #632.
+    const colunaTenantId = await client.query<{ is_nullable: string }>(
+      `select is_nullable from information_schema.columns
+       where table_schema = 'extracao' and table_name = 'extracoes_orcamento' and column_name = 'tenant_id'`,
+    );
+    expect(colunaTenantId.rows).toEqual([{ is_nullable: 'YES' }]);
+
     const triggers = await client.query<{ tgname: string }>(
       `select tgname from pg_trigger where tgname in (
          'trg_extracoes_orcamento_historico_bloquear_update',

@@ -319,11 +319,13 @@ export class ConfirmarRevisaoHumanaExtracao {
             extracao.orcamentoId.toString(),
             extracao.itens.map((item) => item.paraPayload()),
             condicoesComerciais.paraPayload(),
+            extracao.tenantId?.toString(),
           )
         : new OrcamentoExtraidoComPendenciaConfirmada(
             extracao.orcamentoId.toString(),
             extracao.itens.map((item) => item.paraPayload()),
             condicoesComerciais.paraPayload(),
+            extracao.tenantId?.toString(),
           );
     await this.eventPublisher.publicar(evento);
 
