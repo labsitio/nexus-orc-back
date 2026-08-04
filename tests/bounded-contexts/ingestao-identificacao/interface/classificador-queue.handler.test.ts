@@ -4,12 +4,12 @@ import { criarClassificadorQueueHandler } from '../../../../src/bounded-contexts
 import { TransicaoInvalidaError } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
 import type { ClassificarOrcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/classificar-orcamento.js';
 
-function useCaseFake(executar: (orcamentoId: string) => Promise<void>): ClassificarOrcamento {
+function useCaseFake(executar: (orcamentoId: string, tenantId?: unknown) => Promise<void>): ClassificarOrcamento {
   return { executar } as unknown as ClassificarOrcamento;
 }
 
-function envelopeEventBridge(orcamentoId: string): string {
-  return JSON.stringify({ detail: { orcamentoId } });
+function envelopeEventBridge(orcamentoId: string, tenantId?: string): string {
+  return JSON.stringify({ detail: { orcamentoId, tenantId } });
 }
 
 /** Logger pino real gravando em memória — permite inspecionar os campos logados (correlação). */
@@ -23,19 +23,21 @@ function loggerDeTeste() {
 }
 
 describe('criarClassificadorQueueHandler', () => {
-  it('invoca ClassificarOrcamento para cada mensagem com o orcamentoId extraído do envelope EventBridge', async () => {
+  it('invoca ClassificarOrcamento para cada mensagem com orcamentoId e tenantId extraídos do envelope EventBridge', async () => {
     const executar = vi.fn().mockResolvedValue(undefined);
     const handler = criarClassificadorQueueHandler(useCaseFake(executar));
 
     const resposta = await handler({
       Records: [
-        { messageId: 'm1', body: envelopeEventBridge('id-1') },
-        { messageId: 'm2', body: envelopeEventBridge('id-2') },
+        { messageId: 'm1', body: envelopeEventBridge('id-1', undefined) },
+        { messageId: 'm2', body: envelopeEventBridge('id-2', undefined) },
       ],
     });
 
-    expect(executar).toHaveBeenNthCalledWith(1, 'id-1');
-    expect(executar).toHaveBeenNthCalledWith(2, 'id-2');
+    // (spec 007, T017) tenantId é undefined durante transição (T015 não implementado);
+    // no use case, isso resulta em 404 (divergência de tenant — agregado não tem tenantId).
+    expect(executar).toHaveBeenNthCalledWith(1, 'id-1', undefined);
+    expect(executar).toHaveBeenNthCalledWith(2, 'id-2', undefined);
     expect(resposta.batchItemFailures).toHaveLength(0);
   });
 
@@ -49,8 +51,8 @@ describe('criarClassificadorQueueHandler', () => {
 
     const resposta = await handler({
       Records: [
-        { messageId: 'm1', body: envelopeEventBridge('id-falha') },
-        { messageId: 'm2', body: envelopeEventBridge('id-ok') },
+        { messageId: 'm1', body: envelopeEventBridge('id-falha', undefined) },
+        { messageId: 'm2', body: envelopeEventBridge('id-ok', undefined) },
       ],
     });
 

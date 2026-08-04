@@ -21,8 +21,9 @@ import { OrcamentoClassificado } from '../../../../src/bounded-contexts/ingestao
 import { OrcamentoEscalonadoParaRevisaoHumana } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/events/orcamento-escalonado-revisao-humana.event.js';
 import { NivelConfianca } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/nivel-confianca.vo.js';
 import { ResultadoClassificacao } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/resultado-classificacao.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
-function novoOrcamentoRecebido(): Orcamento {
+function novoOrcamentoRecebido(tenantId: TenantId = TenantId.novo()): Orcamento {
   return Orcamento.receber({
     id: OrcamentoId.novo(),
     canal: Canal.de('PORTAL_WEB'),
@@ -31,6 +32,7 @@ function novoOrcamentoRecebido(): Orcamento {
       key: 'portal-web/orcamento.pdf',
       versionId: 'v1',
     }),
+    tenantId,
   });
 }
 
@@ -108,7 +110,7 @@ describe('ClassificarOrcamento', () => {
       publisher,
     );
 
-    await useCase.executar(orcamento.id.toString());
+    await useCase.executar(orcamento.id.toString(), orcamento.tenantId);
 
     expect(orcamento.status).toBe('CLASSIFICADO');
     expect(repositorio.salvos).toHaveLength(1);
@@ -132,7 +134,7 @@ describe('ClassificarOrcamento', () => {
       publisher,
     );
 
-    await useCase.executar(orcamento.id.toString());
+    await useCase.executar(orcamento.id.toString(), orcamento.tenantId);
 
     expect(orcamento.status).toBe('PENDENTE_REVISAO_HUMANA');
     expect(publisher.eventosPublicados[0]?.detailType).toBe(
@@ -155,7 +157,7 @@ describe('ClassificarOrcamento', () => {
       publisher,
     );
 
-    await expect(useCase.executar(OrcamentoId.novo().toString())).rejects.toThrow(
+    await expect(useCase.executar(OrcamentoId.novo().toString(), TenantId.novo())).rejects.toThrow(
       OrcamentoNaoEncontradoParaClassificacaoError,
     );
     expect(publisher.eventosPublicados).toHaveLength(0);
@@ -185,7 +187,7 @@ describe('ClassificarOrcamento', () => {
       publisher,
     );
 
-    await expect(useCase.executar(orcamento.id.toString())).rejects.toThrow();
+    await expect(useCase.executar(orcamento.id.toString(), orcamento.tenantId)).rejects.toThrow();
     expect(publisher.eventosPublicados).toHaveLength(0);
   });
 
@@ -206,7 +208,7 @@ describe('ClassificarOrcamento', () => {
       new CacheIdentificacaoGatewayFalhaFake(),
     );
 
-    await useCase.executar(orcamento.id.toString());
+    await useCase.executar(orcamento.id.toString(), orcamento.tenantId);
 
     expect(orcamento.status).toBe('CLASSIFICADO');
     expect(repositorio.salvos).toHaveLength(1);

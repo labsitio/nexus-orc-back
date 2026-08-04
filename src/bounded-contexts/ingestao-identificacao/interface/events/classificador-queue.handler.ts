@@ -1,7 +1,9 @@
 import type { Logger } from 'pino';
 import type { ClassificarOrcamento } from '../../application/use-cases/classificar-orcamento.js';
+import { TenantDivergenciaError } from '../../application/use-cases/classificar-orcamento.js';
 import { TransicaoInvalidaError } from '../../domain/orcamento.aggregate.js';
 import { criarLogger } from '../../infrastructure/observability/logger.js';
+import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * Shape mínimo do evento SQS relevante aqui (apenas os campos usados) —
@@ -23,7 +25,18 @@ export interface SqsBatchResponse {
 
 /** Envelope publicado pela regra EventBridge `OrcamentoRecebidoParaClassificadorQueue` (T033). */
 interface EventBridgeEnvelope {
-  readonly detail: { readonly orcamentoId: string };
+  readonly detail: {
+    readonly orcamentoId: string;
+    /**
+     * (spec 007, T017) `tenantId` é obrigatório no envelope desde T015 (`schemaVersion: 2`).
+     * Opcional aqui no type guard porque a premissa de T015 é zero tenant real em produção
+     * (baseline da spec) — nenhum evento v1 sem `tenantId` circulará concorrentemente com v2;
+     * quando T015 for implementado, o cutover é direto (sem dual v1/v2). Até lá,
+     * `tenantId` é undefined em produção e será propagado como tal (ou a validação
+     * de tenant no use case rejeitará como legado).
+     */
+    readonly tenantId?: string;
+  };
 }
 
 function ehEventBridgeEnvelope(valor: unknown): valor is EventBridgeEnvelope {
@@ -76,15 +89,44 @@ export function criarClassificadorQueueHandler(
           );
         }
         orcamentoId = corpo.detail.orcamentoId;
-        const logDoOrcamento = logDaMensagem.child({ orcamentoId });
+
+        // (spec 007, T017) `tenantId` vem do evento `OrcamentoRecebido` publicado por T016.
+        // Até T015 ser implementado, `tenantId` é undefined no envelope (schemaVersion: 1).
+        // Depois de T015, é obrigatório (schemaVersion: 2). A validação de tenant no use case
+        // rejeita como legado (404) se `tenantId` for undefined — comportamento transitório
+        // até o cutover completo de todos os eventos.
+        const tenantIdStr = corpo.detail.tenantId;
+        let tenantId: TenantId | undefined;
+        try {
+          tenantId = tenantIdStr ? TenantId.de(tenantIdStr) : undefined;
+        } catch {
+          throw new Error(
+            `Mensagem ${record.messageId} contém tenantId inválido: ${tenantIdStr}`,
+          );
+        }
+
+        const logDoOrcamento = logDaMensagem.child({
+          orcamentoId,
+          tenantId: tenantId?.toString(),
+        });
         logDoOrcamento.info('Classificando orçamento');
-        await classificarOrcamento.executar(orcamentoId);
+        await classificarOrcamento.executar(orcamentoId, tenantId);
         logDoOrcamento.info('Orçamento classificado com sucesso');
       } catch (erro) {
         if (erro instanceof TransicaoInvalidaError) {
           logDaMensagem.info(
             { orcamentoId },
             'Mensagem redelivered (at-least-once) para orçamento já processado — ignorada como sucesso idempotente',
+          );
+          continue;
+        }
+        // (spec 007, T017) TenantDivergenciaError é permanente (tenantId undefined ou
+        // cross-tenant) — retry nunca vai resolver. Tratar como o TransicaoInvalidaError:
+        // log info, continue, nunca batch item failure/DLQ/alarme.
+        if (erro instanceof TenantDivergenciaError) {
+          logDaMensagem.info(
+            { orcamentoId },
+            'Orçamento rejeitado por divergência/ausência de tenantId — ignorado como sucesso idempotente',
           );
           continue;
         }

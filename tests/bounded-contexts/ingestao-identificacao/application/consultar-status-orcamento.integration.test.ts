@@ -8,6 +8,7 @@ import { NivelConfianca } from '../../../../src/bounded-contexts/ingestao-identi
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
 import { ResultadoClassificacao } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/resultado-classificacao.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * Integration test (T045/#50): fluxo Classificador<80% -> Escalonamento
@@ -44,10 +45,12 @@ describe('ConsultarStatusOrcamento — integração com escalonamento (T045)', (
     const consultar = new ConsultarStatusOrcamento(repositorio);
 
     const id = OrcamentoId.novo();
+    const tenantId = TenantId.novo();
     const orcamento = Orcamento.receber({
       id,
       canal: Canal.de('PORTAL_WEB'),
       referenciaBruta: criarReferenciaBruta(),
+      tenantId,
     });
 
     const resultadoBaixaConfianca = ResultadoClassificacao.criar({
@@ -59,7 +62,7 @@ describe('ConsultarStatusOrcamento — integração com escalonamento (T045)', (
     orcamento.registrarTentativaClassificador(resultadoBaixaConfianca);
     await repositorio.salvar(orcamento);
 
-    const consultado = await consultar.executar(id.toString());
+    const consultado = await consultar.executar(id.toString(), tenantId);
 
     expect(consultado.status).toBe('PENDENTE_REVISAO_HUMANA');
     expect(consultado.historico).toHaveLength(1);
@@ -72,10 +75,12 @@ describe('ConsultarStatusOrcamento — integração com escalonamento (T045)', (
     const consultar = new ConsultarStatusOrcamento(repositorio);
 
     const id = OrcamentoId.novo();
+    const tenantId = TenantId.novo();
     const orcamento = Orcamento.receber({
       id,
       canal: Canal.de('API_REST'),
       referenciaBruta: criarReferenciaBruta(),
+      tenantId,
     });
 
     const tentativaClassificador = ResultadoClassificacao.criar({
@@ -95,7 +100,7 @@ describe('ConsultarStatusOrcamento — integração com escalonamento (T045)', (
     orcamento.registrarConfirmacaoHumana(confirmacaoHumana);
     await repositorio.salvar(orcamento);
 
-    const consultado = await consultar.executar(id.toString());
+    const consultado = await consultar.executar(id.toString(), tenantId);
 
     expect(consultado.status).toBe('CLASSIFICADO');
     expect(consultado.historico).toHaveLength(2);
@@ -108,9 +113,10 @@ describe('ConsultarStatusOrcamento — integração com escalonamento (T045)', (
   it('lança OrcamentoNaoEncontradoError para orcamentoId inexistente', async () => {
     const repositorio = new OrcamentoRepositoryFake();
     const consultar = new ConsultarStatusOrcamento(repositorio);
+    const tenantId = TenantId.novo();
 
-    await expect(consultar.executar(OrcamentoId.novo().toString())).rejects.toThrow(
-      OrcamentoNaoEncontradoError,
-    );
+    await expect(
+      consultar.executar(OrcamentoId.novo().toString(), tenantId),
+    ).rejects.toThrow(OrcamentoNaoEncontradoError);
   });
 });

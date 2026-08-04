@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ConfirmarRevisaoHumana,
   OrcamentoNaoEncontradoParaRevisaoHumanaError,
+  TenantDivergenciaError,
 } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/confirmar-revisao-humana.js';
 import {
   Orcamento,
@@ -12,12 +13,13 @@ import { NivelConfianca } from '../../../../src/bounded-contexts/ingestao-identi
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
 import { ResultadoClassificacao } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/resultado-classificacao.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import type { OrcamentoRepository } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/repositories/orcamento.repository.js';
 import type { EventPublisher } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/event-publisher.js';
 import type { DomainEventEnvelope } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/events/domain-event.js';
 import { OrcamentoReclassificadoPorRevisaoHumana } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/events/orcamento-reclassificado-revisao-humana.event.js';
 
-function novoOrcamentoEscalonado(): Orcamento {
+function novoOrcamentoEscalonado(tenantId: TenantId = TenantId.novo()): Orcamento {
   const orcamento = Orcamento.receber({
     id: OrcamentoId.novo(),
     canal: Canal.de('PORTAL_WEB'),
@@ -26,6 +28,7 @@ function novoOrcamentoEscalonado(): Orcamento {
       key: 'portal-web/orcamento.pdf',
       versionId: 'v1',
     }),
+    tenantId,
   });
   orcamento.registrarTentativaClassificador(
     ResultadoClassificacao.criar({
@@ -67,6 +70,7 @@ describe('ConfirmarRevisaoHumana', () => {
       orcamentoId: orcamento.id.toString(),
       fornecedorIdentificado: 'Distribuidora ABC Ltda',
       formatoIdentificado: 'PDF_TABELA_PADRAO',
+      tenantId: orcamento.tenantId!,
     });
 
     expect(resultado.status).toBe('CLASSIFICADO');
@@ -88,6 +92,7 @@ describe('ConfirmarRevisaoHumana', () => {
       orcamentoId: orcamento.id.toString(),
       fornecedorIdentificado: 'Distribuidora ABC Ltda',
       formatoIdentificado: 'PDF_TABELA_PADRAO',
+      tenantId: orcamento.tenantId!,
     });
 
     expect(resultado.historico).toHaveLength(2);
@@ -99,18 +104,21 @@ describe('ConfirmarRevisaoHumana', () => {
     const repositorio = new RepositorioFake(undefined);
     const publisher = new EventPublisherFake();
     const useCase = new ConfirmarRevisaoHumana(repositorio, publisher);
+    const tenantId = TenantId.novo();
 
     await expect(
       useCase.executar({
         orcamentoId: OrcamentoId.novo().toString(),
         fornecedorIdentificado: 'X',
         formatoIdentificado: 'PDF',
+        tenantId,
       }),
     ).rejects.toThrow(OrcamentoNaoEncontradoParaRevisaoHumanaError);
     expect(publisher.eventosPublicados).toHaveLength(0);
   });
 
   it('lança TransicaoInvalidaError (409 no controller) e nunca publica evento se o status não for PENDENTE_REVISAO_HUMANA', async () => {
+    const tenantId = TenantId.novo();
     const orcamento = Orcamento.receber({
       id: OrcamentoId.novo(),
       canal: Canal.de('PORTAL_WEB'),
@@ -119,6 +127,7 @@ describe('ConfirmarRevisaoHumana', () => {
         key: 'portal-web/orcamento.pdf',
         versionId: 'v1',
       }),
+      tenantId,
     });
     const repositorio = new RepositorioFake(orcamento);
     const publisher = new EventPublisherFake();
@@ -129,6 +138,7 @@ describe('ConfirmarRevisaoHumana', () => {
         orcamentoId: orcamento.id.toString(),
         fornecedorIdentificado: 'X',
         formatoIdentificado: 'PDF',
+        tenantId,
       }),
     ).rejects.toThrow(TransicaoInvalidaError);
     expect(publisher.eventosPublicados).toHaveLength(0);
