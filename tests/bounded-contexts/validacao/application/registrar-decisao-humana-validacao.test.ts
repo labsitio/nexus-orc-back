@@ -19,6 +19,7 @@ import {
   PeriodoValidade,
   PeriodoValidadeInvalidoError,
 } from '../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * T035 (#145) — Application: `RegistrarDecisaoHumanaValidacao`. Unit test
@@ -67,8 +68,8 @@ function dadosExtraidos(): DadosExtraidosParaValidacao {
   });
 }
 
-function orcamentoPendenteRevisaoHumana(): OrcamentoValidacao {
-  const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dadosExtraidos());
+function orcamentoPendenteRevisaoHumana(tenantId?: TenantId): OrcamentoValidacao {
+  const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dadosExtraidos(), tenantId);
   validacao.avaliarRegrasDeConsistencia([
     InconsistenciaDetectada.de('PRAZO_INCOERENTE', 'Período de validade anterior à emissão'),
   ]);
@@ -144,6 +145,20 @@ describe('RegistrarDecisaoHumanaValidacao', () => {
     await expect(
       useCase.executar(ORCAMENTO_ID.toString(), { tipo: 'ACEITE_COM_RESSALVA' }),
     ).rejects.toThrow(OrcamentoValidacaoNaoEncontradoError);
+  });
+
+  it('propaga tenantId do agregado para o evento publicado (issue #649)', async () => {
+    const tenantId = TenantId.novo();
+    const repositorio = new OrcamentoValidacaoRepositoryFake(
+      orcamentoPendenteRevisaoHumana(tenantId),
+    );
+    const publisher = new EventPublisherFake();
+    const useCase = new RegistrarDecisaoHumanaValidacao(repositorio, publisher);
+
+    await useCase.executar(ORCAMENTO_ID.toString(), { tipo: 'ACEITE_COM_RESSALVA' });
+
+    const evento = publisher.eventosPublicados[0] as OrcamentoValidadoComRessalva;
+    expect(evento.tenantId).toBe(tenantId.toString());
   });
 });
 

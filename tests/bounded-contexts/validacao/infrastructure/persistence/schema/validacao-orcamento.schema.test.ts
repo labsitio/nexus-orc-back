@@ -80,6 +80,13 @@ describe.skipIf(!DATABASE_URL)('schema validacao.validacoes_orcamento* (Postgres
     );
     expect(indice.rows).toHaveLength(1);
 
+    // (issue #649 — expand/contract, ADR-008) `tenant_id` nullable até a #632.
+    const colunaTenantId = await client.query<{ is_nullable: string }>(
+      `select is_nullable from information_schema.columns
+       where table_schema = 'validacao' and table_name = 'validacoes_orcamento' and column_name = 'tenant_id'`,
+    );
+    expect(colunaTenantId.rows).toEqual([{ is_nullable: 'YES' }]);
+
     const triggers = await client.query<{ tgname: string }>(
       `select tgname from pg_trigger where tgname in (
          'trg_validacoes_orcamento_historico_bloquear_update',

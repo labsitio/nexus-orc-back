@@ -3,8 +3,10 @@ import {
   OrcamentoExtraidoEventACLImpl,
   OrcamentoExtraidoEventACLPayloadIncompletoError,
 } from '../../../../src/bounded-contexts/validacao/infrastructure/orcamento-extraido-event.acl.js';
+import { TenantIdInvalidoError } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const orcamentoId = '018f4b1a-0000-7000-8000-000000000000';
+const tenantId = '018f5b3a-9999-7abc-89ab-0123456789ab';
 
 function payloadCompleto(overrides: Record<string, unknown> = {}) {
   return {
@@ -142,5 +144,20 @@ describe('OrcamentoExtraidoEventACLImpl', () => {
     expect(() => acl.traduzir('nao-e-objeto')).toThrow(
       OrcamentoExtraidoEventACLPayloadIncompletoError,
     );
+  });
+
+  it('extrai e valida tenantId quando presente no envelope (issue #649)', () => {
+    const resultado = acl.traduzir(payloadCompleto({ tenantId }));
+    expect(resultado.tenantId?.toString()).toBe(tenantId);
+  });
+
+  it('nunca rejeita payload sem tenantId — 002 ainda publica opcional (issue #649, expand/contract)', () => {
+    const resultado = acl.traduzir(payloadCompleto());
+    expect(resultado.tenantId).toBeUndefined();
+  });
+
+  it('lança erro de TenantId inválido quando tenantId não é UUID v7', () => {
+    const payload = payloadCompleto({ tenantId: 'não-é-uuid' });
+    expect(() => acl.traduzir(payload)).toThrow(TenantIdInvalidoError);
   });
 });

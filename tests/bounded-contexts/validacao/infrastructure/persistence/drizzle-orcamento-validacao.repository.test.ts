@@ -22,6 +22,7 @@ import { OrcamentoId } from '../../../../../src/bounded-contexts/validacao/domai
 import { PeriodoValidade } from '../../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
 import { DrizzleOrcamentoValidacaoRepository } from '../../../../../src/bounded-contexts/validacao/infrastructure/persistence/drizzle-orcamento-validacao.repository.js';
 import { validacoesOrcamentoHistorico } from '../../../../../src/bounded-contexts/validacao/infrastructure/persistence/schema/validacao-orcamento.schema.js';
+import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -92,6 +93,29 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoValidacaoRepository (Postgres re
 
   it('buscarPorOrcamentoId retorna undefined para orcamentoId inexistente', async () => {
     await expect(repo.buscarPorOrcamentoId(orcamentoIdDeTeste())).resolves.toBeUndefined();
+  });
+
+  it('(issue #649) roundtrip do tenantId opcional — persiste e recarrega o mesmo valor', async () => {
+    const id = orcamentoIdDeTeste();
+    idsParaLimpar.push(id.toString());
+    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+
+    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste(), tenantId);
+    await repo.salvar(agregado);
+
+    const carregado = await repo.buscarPorOrcamentoId(id);
+    expect(carregado?.tenantId?.toString()).toBe(tenantId.toString());
+  });
+
+  it('(issue #649) tenantId ausente na criação é persistido e recarregado como undefined', async () => {
+    const id = orcamentoIdDeTeste();
+    idsParaLimpar.push(id.toString());
+
+    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste());
+    await repo.salvar(agregado);
+
+    const carregado = await repo.buscarPorOrcamentoId(id);
+    expect(carregado?.tenantId).toBeUndefined();
   });
 
   it('salva PENDENTE e recarrega VALIDADO com 1 entrada de histórico', async () => {

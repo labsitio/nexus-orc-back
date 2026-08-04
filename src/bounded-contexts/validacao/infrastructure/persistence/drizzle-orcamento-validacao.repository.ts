@@ -1,5 +1,6 @@
 import { asc, count, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import {
   OrcamentoValidacao,
   type OrcamentoValidacaoProps,
@@ -81,6 +82,7 @@ function agregadoDaLinha(
     status: linha.status as StatusValidacao,
     inconsistencias: inconsistenciasDaLinha(linha.inconsistencias),
     historico,
+    tenantId: linha.tenantId !== null ? TenantId.de(linha.tenantId) : undefined,
   };
   return OrcamentoValidacao.reconstituir(props);
 }
@@ -123,6 +125,10 @@ export class DrizzleOrcamentoValidacaoRepository implements OrcamentoValidacaoRe
         .insert(validacoesOrcamento)
         .values({
           id,
+          // (issue #649) `tenantId` é imutável após a criação — nunca entra
+          // no `set` do onConflictDoUpdate abaixo (mesmo padrão de
+          // `DrizzleExtracaoOrcamentoRepository`, spec 002, #648).
+          tenantId: orcamentoValidacao.tenantId?.toString() ?? null,
           status: orcamentoValidacao.status,
           dadosExtraidos: dadosExtraidosPayload,
           inconsistencias: inconsistenciasPayload,

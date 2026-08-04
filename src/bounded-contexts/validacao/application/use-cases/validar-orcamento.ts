@@ -45,7 +45,7 @@ export class ValidarOrcamento {
   ) {}
 
   async executar(payloadBruto: unknown): Promise<void> {
-    const { orcamentoId, dadosExtraidos } = this.acl.traduzir(payloadBruto);
+    const { orcamentoId, dadosExtraidos, tenantId } = this.acl.traduzir(payloadBruto);
 
     const existente = await this.repositorio.buscarPorOrcamentoId(orcamentoId);
     if (existente && existente.status !== 'PENDENTE') {
@@ -54,7 +54,7 @@ export class ValidarOrcamento {
       return;
     }
 
-    const validacao = existente ?? OrcamentoValidacao.criar(orcamentoId, dadosExtraidos);
+    const validacao = existente ?? OrcamentoValidacao.criar(orcamentoId, dadosExtraidos, tenantId);
 
     const inconsistenciasCnpj = validarCnpjValido(dadosExtraidos);
     const cnpjValido = inconsistenciasCnpj.length === 0;
@@ -91,10 +91,12 @@ export class ValidarOrcamento {
             validacao.orcamentoId.toString(),
             dadosExtraidos.itens.map((item) => item.paraPayload()),
             dadosExtraidos.condicoesComerciais,
+            validacao.tenantId?.toString(),
           )
         : new OrcamentoInconsistenciaDetectada(
             validacao.orcamentoId.toString(),
             validacao.inconsistencias.map((inconsistencia) => inconsistencia.paraPayload()),
+            validacao.tenantId?.toString(),
           );
     await this.eventPublisher.publicar(evento);
   }
