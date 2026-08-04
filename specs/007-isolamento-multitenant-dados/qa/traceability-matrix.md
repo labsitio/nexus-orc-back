@@ -147,3 +147,41 @@ Nenhum defeito de produção encontrado em T040. A opcionalidade de `tenantId` e
 manutenção de `schemaVersion: 1` são decisão de estratégia (expand/contract, ADR-008),
 mesmo padrão de T014/T015, documentada no código e no corpo da PR #630 — não é
 lacuna a reportar como bug.
+
+## T016 — `ReceberOrcamento` exige `tenantId` obrigatório do `TenantContext` (nunca do body)
+
+PR #633 (draft), branch `feat/279-tenantid-receber-orcamento`, commit `f27939d` (issue #279).
+
+| Task | Critério de aceite | Nível | Cenário | Arquivo de teste | Resultado | Evidência |
+|---|---|---|---|---|---|---|
+| T016 | `ReceberOrcamento.executar` exige `tenantId: TenantId` (não mais opcional) e o propaga a `Orcamento.receber(...)` | estático/inspeção + unitário | leitura de `ReceberOrcamentoParams.tenantId: TenantId` (sem `?`) + teste existente que passa `tenantId` e verifica propagação | `receber-orcamento.ts`, `tests/.../application/receber-orcamento.test.ts` | PASS | tipo obrigatório confirmado; suíte verde |
+| T016 | `confirmar-upload.controller.ts` lê `tenantId` exclusivamente de `request.tenantContext.tenantId`, nunca do body | contrato/integração (Fastify inject) | requisição com `preHandler` de tenant válido, body sem campo `tenantId` | `tests/.../contract/confirmar-upload.controller.test.ts` | PASS | 200 com `tenantId` do JWT propagado a `ReceberOrcamento` |
+| T016 (guardrail de segurança) | Schema Zod de `confirmar-upload` (`confirmarUploadRequestSchema`) não declara campo `tenantId` — `z.object()` sem `.passthrough()` descarta silenciosamente qualquer `tenantId` enviado no body por um cliente malicioso, que nunca chega ao controller nem ao caso de uso | inspeção estática + análise de contrato Zod | leitura de `confirmar-upload.schema.ts` (campos: `canal`, `nomeArquivo`, `referenciaExterna` — sem `tenantId`) e confirmação do modo padrão `strip` do Zod (`z.object()` sem `.passthrough()`/`.strict()` remove chaves desconhecidas do `.data` parseado) | `confirmar-upload.schema.ts` | PASS | campo ausente do schema; `body.data` nunca contém `tenantId` mesmo que o body bruto o inclua — o controller só lê `tenantContext.tenantId` (linha 101), nunca `body.data.tenantId` (nem existiria) |
+| T016 | `request.tenantContext` ausente -> 401 Problem Details, `ReceberOrcamento.executar` nunca chamado | contrato/integração (Fastify inject) | POST sem `preHandler` de tenant, body válido | `tests/.../contract/confirmar-upload.controller.test.ts` ("401 Problem Details quando request.tenantContext está ausente") | PASS | `statusCode === 401`, `content-type: application/problem+json` |
+| T016 | `sftp-upload.handler.ts` propaga o `tenantId` já resolvido por `SftpTenantResolverGateway` (T006) a `ReceberOrcamento` | unitário | `resolverTenant.resolver()` retorna `TenantId` válido | `tests/.../interface/events/sftp-upload.handler.test.ts` ("resolve tenantId via resolverTenant.resolver...") | PASS | `receberOrcamento.executar` chamado com o `tenantId` resolvido |
+| T016 | Mapeamento usuário/servidor ausente (`resolverTenant.resolver()` retorna `undefined`) não lança erro, apenas `console.warn` + pula o registro (`continue`), sem chamar `ReceberOrcamento` | unitário/adversarial | `resolverTenant` mockado retornando `undefined` para 1 registro do lote | `tests/.../interface/events/sftp-upload.handler.test.ts` ("não lança erro quando o mapeamento usuário/servidor está ausente...") | PASS | `receberOrcamento.executar` não chamado para o registro afetado; handler não lança |
+| T016 | Lote S3 com múltiplos registros: registro sem mapeamento é pulado, demais registros do mesmo lote continuam sendo processados (não trava o batch inteiro) | regressão/unitário | suíte completa do handler (5 cenários pré-existentes de idempotência/redelivery/múltiplos registros + 2 novos T016) | idem | PASS | nenhuma regressão nos cenários pré-existentes de multi-registro |
+| T016 | Nenhum outro caller de produção (`upload-url.controller.ts`, `composition/ingestao-identificacao.ts`) chama `ReceberOrcamento.executar` diretamente — nada além dos 2 sites reais precisou mudar para compilar | inspeção estática | `grep -rn "receberOrcamento.executar\|ReceberOrcamento(" src` (fora de teste) | — | PASS | únicos 2 call sites de `.executar()` são `confirmar-upload.controller.ts` e `sftp-upload.handler.ts`; `composition/ingestao-identificacao.ts` só instancia a classe, não chama `.executar()` |
+| T016 | Teste de contrato T011 (cross-tenant 404) segue RED por desenho, não vira verde com esta mudança (aguarda #280/#281 — validação de tenant no repositório/controller de consulta) | regressão | suíte completa + inspeção do arquivo (não tocado neste diff) | `tests/bounded-contexts/ingestao-identificacao/contract/tenant-isolation.test.ts` | PASS (1 `it.fails` esperado, não regrediu) | `913 passed \| 1 expected fail \| 99 skipped` (baseline) → `914 passed \| 1 expected fail \| 99 skipped` (pós 1 teste novo, o 401); `git diff HEAD~1 HEAD` confirma o arquivo do `it.fails` intocado |
+| T016 | Nenhuma regressão no restante do BC Ingestão & Identificação nem no monorepo | regressão | suíte completa | — | PASS | `914 passed \| 1 expected fail \| 99 skipped` (157 arquivos passaram, 19 skip) |
+| T016 | `npx eslint` limpo nos 3 arquivos de produção do diff | estático/lint | lint restrito aos arquivos alterados | `receber-orcamento.ts`, `confirmar-upload.controller.ts`, `sftp-upload.handler.ts` | PASS | saída vazia, exit 0 |
+| T016 | `npx tsc --noEmit` sem erro novo introduzido pelo diff | estático/typecheck | typecheck completo do monorepo | — | PASS (erros restantes são pré-existentes em `src/dev/`, módulo `@aws-sdk/client-sqs` ausente e `any` implícito, introduzidos pelo commit `69712ce`, não relacionados a este diff) | nenhum erro em nenhum dos 3 arquivos do diff |
+
+Cobertura (`npx vitest run --coverage`, escopo restrito aos 3 arquivos tocados por T016):
+`receber-orcamento.ts` — 100% statements/branches/functions/lines. `sftp-upload.handler.ts`
+— 100% statements/branches/functions/lines. `confirmar-upload.controller.ts` — 100%
+statements/functions/lines, 90,9% branches (10/11); a única branch não coberta é o
+`Array.isArray(valor)` de `idempotencyKeyDoHeader` — já documentada em comentário no
+próprio código como defesa sem caminho real de teste via HTTP (Node normaliza headers
+repetidos numa string única por RFC 7230; `string[]` só ocorre para `set-cookie`),
+pré-existente, não introduzida por este diff.
+
+Nenhum defeito de produção encontrado em T016. O guardrail de segurança (nunca aceitar
+`tenantId` do body) está estruturalmente garantido em dois níveis independentes: (1) o
+schema Zod de `confirmar-upload` não declara o campo, então mesmo um body malicioso com
+`tenantId` é descartado no parse; (2) o controller lê exclusivamente
+`request.tenantContext.tenantId`, nunca `body.data`. Nenhum teste automatizado envia
+`tenantId` no body para provar o descarte — verificado por inspeção do schema e do
+código do controller nesta validação; risco residual baixo (mudar isso exigiria alguém
+adicionar `.passthrough()` ao schema E trocar a fonte lida pelo controller, dois erros
+independentes simultâneos), mas registrado como lacuna de asserção automatizada abaixo.
