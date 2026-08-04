@@ -3,7 +3,9 @@
 // tradução linha↔agregado e, sobretudo, a serialização via `SELECT ... FOR
 // UPDATE` introduzida na revisão (achado MAJOR: sem o lock, dois `salvar`
 // concorrentes do mesmo agregado duplicavam a mesma tentativa em
-// `orcamentos_historico`).
+// `orcamentos_historico`) e o isolamento multi-tenant via RLS (ADR-005,
+// T007) — repositório estende `DrizzleTenantScopedRepositoryBase` (spec
+// 007/T008/T018).
 //
 // Requer DATABASE_URL (ver .env.example / docker-compose.yml, serviço
 // `postgres`) apontando para um banco já migrado. Sem DATABASE_URL, a suíte
@@ -24,8 +26,11 @@ import {
   orcamentos,
   orcamentosHistorico,
 } from '../../../../../src/bounded-contexts/ingestao-identificacao/infrastructure/persistence/schema/orcamento.schema.js';
+import { criarTenantContext } from '../../../../../src/shared-kernel/tenant/tenant-context.js';
+import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
+const TENANT_A = TenantId.de('00000000-0000-7000-8000-0000000000aa');
 
 function referenciaBruta(key: string): ReferenciaS3 {
   return ReferenciaS3.de({ bucket: 'nexo-orcamentos-raw', key, versionId: 'v1' });
@@ -63,7 +68,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoRepository (Postgres real)', () 
     client = new Client({ connectionString: DATABASE_URL });
     await client.connect();
     db = drizzle(client);
-    repo = new DrizzleOrcamentoRepository(db);
+    repo = new DrizzleOrcamentoRepository(db, criarTenantContext(TENANT_A));
   });
 
   afterAll(async () => {
@@ -89,6 +94,39 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoRepository (Postgres real)', () 
   it('buscarPorId retorna undefined para orcamentoId inexistente', async () => {
     const id = OrcamentoId.novo();
     await expect(repo.buscarPorId(id)).resolves.toBeUndefined();
+  });
+
+  // Isolamento cross-tenant de fato (RLS bloqueando sob role sem BYPASSRLS)
+  // é responsabilidade de tests/security/isolamento-multitenant/rls-enforcement.test.ts
+  // — a role `nexo` usada nesta suíte é superuser/BYPASSRLS, então qualquer
+  // asserção de "tenant B nunca vê linha de tenant A" aqui passaria mesmo que
+  // a política `tenant_isolation` nunca tivesse sido criada, não é uma prova
+  // real. Este teste confirma apenas que `salvar` persiste o `tenantId`
+  // correto na coluna (correção de tradução linha↔agregado, T018).
+  it('salvar persiste o tenantId do TenantContext da instância na coluna tenant_id', async () => {
+    const id = OrcamentoId.novo();
+    idsParaLimpar.push(id.toString());
+
+    const recebido = Orcamento.receber({
+      id,
+      canal: Canal.de('API_REST'),
+      referenciaBruta: referenciaBruta('doc-tenant.pdf'),
+    });
+    await repo.salvar(recebido);
+
+    const resultado = await client.query<{ tenant_id: string }>(
+      'select tenant_id from orcamentos where id = $1',
+      [id.toString()],
+    );
+    expect(resultado.rows[0]?.tenant_id).toBe(TENANT_A.toString());
+
+    const historico = await client.query<{ tenant_id: string }>(
+      'select tenant_id from orcamentos_historico where orcamento_id = $1',
+      [id.toString()],
+    );
+    for (const linha of historico.rows) {
+      expect(linha.tenant_id).toBe(TENANT_A.toString());
+    }
   });
 
   it('salva RECEBIDO, aplica classificação de alta confiança e recarrega como CLASSIFICADO com 1 entrada de histórico', async () => {
@@ -169,7 +207,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoRepository (Postgres real)', () 
     // sessões distintas, não duas chamadas sequenciais na mesma conexão.
     const clienteB = new Client({ connectionString: DATABASE_URL });
     await clienteB.connect();
-    const repoB = new DrizzleOrcamentoRepository(drizzle(clienteB));
+    const repoB = new DrizzleOrcamentoRepository(drizzle(clienteB), criarTenantContext(TENANT_A));
 
     try {
       // Duas instâncias em memória do mesmo agregado, cada uma aplicando a

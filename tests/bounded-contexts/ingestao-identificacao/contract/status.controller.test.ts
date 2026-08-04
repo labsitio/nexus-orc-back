@@ -50,7 +50,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
     repositorio = new OrcamentoRepositoryFake();
     tenantIdTeste = TenantId.novo();
     app = Fastify();
-    registrarRotaStatusOrcamento(app, new ConsultarStatusOrcamento(repositorio), {
+    registrarRotaStatusOrcamento(app, new ConsultarStatusOrcamento(() => repositorio), {
       preHandler: criarPreHandlerFakeTenant(tenantIdTeste),
     });
   });
@@ -233,7 +233,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
     };
     registrarRotaStatusOrcamento(
       appComRepositorioQuebrado,
-      new ConsultarStatusOrcamento(repositorioQuebrado),
+      new ConsultarStatusOrcamento(() => repositorioQuebrado),
       { preHandler: criarPreHandlerFakeTenant(tenantIdTeste) },
     );
 

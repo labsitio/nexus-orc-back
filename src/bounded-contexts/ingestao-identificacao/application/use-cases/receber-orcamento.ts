@@ -2,7 +2,7 @@ import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import { OrcamentoRecebido } from '../../domain/events/orcamento-recebido.event.js';
 import { Orcamento } from '../../domain/orcamento.aggregate.js';
 import type { IdempotencyKeyRepository } from '../../domain/repositories/idempotency-key.repository.js';
-import type { OrcamentoRepository } from '../../domain/repositories/orcamento.repository.js';
+import type { CriarOrcamentoRepositorio } from '../../domain/repositories/orcamento.repository.js';
 import { Canal } from '../../domain/value-objects/canal.vo.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import type { ReferenciaS3 } from '../../domain/value-objects/referencia-s3.vo.js';
@@ -48,7 +48,7 @@ export interface ReceberOrcamentoParams {
  */
 export class ReceberOrcamento {
   constructor(
-    private readonly repositorio: OrcamentoRepository,
+    private readonly criarRepositorio: CriarOrcamentoRepositorio,
     private readonly publisher: EventPublisher,
     private readonly idempotencia: IdempotencyKeyRepository,
   ) {}
@@ -79,7 +79,10 @@ export class ReceberOrcamento {
       referenciaExterna: params.referenciaExterna,
       tenantId: params.tenantId,
     });
-    await this.repositorio.salvar(orcamento);
+    // (spec 007, T018) Repositório construído por chamada a partir do
+    // `tenantId` já validado do parâmetro — nunca reaproveitado como campo
+    // fixo entre chamadas (ver `CriarOrcamentoRepositorio`).
+    await this.criarRepositorio(params.tenantId).salvar(orcamento);
 
     await this.publisher.publicar(
       new OrcamentoRecebido(

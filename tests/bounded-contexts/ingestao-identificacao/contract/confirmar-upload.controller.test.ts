@@ -23,7 +23,10 @@ vi.mock('aws-jwt-verify', () => ({
 const AUTH_HEADERS = { authorization: 'Bearer token-teste' };
 
 function preHandlerTenantValido(): ReturnType<typeof criarTenantContextMiddleware> {
-  mockVerify.mockResolvedValue({ sub: 'usuario-teste', 'custom:tenant_id': TenantId.novo().toString() });
+  mockVerify.mockResolvedValue({
+    sub: 'usuario-teste',
+    'custom:tenant_id': TenantId.novo().toString(),
+  });
   return criarTenantContextMiddleware({ userPoolId: 'us-east-1_teste', clientId: 'client-teste' });
 }
 
@@ -46,7 +49,7 @@ function receberOrcamentoReal(): ReceberOrcamento {
   const idempotencia: IdempotencyKeyRepository = {
     reservar: vi.fn(async (_chave, orcamentoId) => ({ reservado: true, orcamentoId })),
   };
-  return new ReceberOrcamento(repositorio, publisher, idempotencia);
+  return new ReceberOrcamento(() => repositorio, publisher, idempotencia);
 }
 
 describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — controller', () => {
@@ -154,7 +157,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — controller', ()
       buscarPorId: vi.fn(),
     };
     const publisher: EventPublisher = { publicar: vi.fn().mockResolvedValue(undefined) };
-    const receberOrcamento = new ReceberOrcamento(repositorio, publisher, { reservar });
+    const receberOrcamento = new ReceberOrcamento(() => repositorio, publisher, { reservar });
     app = Fastify();
     registrarRotaConfirmarUpload(app, armazenamentoFake(referencia), receberOrcamento, {
       preHandler: preHandlerTenantValido(),

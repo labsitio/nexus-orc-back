@@ -70,7 +70,9 @@ function appComIsolamentoMultitenant(repositorio: OrcamentoRepository) {
     userPoolId: 'us-east-1_teste',
     clientId: 'client-teste',
   });
-  registrarRotaStatusOrcamento(app, new ConsultarStatusOrcamento(repositorio), { preHandler });
+  registrarRotaStatusOrcamento(app, new ConsultarStatusOrcamento(() => repositorio), {
+    preHandler,
+  });
   return app;
 }
 
@@ -80,42 +82,42 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — isolamento multitenant (T0
     mockCreate.mockClear();
   });
 
-  it(
-    'JWT de Tenant A + orcamentoId de Tenant B retorna 404 (spec 007, T017)',
-    async () => {
-      const tenantA = TenantId.novo();
-      const tenantB = TenantId.novo();
-      const repositorio = new OrcamentoRepositoryFake();
-      const idDoOrcamentoDeTenantB = OrcamentoId.novo();
-      // (spec 007, T017) Agregado tem tenantId de Tenant B
-      await repositorio.salvar(
-        Orcamento.receber({
-          id: idDoOrcamentoDeTenantB,
-          canal: Canal.de('PORTAL_WEB'),
-          referenciaBruta: criarReferenciaBruta(),
-          tenantId: tenantB,
-        }),
-      );
+  it('JWT de Tenant A + orcamentoId de Tenant B retorna 404 (spec 007, T017)', async () => {
+    const tenantA = TenantId.novo();
+    const tenantB = TenantId.novo();
+    const repositorio = new OrcamentoRepositoryFake();
+    const idDoOrcamentoDeTenantB = OrcamentoId.novo();
+    // (spec 007, T017) Agregado tem tenantId de Tenant B
+    await repositorio.salvar(
+      Orcamento.receber({
+        id: idDoOrcamentoDeTenantB,
+        canal: Canal.de('PORTAL_WEB'),
+        referenciaBruta: criarReferenciaBruta(),
+        tenantId: tenantB,
+      }),
+    );
 
-      // JWT autentica Tenant A
-      mockVerify.mockResolvedValue({ sub: 'usuario-tenant-a', 'custom:tenant_id': tenantA.toString() });
-      const app = appComIsolamentoMultitenant(repositorio);
+    // JWT autentica Tenant A
+    mockVerify.mockResolvedValue({
+      sub: 'usuario-tenant-a',
+      'custom:tenant_id': tenantA.toString(),
+    });
+    const app = appComIsolamentoMultitenant(repositorio);
 
-      const resposta = await app.inject({
-        method: 'GET',
-        url: `/v1/orcamentos/${idDoOrcamentoDeTenantB.toString()}/status`,
-        headers: { authorization: 'Bearer token-tenant-a' },
-      });
+    const resposta = await app.inject({
+      method: 'GET',
+      url: `/v1/orcamentos/${idDoOrcamentoDeTenantB.toString()}/status`,
+      headers: { authorization: 'Bearer token-tenant-a' },
+    });
 
-      // (spec 007, T017) Tenant A tentando acessar orcamento de Tenant B → 404,
-      // nunca 403 (não revela existência cross-tenant)
-      expect(resposta.statusCode).toBe(404);
-      expect(resposta.statusCode).not.toBe(403);
-      expect(resposta.headers['content-type']).toContain('application/problem+json');
+    // (spec 007, T017) Tenant A tentando acessar orcamento de Tenant B → 404,
+    // nunca 403 (não revela existência cross-tenant)
+    expect(resposta.statusCode).toBe(404);
+    expect(resposta.statusCode).not.toBe(403);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
 
-      await app.close();
-    },
-  );
+    await app.close();
+  });
 
   it('sem JWT válido (sem claim de tenant), retorna 401 antes de alcançar o controller — nunca revela existência do orcamentoId', async () => {
     const repositorio = new OrcamentoRepositoryFake();
@@ -155,7 +157,10 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — isolamento multitenant (T0
       }),
     );
 
-    mockVerify.mockResolvedValue({ sub: 'usuario-tenant-a', 'custom:tenant_id': tenantA.toString() });
+    mockVerify.mockResolvedValue({
+      sub: 'usuario-tenant-a',
+      'custom:tenant_id': tenantA.toString(),
+    });
     const app = appComIsolamentoMultitenant(repositorio);
 
     const resposta = await app.inject({

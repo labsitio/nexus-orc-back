@@ -57,7 +57,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/revisao-humana — controller', () =
     publisher = new EventPublisherFake();
     tenantIdTeste = TenantId.novo();
     app = Fastify();
-    registrarRotaRevisaoHumana(app, new ConfirmarRevisaoHumana(repositorio, publisher), {
+    registrarRotaRevisaoHumana(app, new ConfirmarRevisaoHumana(() => repositorio, publisher), {
       preHandler: criarPreHandlerFakeTenant(tenantIdTeste),
     });
   });

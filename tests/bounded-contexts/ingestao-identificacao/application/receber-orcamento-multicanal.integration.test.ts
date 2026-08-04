@@ -69,12 +69,22 @@ async function receberViaConfirmarUpload(
     gerarUrlUpload: vi.fn(),
     confirmarUpload: vi.fn().mockResolvedValue(referencia),
   };
-  const receberOrcamento = new ReceberOrcamento(repositorioFake(), publisher, idempotenciaFake());
+  const receberOrcamento = new ReceberOrcamento(
+    () => repositorioFake(),
+    publisher,
+    idempotenciaFake(),
+  );
   const app = Fastify();
-  const preHandler = criarTenantContextMiddleware({ userPoolId: 'us-east-1_teste', clientId: 'client-teste' });
+  const preHandler = criarTenantContextMiddleware({
+    userPoolId: 'us-east-1_teste',
+    clientId: 'client-teste',
+  });
   registrarRotaConfirmarUpload(app, armazenamento, receberOrcamento, { preHandler });
 
-  mockVerify.mockResolvedValue({ sub: 'usuario-teste', 'custom:tenant_id': TenantId.novo().toString() });
+  mockVerify.mockResolvedValue({
+    sub: 'usuario-teste',
+    'custom:tenant_id': TenantId.novo().toString(),
+  });
   const resposta = await app.inject({
     method: 'POST',
     url: `/v1/orcamentos/${orcamentoId.toString()}/confirmar-upload`,
@@ -86,8 +96,14 @@ async function receberViaConfirmarUpload(
 }
 
 async function receberViaTriggerSftp(publisher: EventPublisher): Promise<void> {
-  const receberOrcamento = new ReceberOrcamento(repositorioFake(), publisher, idempotenciaFake());
-  const resolverTenant: SftpTenantResolverGateway = { resolver: vi.fn().mockResolvedValue(TenantId.novo()) };
+  const receberOrcamento = new ReceberOrcamento(
+    () => repositorioFake(),
+    publisher,
+    idempotenciaFake(),
+  );
+  const resolverTenant: SftpTenantResolverGateway = {
+    resolver: vi.fn().mockResolvedValue(TenantId.novo()),
+  };
   const handler = criarHandlerSftpUpload(receberOrcamento, resolverTenant);
 
   await handler(
