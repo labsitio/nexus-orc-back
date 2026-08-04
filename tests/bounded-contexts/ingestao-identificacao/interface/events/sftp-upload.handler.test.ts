@@ -196,4 +196,34 @@ describe('criarHandlerSftpUpload', () => {
       ),
     ).rejects.toThrow(/versionId/);
   });
+
+  it('registra descarte em log estruturado quando o mapeamento usuário/servidor está ausente, com bucket/key/versionId como campos consultáveis', async () => {
+    const { useCase, salvar } = receberOrcamentoFake();
+    const resolverTenant: SftpTenantResolverGateway = { resolver: vi.fn().mockResolvedValue(undefined) };
+    const childLogger = { warn: vi.fn(), child: vi.fn() };
+    const logger = { child: vi.fn().mockReturnValue(childLogger) };
+    const handler = criarHandlerSftpUpload(
+      useCase,
+      resolverTenant,
+      logger as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    );
+
+    await handler(
+      eventoS3([
+        { bucket: 'nexo-orcamentos-raw', key: 'sftp-incoming/orcamento.pdf', versionId: 'v-1' },
+      ]),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {} as any,
+      () => undefined,
+    );
+
+    expect(logger.child).toHaveBeenCalledWith({
+      bucket: 'nexo-orcamentos-raw',
+      key: 'sftp-incoming/orcamento.pdf',
+      versionId: 'v-1',
+    });
+    expect(childLogger.warn).toHaveBeenCalledOnce();
+    expect(childLogger.warn).toHaveBeenCalledWith(expect.stringContaining('TenantId não resolvido'));
+    expect(salvar).not.toHaveBeenCalled();
+  });
 });
