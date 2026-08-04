@@ -6,10 +6,11 @@ import type { SftpTenantResolverGateway } from '../../../../../src/bounded-conte
 import type { IdempotencyKeyRepository } from '../../../../../src/bounded-contexts/ingestao-identificacao/domain/repositories/idempotency-key.repository.js';
 import type { OrcamentoRepository } from '../../../../../src/bounded-contexts/ingestao-identificacao/domain/repositories/orcamento.repository.js';
 import { criarHandlerSftpUpload } from '../../../../../src/bounded-contexts/ingestao-identificacao/interface/events/sftp-upload.handler.js';
+import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
-/** Fake que sempre resolve para `undefined` — testes desta suíte não validam T016 (wiring de tenantId em ReceberOrcamento). */
+/** Resolve sempre para um `TenantId` válido — testes que só exercitam o fluxo feliz (não o gap de mapeamento ausente, T016). */
 function resolverTenantFake(): SftpTenantResolverGateway {
-  return { resolver: vi.fn().mockResolvedValue(undefined) };
+  return { resolver: vi.fn().mockResolvedValue(TenantId.novo()) };
 }
 
 function eventoS3(registros: Array<{ bucket: string; key: string; versionId?: string }>): S3Event {
@@ -117,9 +118,10 @@ describe('criarHandlerSftpUpload', () => {
     });
   });
 
-  it('não lança erro quando o mapeamento usuário/servidor está ausente — apenas registra, não bloqueia o processamento nesta fase (T016 formaliza a exigência)', async () => {
+  it('não lança erro quando o mapeamento usuário/servidor está ausente — registra e pula o registro, sem chamar ReceberOrcamento (T016 formaliza a exigência de tenantId)', async () => {
     const { useCase, salvar } = receberOrcamentoFake();
-    const handler = criarHandlerSftpUpload(useCase, resolverTenantFake());
+    const resolverTenant: SftpTenantResolverGateway = { resolver: vi.fn().mockResolvedValue(undefined) };
+    const handler = criarHandlerSftpUpload(useCase, resolverTenant);
 
     await expect(
       handler(
@@ -132,7 +134,7 @@ describe('criarHandlerSftpUpload', () => {
       ),
     ).resolves.toBeUndefined();
 
-    expect(salvar).toHaveBeenCalledTimes(1);
+    expect(salvar).not.toHaveBeenCalled();
   });
 
   it('redelivery do mesmo evento S3 (at-least-once da AWS) não duplica salvar/publicar — mesma Idempotency-Key', async () => {

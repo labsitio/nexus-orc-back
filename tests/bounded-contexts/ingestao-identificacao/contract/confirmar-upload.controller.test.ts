@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReceberOrcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/receber-orcamento.js';
 import type { ArmazenamentoBrutoGateway } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/armazenamento-bruto.gateway.js';
 import type { EventPublisher } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/event-publisher.js';
@@ -8,6 +8,24 @@ import type { OrcamentoRepository } from '../../../../src/bounded-contexts/inges
 import { OrcamentoId } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/orcamento-id.vo.js';
 import { ReferenciaS3 } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/referencia-s3.vo.js';
 import { registrarRotaConfirmarUpload } from '../../../../src/bounded-contexts/ingestao-identificacao/interface/http/confirmar-upload.controller.js';
+import { criarTenantContextMiddleware } from '../../../../src/interface/shared/tenant-context.middleware.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
+
+const { mockVerify, mockCreate } = vi.hoisted(() => {
+  const mockVerify = vi.fn();
+  return { mockVerify, mockCreate: vi.fn(() => ({ verify: mockVerify })) };
+});
+
+vi.mock('aws-jwt-verify', () => ({
+  CognitoJwtVerifier: { create: mockCreate },
+}));
+
+const AUTH_HEADERS = { authorization: 'Bearer token-teste' };
+
+function preHandlerTenantValido(): ReturnType<typeof criarTenantContextMiddleware> {
+  mockVerify.mockResolvedValue({ sub: 'usuario-teste', 'custom:tenant_id': TenantId.novo().toString() });
+  return criarTenantContextMiddleware({ userPoolId: 'us-east-1_teste', clientId: 'client-teste' });
+}
 
 /** Contract test do controller real (T022/#27) — fakes de gateway/repositório/publisher/idempotência. */
 function armazenamentoFake(referencia: ReferenciaS3 | undefined): ArmazenamentoBrutoGateway {
@@ -34,8 +52,28 @@ function receberOrcamentoReal(): ReceberOrcamento {
 describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — controller', () => {
   let app: ReturnType<typeof Fastify>;
 
+  beforeEach(() => {
+    mockVerify.mockReset();
+    mockCreate.mockClear();
+  });
+
   afterEach(async () => {
     await app.close();
+  });
+
+  it('401 Problem Details quando request.tenantContext está ausente (T016 — tenantId nunca vem do body)', async () => {
+    const referencia = ReferenciaS3.de({ bucket: 'b', key: 'k', versionId: 'v' });
+    app = Fastify();
+    registrarRotaConfirmarUpload(app, armazenamentoFake(referencia), receberOrcamentoReal());
+
+    const resposta = await app.inject({
+      method: 'POST',
+      url: `/v1/orcamentos/${OrcamentoId.novo().toString()}/confirmar-upload`,
+      payload: { canal: 'PORTAL_WEB', nomeArquivo: 'orcamento.pdf' },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
   });
 
   it('200 com o mesmo orcamentoId quando o upload já foi concluído', async () => {
@@ -46,12 +84,15 @@ describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — controller', ()
       versionId: 'v-1',
     });
     app = Fastify();
-    registrarRotaConfirmarUpload(app, armazenamentoFake(referencia), receberOrcamentoReal());
+    registrarRotaConfirmarUpload(app, armazenamentoFake(referencia), receberOrcamentoReal(), {
+      preHandler: preHandlerTenantValido(),
+    });
 
     const resposta = await app.inject({
       method: 'POST',
       url: `/v1/orcamentos/${orcamentoId.toString()}/confirmar-upload`,
       payload: { canal: 'PORTAL_WEB', nomeArquivo: 'orcamento.pdf' },
+      headers: AUTH_HEADERS,
     });
 
     expect(resposta.statusCode).toBe(200);
@@ -60,12 +101,15 @@ describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — controller', ()
 
   it('409 Problem Details quando o upload nunca foi concluído', async () => {
     app = Fastify();
-    registrarRotaConfirmarUpload(app, armazenamentoFake(undefined), receberOrcamentoReal());
+    registrarRotaConfirmarUpload(app, armazenamentoFake(undefined), receberOrcamentoReal(), {
+      preHandler: preHandlerTenantValido(),
+    });
 
     const resposta = await app.inject({
       method: 'POST',
       url: `/v1/orcamentos/${OrcamentoId.novo().toString()}/confirmar-upload`,
       payload: { canal: 'API_REST', nomeArquivo: 'orcamento.pdf' },
+      headers: AUTH_HEADERS,
     });
 
     expect(resposta.statusCode).toBe(409);
@@ -112,13 +156,15 @@ describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — controller', ()
     const publisher: EventPublisher = { publicar: vi.fn().mockResolvedValue(undefined) };
     const receberOrcamento = new ReceberOrcamento(repositorio, publisher, { reservar });
     app = Fastify();
-    registrarRotaConfirmarUpload(app, armazenamentoFake(referencia), receberOrcamento);
+    registrarRotaConfirmarUpload(app, armazenamentoFake(referencia), receberOrcamento, {
+      preHandler: preHandlerTenantValido(),
+    });
 
     await app.inject({
       method: 'POST',
       url: `/v1/orcamentos/${orcamentoId.toString()}/confirmar-upload`,
       payload: { canal: 'APP_MOBILE', nomeArquivo: 'x.pdf' },
-      headers: { 'idempotency-key': 'chave-abc' },
+      headers: { ...AUTH_HEADERS, 'idempotency-key': 'chave-abc' },
     });
 
     expect(reservar).toHaveBeenCalledWith('chave-abc', expect.anything(), expect.any(Date));
