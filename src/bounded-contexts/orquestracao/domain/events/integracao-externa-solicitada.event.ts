@@ -16,13 +16,13 @@ export interface IntegracaoExternaSolicitadaPayload extends DomainEventEnvelope 
 export class IntegracaoExternaSolicitada implements IntegracaoExternaSolicitadaPayload {
   static readonly detailType = 'IntegracaoExternaSolicitada' as const;
   readonly detailType = IntegracaoExternaSolicitada.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
     readonly acaoOrigem: AcaoRoteamento,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

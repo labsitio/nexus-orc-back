@@ -69,6 +69,7 @@ class EventPublisherFake implements EventPublisher {
 }
 
 const ORCAMENTO_ID = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+const TENANT_ID = TenantId.novo();
 
 const CONTEXTO_VALIDACAO = ContextoValidacao.de({ resultado: 'VALIDADO' });
 
@@ -96,7 +97,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
@@ -141,7 +146,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
@@ -164,7 +173,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'ENCAMINHAR_COMPRADOR',
@@ -187,7 +200,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'SOLICITAR_REENVIO',
@@ -210,7 +227,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake();
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
@@ -251,7 +272,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
       },
     };
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       agenteOrquestrador,
       publisher,
@@ -284,7 +309,11 @@ describe('ConsolidarEDecidirWorkflow', () => {
       },
     };
     const useCase = new ConsolidarEDecidirWorkflow(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       agenteOrquestrador,
       publisher,

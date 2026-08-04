@@ -1,4 +1,7 @@
-import { DecisaoWorkflow } from '../../domain/aggregates/decisao-workflow.aggregate.js';
+import {
+  DecisaoWorkflow,
+  DecisaoWorkflowSemTenantIdError,
+} from '../../domain/aggregates/decisao-workflow.aggregate.js';
 import type { StatusDecisaoWorkflow } from '../../domain/aggregates/decisao-workflow.aggregate.js';
 import { DecisaoWorkflowEscalonadaParaComprador } from '../../domain/events/decisao-workflow-escalonada-para-comprador.event.js';
 import type { DomainEventEnvelope } from '../../domain/events/domain-event.js';
@@ -78,7 +81,14 @@ export class ConsolidarEDecidirWorkflow {
     decisaoWorkflow.registrarTentativaOrquestrador(resultado);
     await this.repositorio.salvar(decisaoWorkflow);
 
-    const tenantIdParaEventos = decisaoWorkflow.tenantId?.toString();
+    // (spec 007, ADR-008 — cutover de contract, #632) As 3 ACLs upstream
+    // (001/002/003) já rejeitam evento sem `tenantId` — chegar aqui sem ele
+    // seria falha de invariante, nunca caminho esperado.
+    const tenantIdConsolidado = decisaoWorkflow.tenantId;
+    if (!tenantIdConsolidado) {
+      throw new DecisaoWorkflowSemTenantIdError(orcamentoId.toString());
+    }
+    const tenantIdParaEventos = tenantIdConsolidado.toString();
 
     if (decisaoWorkflow.status === 'PENDENTE_REVISAO_HUMANA') {
       await this.publisher.publicar(
@@ -112,7 +122,7 @@ export class ConsolidarEDecidirWorkflow {
       readonly nivelConfianca: { readonly valor: number } | null;
       readonly motivoDadoAusente?: string;
     },
-    tenantId: string | undefined,
+    tenantId: string,
   ): DomainEventEnvelope {
     const nivelConfianca = decisao.nivelConfianca?.valor ?? null;
 

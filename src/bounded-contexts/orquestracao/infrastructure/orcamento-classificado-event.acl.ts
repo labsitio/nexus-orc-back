@@ -25,11 +25,11 @@ interface OrcamentoClassificadoPayloadBruto {
     readonly formatoIdentificado: string;
   };
   /**
-   * (issue #650 — expand/contract, ADR-008) Ainda opcional no envelope de
-   * origem (spec 001). `undefined` nunca é rejeitado aqui — ver
-   * `OrcamentoClassificadoEventACLResultado.tenantId`.
+   * (spec 007, ADR-008 — cutover de contract, #632) Obrigatório desde
+   * `schemaVersion: 2` do envelope de origem (spec 001) — o type guard
+   * estrutural (`ehOrcamentoClassificadoPayloadBruto`) já rejeita ausente.
    */
-  readonly tenantId?: string;
+  readonly tenantId: string;
 }
 
 /**
@@ -62,7 +62,7 @@ function ehOrcamentoClassificadoPayloadBruto(
   ) {
     return false;
   }
-  return objeto.tenantId === undefined || typeof objeto.tenantId === 'string';
+  return typeof objeto.tenantId === 'string';
 }
 
 /**
@@ -86,10 +86,7 @@ export class OrcamentoClassificadoEventACL implements OrcamentoClassificadoEvent
         fornecedorIdentificado: payloadBruto.resultado.fornecedorIdentificado,
         formatoIdentificado: payloadBruto.resultado.formatoIdentificado,
       }),
-      // (issue #650) Nunca rejeitado quando ausente — ver
-      // `OrcamentoClassificadoEventACLResultado.tenantId`.
-      tenantId:
-        payloadBruto.tenantId !== undefined ? TenantId.de(payloadBruto.tenantId) : undefined,
+      tenantId: TenantId.de(payloadBruto.tenantId),
     };
   }
 }

@@ -17,13 +17,13 @@ export interface OrcamentoInconsistenciaDetectadaPayload extends DomainEventEnve
 export class OrcamentoInconsistenciaDetectada implements OrcamentoInconsistenciaDetectadaPayload {
   static readonly detailType = 'OrcamentoInconsistenciaDetectada' as const;
   readonly detailType = OrcamentoInconsistenciaDetectada.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
     readonly inconsistencias: readonly InconsistenciaDetectadaPayload[],
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

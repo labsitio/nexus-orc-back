@@ -16,14 +16,14 @@ export interface OrcamentoExtraidoComPendenciaConfirmadaPayload extends DomainEv
 export class OrcamentoExtraidoComPendenciaConfirmada implements OrcamentoExtraidoComPendenciaConfirmadaPayload {
   static readonly detailType = 'OrcamentoExtraidoComPendenciaConfirmada' as const;
   readonly detailType = OrcamentoExtraidoComPendenciaConfirmada.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
     readonly itens: readonly ItemOrcamentoPayload[],
     readonly condicoesComerciais: CondicoesComerciaisPayload,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

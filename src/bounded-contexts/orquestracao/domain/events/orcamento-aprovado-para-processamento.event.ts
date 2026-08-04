@@ -17,7 +17,7 @@ export interface OrcamentoAprovadoParaProcessamentoPayload extends DomainEventEn
 export class OrcamentoAprovadoParaProcessamento implements OrcamentoAprovadoParaProcessamentoPayload {
   static readonly detailType = 'OrcamentoAprovadoParaProcessamento' as const;
   readonly detailType = OrcamentoAprovadoParaProcessamento.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
@@ -25,7 +25,7 @@ export class OrcamentoAprovadoParaProcessamento implements OrcamentoAprovadoPara
     readonly agenteOrigem: AgenteOrigemDecisao,
     readonly criterio: string,
     readonly nivelConfianca: number | null,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

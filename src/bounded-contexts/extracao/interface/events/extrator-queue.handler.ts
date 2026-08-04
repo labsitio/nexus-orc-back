@@ -37,11 +37,12 @@ interface EventBridgeEnvelope {
       readonly versionId: string;
     };
     /**
-     * (issue #648) `tenantId` ainda é opcional no envelope de 001 (T016,
-     * schemaVersion 1) — a #632 o torna obrigatório nos 4 BCs de uma vez.
-     * Ausente aqui é o estado normal pré-cutover (ADR-008, fase de expand).
+     * (spec 007, ADR-008 — cutover de contract, #632) `tenantId` é
+     * obrigatório no envelope de 001 desde `schemaVersion: 2`. Mensagem sem
+     * `tenantId` é rejeitada aqui (batch item failure), nunca propagada
+     * como `undefined`.
      */
-    readonly tenantId?: string;
+    readonly tenantId: string;
   };
 }
 
@@ -78,7 +79,7 @@ function ehEventBridgeEnvelope(valor: unknown): valor is EventBridgeEnvelope {
   ) {
     return false;
   }
-  return d.tenantId === undefined || typeof d.tenantId === 'string';
+  return typeof d.tenantId === 'string';
 }
 
 /**
@@ -112,16 +113,15 @@ function ehEventBridgeEnvelope(valor: unknown): valor is EventBridgeEnvelope {
  * levou `classificador-queue.handler.ts` (spec 001, #280/T017) a extrair
  * `tenantId` inline em vez de criar uma ACL só para isso.
  *
- * `tenantId` ausente no envelope é o estado normal pré-#632 (ADR-008, fase de
- * expand) — nunca rejeitado, propagado como `undefined`. Diferente do
- * padrão AUSENTE/DIVERGENTE de `classificador-queue.handler.ts` (#640):
- * `ExtracaoOrcamento` é sempre *criado* aqui (nunca há um agregado
- * pré-existente de outro tenant para divergir contra — `orcamentoId` é
- * UUID v7, colisão entre tenants não é um cenário real), então não há
- * distinção AUSENTE/DIVERGENTE a fazer nem `TenantDivergenciaError` a
- * lançar. Só `tenantId` malformado (não UUID v7) é erro — dado de produtor
- * corrompido, tratado como qualquer outro envelope inválido (bloco `catch`
- * abaixo, nunca instância especial).
+ * (spec 007, ADR-008 — cutover de contract, #632) `tenantId` ausente no
+ * envelope é rejeitado aqui (`ehEventBridgeEnvelope` exige `string`) — mesmo
+ * tratamento de erro genérico do envelope (batch item failure, retry,
+ * eventual DLQ). Diferente do padrão AUSENTE/DIVERGENTE de
+ * `classificador-queue.handler.ts` (#640): `ExtracaoOrcamento` é sempre
+ * *criado* aqui (nunca há um agregado pré-existente de outro tenant para
+ * divergir contra — `orcamentoId` é UUID v7, colisão entre tenants não é um
+ * cenário real), então não há distinção AUSENTE/DIVERGENTE a fazer nem
+ * `TenantDivergenciaError` a lançar.
  */
 export function criarExtratorQueueHandler(
   extrairDadosOrcamento: ExtrairDadosOrcamento,
@@ -142,20 +142,21 @@ export function criarExtratorQueueHandler(
         }
         orcamentoId = corpo.detail.orcamentoId;
 
-        // (issue #648) `tenantId` malformado (não UUID v7) é dado de produtor
-        // corrompido, não ausência esperada — mesmo tratamento de erro
-        // genérico do envelope (batch item failure, retry, eventual DLQ).
+        // (spec 007, ADR-008 — cutover de contract, #632) `tenantId`
+        // malformado (não UUID v7) é dado de produtor corrompido — mesmo
+        // tratamento de erro genérico do envelope (batch item failure,
+        // retry, eventual DLQ).
         const tenantIdStr = corpo.detail.tenantId;
-        let tenantId: TenantId | undefined;
+        let tenantId: TenantId;
         try {
-          tenantId = tenantIdStr ? TenantId.de(tenantIdStr) : undefined;
+          tenantId = TenantId.de(tenantIdStr);
         } catch {
           throw new Error(`Mensagem ${record.messageId} contém tenantId inválido: ${tenantIdStr}`);
         }
 
         const logDoOrcamento = logDaMensagem.child({
           orcamentoId,
-          tenantId: tenantId?.toString(),
+          tenantId: tenantId.toString(),
         });
         logDoOrcamento.info('Extraindo dados do orçamento');
         await extrairDadosOrcamento.executar({

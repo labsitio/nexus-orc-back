@@ -99,12 +99,7 @@ export class ClassificarOrcamento {
     // - se agregado não tem tenantId (legado): divergência, 404
     // - se ambos têm e coincidem: sucesso
     if (!orcamento.tenantId) {
-      throw new TenantDivergenciaError(
-        orcamentoIdBruto,
-        'AUSENTE',
-        undefined,
-        tenantId.toString(),
-      );
+      throw new TenantDivergenciaError(orcamentoIdBruto, 'AUSENTE', undefined, tenantId.toString());
     }
     if (orcamento.tenantId.toString() !== tenantId.toString()) {
       throw new TenantDivergenciaError(
@@ -148,14 +143,20 @@ export class ClassificarOrcamento {
 
     const evento =
       orcamento.status === 'CLASSIFICADO'
-        ? new OrcamentoClassificado(orcamento.id.toString(), resultado.paraPayload(), {
-            bucket: orcamento.referenciaBruta.bucket,
-            key: orcamento.referenciaBruta.key,
-            versionId: orcamento.referenciaBruta.versionId,
-          })
+        ? new OrcamentoClassificado(
+            orcamento.id.toString(),
+            resultado.paraPayload(),
+            {
+              bucket: orcamento.referenciaBruta.bucket,
+              key: orcamento.referenciaBruta.key,
+              versionId: orcamento.referenciaBruta.versionId,
+            },
+            tenantId.toString(),
+          )
         : new OrcamentoEscalonadoParaRevisaoHumana(
             orcamento.id.toString(),
             resultado.paraPayload(),
+            tenantId.toString(),
           );
     await this.eventPublisher.publicar(evento);
   }

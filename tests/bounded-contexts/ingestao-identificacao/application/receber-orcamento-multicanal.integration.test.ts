@@ -146,7 +146,7 @@ describe('OrcamentoRecebido — mesmo shape entre os 4 canais', () => {
     const canaisEsperados = ['PORTAL_WEB', 'API_REST', 'APP_MOBILE', 'SFTP'];
     eventos.forEach((evento, i) => {
       expect(evento.detailType).toBe('OrcamentoRecebido');
-      expect(evento.schemaVersion).toBe(1);
+      expect(evento.schemaVersion).toBe(2);
       expect(evento.canal).toBe(canaisEsperados[i]);
       expect(typeof evento.orcamentoId).toBe('string');
       expect(evento.orcamentoId).toMatch(

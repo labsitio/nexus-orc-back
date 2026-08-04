@@ -31,6 +31,7 @@ import {
   validarPrecoDentroDaFaixa,
 } from '../../../../src/bounded-contexts/validacao/domain/regras-consistencia.js';
 import type { InconsistenciaDetectada } from '../../../../src/bounded-contexts/validacao/domain/value-objects/inconsistencia-detectada.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * T033 (#143, spec 003) — Integration test: `OrcamentoExtraido` com
@@ -140,12 +141,14 @@ async function processarDecisaoHumana(
 
   await repositorio.salvar(validacao);
 
+  const tenantId = validacao.tenantId!.toString();
   if (validacao.status === 'VALIDADO') {
     await publisher.publicar(
       new OrcamentoValidado(
         validacao.orcamentoId.toString(),
         validacao.dadosExtraidos.itens.map((item) => item.paraPayload()),
         validacao.dadosExtraidos.condicoesComerciais,
+        tenantId,
       ),
     );
   } else if (validacao.status === 'VALIDADO_COM_RESSALVA') {
@@ -155,6 +158,7 @@ async function processarDecisaoHumana(
         validacao.inconsistencias.map((i) => i.paraPayload()),
         validacao.dadosExtraidos.itens.map((item) => item.paraPayload()),
         validacao.dadosExtraidos.condicoesComerciais,
+        tenantId,
       ),
     );
   }
@@ -192,7 +196,11 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
     const parametroFaixaPreco = new ParametroFaixaPrecoGatewayFake();
 
     const validarOrcamento = new ValidarOrcamento(
-      new ACLFake({ orcamentoId, dadosExtraidos: dadosConsistentes('11111111111111') }),
+      new ACLFake({
+        orcamentoId,
+        dadosExtraidos: dadosConsistentes('11111111111111'),
+        tenantId: TenantId.novo(),
+      }),
       repositorio,
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
@@ -237,7 +245,11 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
     const parametroFaixaPreco = new ParametroFaixaPrecoGatewayFake();
 
     const validarOrcamento = new ValidarOrcamento(
-      new ACLFake({ orcamentoId, dadosExtraidos: dadosConsistentes('11111111111111') }),
+      new ACLFake({
+        orcamentoId,
+        dadosExtraidos: dadosConsistentes('11111111111111'),
+        tenantId: TenantId.novo(),
+      }),
       repositorio,
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
@@ -270,7 +282,11 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
     const parametroFaixaPreco = new ParametroFaixaPrecoGatewayFake();
 
     const validarOrcamento = new ValidarOrcamento(
-      new ACLFake({ orcamentoId, dadosExtraidos: dadosConsistentes('11111111111111') }),
+      new ACLFake({
+        orcamentoId,
+        dadosExtraidos: dadosConsistentes('11111111111111'),
+        tenantId: TenantId.novo(),
+      }),
       repositorio,
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
@@ -325,6 +341,7 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new ACLFake({
         orcamentoId: orcamentoPendente,
         dadosExtraidos: dadosConsistentes('11111111111111'),
+        tenantId: TenantId.novo(),
       }),
       repositorio,
       new FornecedorCadastradoGatewayFake(true),
@@ -337,6 +354,7 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new ACLFake({
         orcamentoId: orcamentoConsistente,
         dadosExtraidos: dadosConsistentes(CNPJ_VALIDO),
+        tenantId: TenantId.novo(),
       }),
       repositorio,
       new FornecedorCadastradoGatewayFake(true),

@@ -23,13 +23,11 @@ export interface ExtrairDadosOrcamentoParams {
   readonly referenciaClassificacao: ReferenciaClassificacaoParams;
   readonly referenciaBrutaS3: ReferenciaS3Params;
   /**
-   * (issue #648 — expand/contract, ADR-008) Vem do envelope `OrcamentoClassificado`
-   * (spec 001), ainda opcional até a #632. Ausente aqui é o estado normal
-   * pré-cutover: propagado como `undefined` para o agregado, nunca rejeitado —
-   * não há estado anterior do agregado para divergir contra (`ExtracaoOrcamento`
-   * é sempre criado, nunca pré-existente por outro caminho de escrita).
+   * (spec 007, ADR-008 — cutover de contract, #632) Vem do envelope
+   * `OrcamentoClassificado` (spec 001), obrigatório desde `schemaVersion: 2`.
+   * Extraído/validado pelo handler antes de chegar aqui (T023/#88).
    */
-  readonly tenantId?: TenantId;
+  readonly tenantId: TenantId;
 }
 
 /** Motivo registrado em `ExtracaoEscalonadaParaRevisaoHumana` (plan.md/ADR-003). */
@@ -40,6 +38,20 @@ export class ExtracaoInconsistenteError extends ErroDominio {
   constructor(orcamentoId: string) {
     super(
       `ExtracaoOrcamento ${orcamentoId} está EXTRAIDO sem condicoesComerciais — invariante do agregado violada`,
+    );
+  }
+}
+
+/**
+ * (spec 007, ADR-008 — cutover de contract, #632) Nunca deveria ocorrer: todo
+ * `ExtracaoOrcamento.criar` neste caso de uso recebe `params.tenantId`
+ * (obrigatório). Guarda de fail-fast contra reentrega de fila com um
+ * agregado legado (pré-retrofit) sem `tenantId` persistido.
+ */
+export class ExtracaoSemTenantIdError extends ErroDominio {
+  constructor(orcamentoId: string) {
+    super(
+      `ExtracaoOrcamento ${orcamentoId} não possui tenantId — registro pré-retrofit incompatível com o envelope de evento obrigatório (ADR-008)`,
     );
   }
 }
@@ -102,6 +114,17 @@ export class ExtrairDadosOrcamento {
     extracao.registrarTentativaExtrator(resultado.itens, resultado.condicoesComerciais);
     await this.repositorio.salvar(extracao);
 
+    // (spec 007, ADR-008 — cutover de contract, #632) O evento carrega o
+    // `tenantId` já persistido no agregado (fonte da verdade, imutável desde
+    // a criação) — nunca `params.tenantId` diretamente: numa reentrega com
+    // `tenantId` divergente do já registrado (ponytail acima, silenciosamente
+    // descartado), o evento nunca deve reportar um tenant diferente do dono
+    // real do agregado.
+    const tenantId = extracao.tenantId;
+    if (!tenantId) {
+      throw new ExtracaoSemTenantIdError(extracao.orcamentoId.toString());
+    }
+
     let evento: OrcamentoExtraido | ExtracaoEscalonadaParaRevisaoHumana;
     if (extracao.status === 'EXTRAIDO') {
       const condicoesComerciais = extracao.condicoesComerciais;
@@ -114,13 +137,13 @@ export class ExtrairDadosOrcamento {
         extracao.orcamentoId.toString(),
         extracao.itens.map((item) => item.paraPayload()),
         condicoesComerciais.paraPayload(),
-        extracao.tenantId?.toString(),
+        tenantId.toString(),
       );
     } else {
       evento = new ExtracaoEscalonadaParaRevisaoHumana(
         extracao.orcamentoId.toString(),
         MOTIVO_CAMPO_SEM_CONFIANCA,
-        extracao.tenantId?.toString(),
+        tenantId.toString(),
       );
     }
     await this.eventPublisher.publicar(evento);

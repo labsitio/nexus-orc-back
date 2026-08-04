@@ -35,10 +35,10 @@ interface OrcamentoValidadoPayloadBruto {
   readonly itens: readonly ItemPayloadBruto[];
   readonly condicoesComerciais: string;
   /**
-   * Ainda opcional no envelope de origem (003, T041 — expand/contract).
-   * Checagem estrutural do type guard não confunde "ausente" com "shape
-   * errado": `undefined` passa aqui, e é `traduzir` quem decide rejeitar
-   * (spec-007 T042/ADR-008).
+   * (spec 007, ADR-008 — cutover de contract, #632) Obrigatório desde
+   * `schemaVersion: 2` do envelope de 003. Continua opcional aqui no shape
+   * estrutural de wire (payload de outro BC é entrada não confiável, `unknown`
+   * de propósito) — é `traduzir` quem rejeita ausência (spec-007 T042/ADR-008).
    */
   readonly tenantId?: string;
 }
@@ -97,14 +97,10 @@ function origemValidacaoDe(detailType: OrcamentoValidadoEventDetailType): Origem
  * 003 e o valida via `TenantId.de` (Shared Kernel — único VO cujo import
  * direto entre BCs é autorizado). Decisão vinculante (opção estrita): evento
  * sem `tenantId` é rejeitado aqui — `OrcamentoValidadoEventACLInvalidaError`,
- * nunca indexado sem isolamento de tenant. 003 ainda publica `tenantId`
- * opcional (T041, expand/contract); enquanto os sites de emissão de 003 não
- * preencherem o campo, qualquer evento recebido aqui será rejeitado — essa
- * lacuna é rastreada como dependência pendente na issue #584 (fora do
- * escopo de T042, que é só a tradução na ACL). Base para a decisão: zero
- * tenant real em produção (#587/#297/T045) e nenhum handler Lambda
- * implantado — falhar rápido na fronteira de tradução entre BCs é seguro
- * hoje e não interrompe nenhum pipeline real.
+ * nunca indexado sem isolamento de tenant. Desde o cutover de contract (#632),
+ * `tenantId` é obrigatório no envelope de 003 (`schemaVersion: 2`) — a
+ * rejeição aqui deixou de ser esperada em operação normal e passa a ser só
+ * defesa de fronteira contra payload malformado/produtor corrompido.
  */
 export class OrcamentoValidadoEventACL implements OrcamentoValidadoEventACLPort {
   traduzir(

@@ -6,14 +6,14 @@ export interface OrcamentoExtraidoEventACLResultado {
   readonly orcamentoId: OrcamentoId;
   readonly contextoExtracao: ContextoExtracao;
   /**
-   * (issue #650 — expand/contract, ADR-008) Extraído do envelope de 002, que
-   * ainda publica `tenantId` opcional. `undefined` nunca é rejeitado aqui —
-   * propagado como tal até a #632 tornar o campo obrigatório nos 4 BCs.
-   * Sem consumidor de application ainda (`RegistrarContextoExtracao` não
-   * existe, #235/T029): campo extraído e disponível, aguardando o caso de
-   * uso que o consumirá.
+   * (spec 007, ADR-008 — cutover de contract, #632) Extraído do envelope de
+   * 002, obrigatório desde `schemaVersion: 2`. Evento sem `tenantId` é
+   * rejeitado por `OrcamentoExtraidoEventACL` (Infrastructure) — nunca
+   * propagado como `undefined`. Sem consumidor de application ainda
+   * (`RegistrarContextoExtracao` não existe, #235/T029): campo extraído e
+   * disponível, aguardando o caso de uso que o consumirá.
    */
-  readonly tenantId?: TenantId;
+  readonly tenantId: TenantId;
 }
 
 /**

@@ -70,6 +70,22 @@ export class TenantIdDivergenteError extends ErroDominio {
   }
 }
 
+/**
+ * (spec 007, ADR-008 — cutover de contract, #632) Disparado quando
+ * `consolidarContexto()` já concluiu (`CONTEXTO_CONSOLIDADO`) mas nenhum dos 3
+ * upstreams registrou `tenantId` — nunca deveria ocorrer desde o cutover
+ * (001/002/003 publicam `tenantId` obrigatório em `schemaVersion: 2`, e as 3
+ * ACLs cross-BC rejeitam evento sem o campo antes de chegar aqui). Fail-fast
+ * em vez de publicar o desfecho de workflow com `tenantId` ausente.
+ */
+export class DecisaoWorkflowSemTenantIdError extends ErroDominio {
+  constructor(orcamentoId: string) {
+    super(
+      `DecisaoWorkflow ${orcamentoId} consolidada sem tenantId — nenhum dos 3 upstreams o registrou (ADR-008)`,
+    );
+  }
+}
+
 /** Resultado reportado pelo `AgenteOrquestradorGateway` — ainda não é uma `DecisaoRoteamento` válida (depende do limiar de confiança ser atingido). */
 export interface ResultadoOrquestrador {
   readonly acao: AcaoRoteamento;

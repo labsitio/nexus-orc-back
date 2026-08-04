@@ -79,6 +79,7 @@ class EventPublisherFake implements EventPublisher {
 
 const CNPJ_VALIDO = '11222333000181';
 const ORCAMENTO_ID = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+const TENANT_ID = TenantId.novo();
 
 function dadosConsistentes(): DadosExtraidosParaValidacao {
   return DadosExtraidosParaValidacao.de({
@@ -110,7 +111,11 @@ describe('ValidarOrcamento', () => {
     const publisher = new EventPublisherFake();
     const fornecedorCadastrado = new FornecedorCadastradoGatewayFake(true);
     const useCase = new ValidarOrcamento(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, dadosExtraidos: dadosConsistentes() }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        dadosExtraidos: dadosConsistentes(),
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       fornecedorCadastrado,
       new ParametroFaixaPrecoGatewayFake(),
@@ -132,7 +137,11 @@ describe('ValidarOrcamento', () => {
     const repositorio = new OrcamentoValidacaoRepositoryFake();
     const publisher = new EventPublisherFake();
     const useCase = new ValidarOrcamento(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, dadosExtraidos: dadosConsistentes() }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        dadosExtraidos: dadosConsistentes(),
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       new FornecedorCadastradoGatewayFake(false),
       new ParametroFaixaPrecoGatewayFake(),
@@ -152,7 +161,11 @@ describe('ValidarOrcamento', () => {
     const publisher = new EventPublisherFake();
     const fornecedorCadastrado = new FornecedorCadastradoGatewayFake(true);
     const useCase = new ValidarOrcamento(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, dadosExtraidos: dadosComCnpjInvalido() }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        dadosExtraidos: dadosComCnpjInvalido(),
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       fornecedorCadastrado,
       new ParametroFaixaPrecoGatewayFake(),
@@ -175,7 +188,11 @@ describe('ValidarOrcamento', () => {
     const publisher = new EventPublisherFake();
     const fornecedorCadastrado = new FornecedorCadastradoGatewayFake(true);
     const useCase = new ValidarOrcamento(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, dadosExtraidos: dadosConsistentes() }),
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        dadosExtraidos: dadosConsistentes(),
+        tenantId: TENANT_ID,
+      }),
       repositorio,
       fornecedorCadastrado,
       new ParametroFaixaPrecoGatewayFake(),
@@ -206,23 +223,5 @@ describe('ValidarOrcamento', () => {
     expect(repositorio.salvos[0]!.tenantId).toBe(tenantId);
     const evento = publisher.eventosPublicados[0] as OrcamentoValidado;
     expect(evento.tenantId).toBe(tenantId.toString());
-  });
-
-  it('nunca rejeita quando a ACL não retorna tenantId — 002 ainda publica opcional (issue #649, expand/contract)', async () => {
-    const repositorio = new OrcamentoValidacaoRepositoryFake();
-    const publisher = new EventPublisherFake();
-    const useCase = new ValidarOrcamento(
-      new ACLFake({ orcamentoId: ORCAMENTO_ID, dadosExtraidos: dadosConsistentes() }),
-      repositorio,
-      new FornecedorCadastradoGatewayFake(true),
-      new ParametroFaixaPrecoGatewayFake(),
-      publisher,
-    );
-
-    await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
-
-    expect(repositorio.salvos[0]!.tenantId).toBeUndefined();
-    const evento = publisher.eventosPublicados[0] as OrcamentoValidado;
-    expect(evento.tenantId).toBeUndefined();
   });
 });

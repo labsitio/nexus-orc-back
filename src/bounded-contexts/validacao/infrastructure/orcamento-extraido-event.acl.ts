@@ -58,9 +58,9 @@ interface OrcamentoExtraidoPayloadBruto {
   readonly cnpjFornecedor?: string;
   readonly dataEmissaoProposta?: string;
   /**
-   * (issue #649 — expand/contract, ADR-008) Ainda opcional no envelope de
-   * origem (spec-002 #648). `undefined` nunca é rejeitado aqui — ver
-   * `OrcamentoExtraidoEventACLResultado.tenantId`.
+   * (spec 007, ADR-008 — cutover de contract, #632) Obrigatório desde
+   * `schemaVersion: 2` do envelope de origem — `undefined` é rejeitado por
+   * `traduzir` (ver `OrcamentoExtraidoEventACLImpl`).
    */
   readonly tenantId?: string;
 }
@@ -143,6 +143,11 @@ function periodoValidadeDoPayload(condicoes: CondicoesComerciaisPayloadBruto): P
  * já rastreia a coordenação para `dataEmissaoProposta`; `cnpjFornecedor`
  * precisa do mesmo tratamento (nenhum campo equivalente existe em nenhum
  * evento hoje publicado pela Extração).
+ *
+ * **Amendment spec-007 (ADR-008 — cutover de contract, #632)**: `tenantId`
+ * passa a ser obrigatório no envelope de 002 — evento sem `tenantId` é
+ * rejeitado aqui, nunca propagado como `undefined` (mesma decisão vinculante
+ * já aplicada por `OrcamentoValidadoEventACL`, T042, sobre eventos de 003).
  */
 export class OrcamentoExtraidoEventACLImpl implements OrcamentoExtraidoEventACL {
   traduzir(payloadBruto: unknown): OrcamentoExtraidoEventACLResultado {
@@ -153,6 +158,9 @@ export class OrcamentoExtraidoEventACLImpl implements OrcamentoExtraidoEventACL 
     }
     if (!payload.dataEmissaoProposta) {
       throw new OrcamentoExtraidoEventACLPayloadIncompletoError('dataEmissaoProposta');
+    }
+    if (!payload.tenantId) {
+      throw new OrcamentoExtraidoEventACLPayloadIncompletoError('tenantId');
     }
 
     const dadosExtraidos = DadosExtraidosParaValidacao.de({
@@ -166,9 +174,7 @@ export class OrcamentoExtraidoEventACLImpl implements OrcamentoExtraidoEventACL 
     return {
       orcamentoId: OrcamentoId.de(payload.orcamentoId),
       dadosExtraidos,
-      // (issue #649) Nunca rejeitado quando ausente — ver
-      // `OrcamentoExtraidoEventACLResultado.tenantId`.
-      tenantId: payload.tenantId !== undefined ? TenantId.de(payload.tenantId) : undefined,
+      tenantId: TenantId.de(payload.tenantId),
     };
   }
 }

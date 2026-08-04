@@ -45,6 +45,7 @@ function payloadCompleto(overrides: Record<string, unknown> = {}) {
     },
     cnpjFornecedor: '11222333000181',
     dataEmissaoProposta: '2026-01-10T00:00:00.000Z',
+    tenantId,
     ...overrides,
   };
 }
@@ -148,12 +149,13 @@ describe('OrcamentoExtraidoEventACLImpl', () => {
 
   it('extrai e valida tenantId quando presente no envelope (issue #649)', () => {
     const resultado = acl.traduzir(payloadCompleto({ tenantId }));
-    expect(resultado.tenantId?.toString()).toBe(tenantId);
+    expect(resultado.tenantId.toString()).toBe(tenantId);
   });
 
-  it('nunca rejeita payload sem tenantId — 002 ainda publica opcional (issue #649, expand/contract)', () => {
-    const resultado = acl.traduzir(payloadCompleto());
-    expect(resultado.tenantId).toBeUndefined();
+  it('rejeita payload sem tenantId — obrigatório desde o cutover de contract (#632, ADR-008)', () => {
+    const payload = payloadCompleto();
+    delete (payload as Record<string, unknown>).tenantId;
+    expect(() => acl.traduzir(payload)).toThrow(OrcamentoExtraidoEventACLPayloadIncompletoError);
   });
 
   it('lança erro de TenantId inválido quando tenantId não é UUID v7', () => {

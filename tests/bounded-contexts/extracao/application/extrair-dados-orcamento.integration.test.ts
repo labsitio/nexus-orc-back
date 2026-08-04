@@ -167,10 +167,12 @@ async function processarMensagemExtratorQueue(
           extracao.orcamentoId.toString(),
           extracao.itens.map((item) => item.paraPayload()),
           extracao.condicoesComerciais!.paraPayload(),
+          '018f4b1a-tenant-0000-000000000000',
         )
       : new ExtracaoEscalonadaParaRevisaoHumana(
           extracao.orcamentoId.toString(),
           '1+ campo obrigatório sem confiança suficiente',
+          '018f4b1a-tenant-0000-000000000000',
         );
   await publisher.publicar(evento);
 }
@@ -196,7 +198,7 @@ describe('Consumidor de extrator-queue (integração simulada)', () => {
     expect(publisher.eventosPublicados).toHaveLength(1);
     const evento = publisher.eventosPublicados[0] as OrcamentoExtraido;
     expect(evento.detailType).toBe(OrcamentoExtraido.detailType);
-    expect(evento.schemaVersion).toBe(1);
+    expect(evento.schemaVersion).toBe(2);
     expect(evento.orcamentoId).toBe(extracao.orcamentoId.toString());
     expect(evento.itens).toHaveLength(1);
     expect(evento.itens[0]?.descricao.valor).toEqual({

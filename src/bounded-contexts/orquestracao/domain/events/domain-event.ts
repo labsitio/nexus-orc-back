@@ -5,17 +5,16 @@
  * (Ingestão/Extração/Validação) mas publica apenas os desfechos de decisão
  * de workflow definidos nesta spec — nunca reexporta tipo de evento upstream.
  *
- * **Amendment (spec-007, T044 — expand/contract)**: `tenantId` é extraído dos
- * 3 eventos upstream (001/002/003, já v2 após T040/T041). Opcional e
- * `schemaVersion` mantido em 1 de propósito: os sites de emissão deste BC
- * ainda não preenchem o campo (wiring é escopo de outra issue). Uma PR de
- * contract futura torna `tenantId` obrigatório (ADR-008 — cutover único,
- * sem suporte dual publicado).
+ * **Amendment (spec-007, ADR-008 — cutover de contract, #632)**: `tenantId`
+ * é extraído dos 3 eventos upstream (001/002/003, já v2) e consolidado pelo
+ * agregado `DecisaoWorkflow`. Obrigatório desde `schemaVersion: 2`: cutover
+ * único, sem suporte dual v1/v2 publicado (baseline de zero tenant real em
+ * produção e zero Lambda implantada, #587/#297).
  */
 export interface DomainEventEnvelope {
   readonly detailType: string;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly orcamentoId: string;
   readonly ocorreuEm: string;
-  readonly tenantId?: string;
+  readonly tenantId: string;
 }

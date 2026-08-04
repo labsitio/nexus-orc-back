@@ -11,11 +11,16 @@ describe('EventBridgePublisher', () => {
   it('publica no bus informado com source fixo e detail-type do evento', async () => {
     const send = vi.fn().mockResolvedValue({ FailedEntryCount: 0 });
     const publisher = new EventBridgePublisher(eventBridgeClientFake(send), 'nexo-dominio-bus');
-    const evento = new OrcamentoRecebido('orc-1', 'SFTP', {
-      bucket: 'nexo-orcamentos-raw',
-      key: 'sftp-incoming/x.pdf',
-      versionId: 'v-1',
-    });
+    const evento = new OrcamentoRecebido(
+      'orc-1',
+      'SFTP',
+      {
+        bucket: 'nexo-orcamentos-raw',
+        key: 'sftp-incoming/x.pdf',
+        versionId: 'v-1',
+      },
+      '018f4b1a-tenant-0000-000000000000',
+    );
 
     await publisher.publicar(evento);
 
@@ -34,11 +39,16 @@ describe('EventBridgePublisher', () => {
       Entries: [{ ErrorMessage: 'rate exceeded' }],
     });
     const publisher = new EventBridgePublisher(eventBridgeClientFake(send), 'nexo-dominio-bus');
-    const evento = new OrcamentoRecebido('orc-2', 'API_REST', {
-      bucket: 'nexo-orcamentos-raw',
-      key: 'api-rest/y.pdf',
-      versionId: 'v-2',
-    });
+    const evento = new OrcamentoRecebido(
+      'orc-2',
+      'API_REST',
+      {
+        bucket: 'nexo-orcamentos-raw',
+        key: 'api-rest/y.pdf',
+        versionId: 'v-2',
+      },
+      '018f4b1a-tenant-0000-000000000000',
+    );
 
     await expect(publisher.publicar(evento)).rejects.toThrow(/rate exceeded/);
   });
@@ -46,11 +56,16 @@ describe('EventBridgePublisher', () => {
   it('usa mensagem de fallback quando o EventBridge não informa ErrorMessage', async () => {
     const send = vi.fn().mockResolvedValue({ FailedEntryCount: 1, Entries: [{}] });
     const publisher = new EventBridgePublisher(eventBridgeClientFake(send), 'nexo-dominio-bus');
-    const evento = new OrcamentoRecebido('orc-3', 'PORTAL_WEB', {
-      bucket: 'nexo-orcamentos-raw',
-      key: 'portal-web/z.pdf',
-      versionId: 'v-3',
-    });
+    const evento = new OrcamentoRecebido(
+      'orc-3',
+      'PORTAL_WEB',
+      {
+        bucket: 'nexo-orcamentos-raw',
+        key: 'portal-web/z.pdf',
+        versionId: 'v-3',
+      },
+      '018f4b1a-tenant-0000-000000000000',
+    );
 
     await expect(publisher.publicar(evento)).rejects.toThrow(/motivo desconhecido/);
   });

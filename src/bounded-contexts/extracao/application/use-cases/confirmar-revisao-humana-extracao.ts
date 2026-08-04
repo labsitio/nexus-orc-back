@@ -63,6 +63,23 @@ export class ExtracaoSemCondicoesComerciaisError extends ErroDominio {
   }
 }
 
+/**
+ * (spec 007, ADR-008 — cutover de contract, #632) Este endpoint não recebe
+ * `tenantId` via `TenantContext` (nenhuma issue wireou isso ainda para 002 —
+ * gap registrado na #632, não improvisado aqui). O `tenantId` publicado no
+ * evento vem sempre do agregado (preenchido na criação, via
+ * `ExtrairDadosOrcamento`/T022) — nunca deveria faltar dado o baseline de
+ * zero tenant real em produção (#587/#297); fail-fast em vez de publicar
+ * evento com `tenantId` inventado ou ausente.
+ */
+export class ExtracaoSemTenantIdError extends ErroDominio {
+  constructor(orcamentoId: string) {
+    super(
+      `ExtracaoOrcamento ${orcamentoId} não possui tenantId — registro pré-retrofit incompatível com o envelope de evento obrigatório (ADR-008)`,
+    );
+  }
+}
+
 const ITEM_CAMINHO_RE = /^itens\[(\d+)\]\.(descricao|quantidade|precoUnitario)$/;
 const CONDICOES_CAMINHO_RE =
   /^condicoesComerciais\.(condicoesPagamento|prazoValidade|condicoesEntrega)$/;
@@ -304,6 +321,14 @@ export class ConfirmarRevisaoHumanaExtracao {
       throw new ExtracaoSemCondicoesComerciaisError(params.orcamentoId);
     }
 
+    // (spec 007, ADR-008 — cutover de contract, #632) Capturado antes de
+    // `registrarConfirmacaoHumana` mutar o agregado — mesma indireção de
+    // `statusDe` (getter perde narrowing após chamada de método mutável).
+    // Guarda de ausência só é aplicada mais abaixo, perto da publicação do
+    // evento: erros de validação do próprio `camposConfirmados` (caminho,
+    // shape) têm precedência sobre a checagem de `tenantId`.
+    const tenantId = extracao.tenantId;
+
     const { itens, condicoesComerciais } = aplicarConfirmacoes(
       extracao.itens,
       condicoesAtuais,
@@ -313,19 +338,23 @@ export class ConfirmarRevisaoHumanaExtracao {
     extracao.registrarConfirmacaoHumana(itens, condicoesComerciais);
     await this.repositorio.salvar(extracao);
 
+    if (!tenantId) {
+      throw new ExtracaoSemTenantIdError(params.orcamentoId);
+    }
+
     const evento =
       statusDe(extracao) === 'EXTRAIDO'
         ? new OrcamentoExtraido(
             extracao.orcamentoId.toString(),
             extracao.itens.map((item) => item.paraPayload()),
             condicoesComerciais.paraPayload(),
-            extracao.tenantId?.toString(),
+            tenantId.toString(),
           )
         : new OrcamentoExtraidoComPendenciaConfirmada(
             extracao.orcamentoId.toString(),
             extracao.itens.map((item) => item.paraPayload()),
             condicoesComerciais.paraPayload(),
-            extracao.tenantId?.toString(),
+            tenantId.toString(),
           );
     await this.eventPublisher.publicar(evento);
 

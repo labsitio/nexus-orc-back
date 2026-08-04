@@ -24,6 +24,7 @@ import type { EventPublisher } from '../../../../src/bounded-contexts/validacao/
 import type { DomainEventEnvelope } from '../../../../src/bounded-contexts/validacao/domain/events/domain-event.js';
 import { OrcamentoValidado } from '../../../../src/bounded-contexts/validacao/domain/events/orcamento-validado.event.js';
 import { OrcamentoInconsistenciaDetectada } from '../../../../src/bounded-contexts/validacao/domain/events/orcamento-inconsistencia-detectada.event.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * T021 — Integration test: `OrcamentoExtraido` (documento de teste
@@ -116,8 +117,8 @@ async function processarMensagemValidadorQueue(
   parametroFaixaPreco: ParametroFaixaPrecoGateway,
   publisher: EventPublisher,
 ): Promise<OrcamentoValidacao> {
-  const { orcamentoId, dadosExtraidos } = acl.traduzir(payloadBruto);
-  const validacao = OrcamentoValidacao.criar(orcamentoId, dadosExtraidos);
+  const { orcamentoId, dadosExtraidos, tenantId } = acl.traduzir(payloadBruto);
+  const validacao = OrcamentoValidacao.criar(orcamentoId, dadosExtraidos, tenantId);
 
   const faixasPreco = await parametroFaixaPreco.listarTodas();
   const cnpj = CNPJ.de(dadosExtraidos.cnpjFornecedor);
@@ -146,10 +147,12 @@ async function processarMensagemValidadorQueue(
           validacao.orcamentoId.toString(),
           dadosExtraidos.itens.map((item) => item.paraPayload()),
           dadosExtraidos.condicoesComerciais,
+          tenantId.toString(),
         )
       : new OrcamentoInconsistenciaDetectada(
           validacao.orcamentoId.toString(),
           validacao.inconsistencias.map((inconsistencia) => inconsistencia.paraPayload()),
+          tenantId.toString(),
         );
   await publisher.publicar(evento);
 
@@ -162,6 +165,7 @@ describe('Consumidor de validador-queue (integração simulada)', () => {
     const acl = new OrcamentoExtraidoEventACLFake({
       orcamentoId,
       dadosExtraidos: novosDadosConsistentes(),
+      tenantId: TenantId.novo(),
     });
     const publisher = new EventPublisherFake();
 
@@ -190,6 +194,7 @@ describe('Consumidor de validador-queue (integração simulada)', () => {
       const acl = new OrcamentoExtraidoEventACLFake({
         orcamentoId,
         dadosExtraidos: novosDadosConsistentes(),
+        tenantId: TenantId.novo(),
       });
       const publisher = new EventPublisherFake();
 

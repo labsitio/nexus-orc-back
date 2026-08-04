@@ -1,8 +1,7 @@
-import type { ResultadoClassificacaoPayload } from "../value-objects/resultado-classificacao.vo.js";
-import type { DomainEventEnvelope } from "./domain-event.js";
+import type { ResultadoClassificacaoPayload } from '../value-objects/resultado-classificacao.vo.js';
+import type { DomainEventEnvelope } from './domain-event.js';
 
-export interface OrcamentoReclassificadoPorRevisaoHumanaPayload
-  extends DomainEventEnvelope {
+export interface OrcamentoReclassificadoPorRevisaoHumanaPayload extends DomainEventEnvelope {
   readonly resultado: ResultadoClassificacaoPayload;
 }
 
@@ -11,19 +10,16 @@ export interface OrcamentoReclassificadoPorRevisaoHumanaPayload
  * de `OrcamentoClassificado` com `agenteOrigem: 'HUMANO'`; é o próprio evento
  * de auditoria da correção manual (plan.md).
  */
-export class OrcamentoReclassificadoPorRevisaoHumana
-  implements OrcamentoReclassificadoPorRevisaoHumanaPayload
-{
-  static readonly detailType =
-    "OrcamentoReclassificadoPorRevisaoHumana" as const;
+export class OrcamentoReclassificadoPorRevisaoHumana implements OrcamentoReclassificadoPorRevisaoHumanaPayload {
+  static readonly detailType = 'OrcamentoReclassificadoPorRevisaoHumana' as const;
   readonly detailType = OrcamentoReclassificadoPorRevisaoHumana.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
     readonly resultado: ResultadoClassificacaoPayload,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

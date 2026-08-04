@@ -4,16 +4,14 @@
  */
 export interface DomainEventEnvelope {
   readonly detailType: string;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly orcamentoId: string;
   readonly ocorreuEm: string;
   /**
-   * Tenant dono do orçamento (spec-007, T040 — expand/contract).
-   * Opcional e `schemaVersion` mantido em `1` de propósito: os sites de
-   * emissão deste BC ainda não preenchem este campo. Uma PR de contract
-   * futura torna `tenantId` obrigatório e sobe `schemaVersion` para `2`
-   * nos 4 BCs de uma vez (ADR-008 — cutover único, sem suporte dual v1/v2
-   * publicado).
+   * Tenant dono do orçamento (spec-007, ADR-008 — cutover de contract, #632).
+   * Obrigatório desde `schemaVersion: 2`: cutover único, sem suporte dual
+   * v1/v2 publicado (baseline de zero tenant real em produção e zero Lambda
+   * implantada, #587/#297).
    */
-  readonly tenantId?: string;
+  readonly tenantId: string;
 }

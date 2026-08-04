@@ -138,6 +138,7 @@ function mensagemSqsComCampoAmbiguo(): { messageId: string; body: string } {
           key: `sftp/${ORCAMENTO_ID}.pdf`,
           versionId: 'v1',
         },
+        tenantId: '01890a5d-ac96-774b-bcce-b302099a9000',
       },
     }),
   };

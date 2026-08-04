@@ -86,7 +86,11 @@ export class ConfirmarRevisaoHumana {
     await repositorio.salvar(orcamento);
 
     await this.eventPublisher.publicar(
-      new OrcamentoReclassificadoPorRevisaoHumana(orcamento.id.toString(), resultado.paraPayload()),
+      new OrcamentoReclassificadoPorRevisaoHumana(
+        orcamento.id.toString(),
+        resultado.paraPayload(),
+        params.tenantId.toString(),
+      ),
     );
 
     return orcamento;

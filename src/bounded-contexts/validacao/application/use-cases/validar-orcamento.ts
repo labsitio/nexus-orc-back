@@ -91,12 +91,12 @@ export class ValidarOrcamento {
             validacao.orcamentoId.toString(),
             dadosExtraidos.itens.map((item) => item.paraPayload()),
             dadosExtraidos.condicoesComerciais,
-            validacao.tenantId?.toString(),
+            tenantId.toString(),
           )
         : new OrcamentoInconsistenciaDetectada(
             validacao.orcamentoId.toString(),
             validacao.inconsistencias.map((inconsistencia) => inconsistencia.paraPayload()),
-            validacao.tenantId?.toString(),
+            tenantId.toString(),
           );
     await this.eventPublisher.publicar(evento);
   }

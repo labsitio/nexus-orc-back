@@ -13,6 +13,7 @@ import { ItemParaValidacao } from '../../../../src/bounded-contexts/validacao/do
 import { OrcamentoId } from '../../../../src/bounded-contexts/validacao/domain/value-objects/orcamento-id.vo.js';
 import { PeriodoValidade } from '../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
 import { registrarRotaDecisaoHumanaValidacao } from '../../../../src/bounded-contexts/validacao/interface/http/decisao-humana.controller.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 /** Contract test do controller real (T036/#146), fakes in-memory (sem Drizzle/EventBridge). */
 class OrcamentoValidacaoRepositoryFake implements OrcamentoValidacaoRepository {
@@ -73,7 +74,11 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — control
 
   it('200 — CORRECAO_APLICADA corrige o CNPJ e transita para VALIDADO, publicando OrcamentoValidado', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a1');
-    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos('11111111111111'));
+    const validacao = OrcamentoValidacao.criar(
+      id,
+      dadosExtraidos('11111111111111'),
+      TenantId.novo(),
+    );
     validacao.avaliarRegrasDeConsistencia([
       InconsistenciaDetectada.de('CNPJ_INVALIDO', 'dígito verificador incorreto'),
     ]);
@@ -101,7 +106,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — control
 
   it('200 — ACEITE_COM_RESSALVA transita para VALIDADO_COM_RESSALVA, publicando OrcamentoValidadoComRessalva', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a2');
-    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos());
+    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos(), TenantId.novo());
     validacao.avaliarRegrasDeConsistencia([
       InconsistenciaDetectada.de('PRAZO_INCOERENTE', 'prazo incoerente'),
     ]);

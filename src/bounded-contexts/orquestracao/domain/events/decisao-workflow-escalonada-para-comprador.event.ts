@@ -18,13 +18,13 @@ export interface DecisaoWorkflowEscalonadaParaCompradorPayload extends DomainEve
 export class DecisaoWorkflowEscalonadaParaComprador implements DecisaoWorkflowEscalonadaParaCompradorPayload {
   static readonly detailType = 'DecisaoWorkflowEscalonadaParaComprador' as const;
   readonly detailType = DecisaoWorkflowEscalonadaParaComprador.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
     readonly nivelConfianca: number,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

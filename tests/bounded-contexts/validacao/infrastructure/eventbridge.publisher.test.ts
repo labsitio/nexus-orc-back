@@ -10,9 +10,10 @@ function eventBridgeClientFake(send: (command: unknown) => unknown): EventBridge
 function eventoFake(orcamentoId: string): DomainEventEnvelope {
   return {
     detailType: 'OrcamentoValidado',
-    schemaVersion: 1,
+    schemaVersion: 2,
     orcamentoId,
     ocorreuEm: new Date().toISOString(),
+    tenantId: '018f4b1a-tenant-0000-000000000000',
   };
 }
 

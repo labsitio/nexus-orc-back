@@ -13,13 +13,13 @@ export interface ExtracaoEscalonadaParaRevisaoHumanaPayload extends DomainEventE
 export class ExtracaoEscalonadaParaRevisaoHumana implements ExtracaoEscalonadaParaRevisaoHumanaPayload {
   static readonly detailType = 'ExtracaoEscalonadaParaRevisaoHumana' as const;
   readonly detailType = ExtracaoEscalonadaParaRevisaoHumana.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
     readonly orcamentoId: string,
     readonly motivo: string,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

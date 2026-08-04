@@ -24,7 +24,7 @@ export interface OrcamentoReenvioSolicitadoPayload extends DomainEventEnvelope {
 export class OrcamentoReenvioSolicitado implements OrcamentoReenvioSolicitadoPayload {
   static readonly detailType = 'OrcamentoReenvioSolicitado' as const;
   readonly detailType = OrcamentoReenvioSolicitado.detailType;
-  readonly schemaVersion = 1 as const;
+  readonly schemaVersion = 2 as const;
   readonly ocorreuEm: string;
 
   constructor(
@@ -33,7 +33,7 @@ export class OrcamentoReenvioSolicitado implements OrcamentoReenvioSolicitadoPay
     readonly criterio: string,
     readonly nivelConfianca: number | null,
     readonly motivoDadoAusente: string,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();

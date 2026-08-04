@@ -17,22 +17,15 @@ import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
  * nunca 200 (leak de dado) nem 403 (confirma para o requisitante que o
  * recurso existe em outro tenant).
  *
- * Fronteira T011 vs T014-T018 (ver tasks.md, Phase 3): esta task é
- * exclusivamente o teste de contrato, escrito ANTES da implementação —
- * `Orcamento.aggregate` ainda não tem `tenantId` (T014), `ConsultarStatusOrcamento`
- * ainda não valida tenant (T017) e `DrizzleOrcamentoRepository` ainda não
- * estende `DrizzleTenantScopedRepositoryBase` (T018). Este arquivo não altera
- * nenhum desses três — apenas exercita o `TenantContextMiddleware` (T005, já
- * concluído) plugado na frente do controller real (T047), exatamente como
- * ficará em produção.
- *
- * Por isso o cenário cross-tenant abaixo está em RED (`it.fails`) por
- * desenho: hoje o endpoint retorna 200 para qualquer orcamentoId existente,
- * independente do tenant da claim JWT, porque o agregado não carrega
- * `tenantId` para o controller comparar. `it.fails` documenta esse gap sem
- * quebrar a suíte — quando T014-T018 forem implementadas, esta asserção
- * passa a ser verdadeira e o `it.fails` passa a falhar (teste inesperadamente
- * verde), sinalizando que é hora de trocar para `it()` simples.
+ * Fronteira T011 vs T014-T018 (ver tasks.md, Phase 3): esta task nasceu como
+ * o teste de contrato, escrito ANTES da implementação (`it.fails` enquanto
+ * `Orcamento.aggregate` não tinha `tenantId`/T014, `ConsultarStatusOrcamento`
+ * não validava tenant/T017 e `DrizzleOrcamentoRepository` não estendia
+ * `DrizzleTenantScopedRepositoryBase`/T018). As três já foram implementadas —
+ * o cenário cross-tenant abaixo foi promovido de `it.fails` para `it()`
+ * simples (spec-007, ADR-008, #632) e exercita o `TenantContextMiddleware`
+ * (T005) plugado na frente do controller real (T047), exatamente como fica
+ * em produção.
  */
 
 const { mockVerify, mockCreate } = vi.hoisted(() => {

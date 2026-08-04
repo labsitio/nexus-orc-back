@@ -27,7 +27,7 @@ export class OrcamentoValidado implements OrcamentoValidadoPayload {
     readonly orcamentoId: string,
     readonly itens: readonly ItemParaValidacaoPayload[],
     readonly condicoesComerciais: string,
-    readonly tenantId?: string,
+    readonly tenantId: string,
     ocorreuEm: Date = new Date(),
   ) {
     this.ocorreuEm = ocorreuEm.toISOString();
