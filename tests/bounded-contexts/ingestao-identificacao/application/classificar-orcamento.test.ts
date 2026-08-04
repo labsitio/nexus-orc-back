@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ClassificarOrcamento,
   OrcamentoNaoEncontradoParaClassificacaoError,
+  TenantDivergenciaError,
 } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/classificar-orcamento.js';
 import { Orcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
 import { Canal } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/canal.vo.js';
@@ -214,5 +215,90 @@ describe('ClassificarOrcamento', () => {
     expect(repositorio.salvos).toHaveLength(1);
     expect(publisher.eventosPublicados).toHaveLength(1);
     expect(publisher.eventosPublicados[0]?.detailType).toBe(OrcamentoClassificado.detailType);
+  });
+
+  it('(spec 007, T018) lança TenantDivergenciaError (DIVERGENTE) e nunca constrói o repositório quando tenantId não é informado', async () => {
+    const publisher = new EventPublisherFake();
+    const useCase = new ClassificarOrcamento(
+      () => {
+        throw new Error('nunca deveria construir o repositório sem tenantId');
+      },
+      new ArmazenamentoBrutoFake(),
+      new ConversorFake(),
+      new AgenteClassificadorFake({
+        fornecedorIdentificado: 'X',
+        formatoIdentificado: 'PDF',
+        nivelConfianca: 90,
+      }),
+      publisher,
+    );
+
+    const erro = await useCase
+      .executar(OrcamentoId.novo().toString(), undefined)
+      .catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(TenantDivergenciaError);
+    expect((erro as TenantDivergenciaError).motivo).toBe('DIVERGENTE');
+    expect(publisher.eventosPublicados).toHaveLength(0);
+  });
+
+  it('(spec 007, T017) lança TenantDivergenciaError (AUSENTE) quando o agregado não tem tenantId (legado pré-retrofit)', async () => {
+    const orcamentoLegado = Orcamento.receber({
+      id: OrcamentoId.novo(),
+      canal: Canal.de('PORTAL_WEB'),
+      referenciaBruta: ReferenciaS3.de({
+        bucket: 'nexo-orcamentos-raw',
+        key: 'portal-web/orcamento.pdf',
+        versionId: 'v1',
+      }),
+    });
+    const repositorio = new RepositorioFake(orcamentoLegado);
+    const publisher = new EventPublisherFake();
+    const useCase = new ClassificarOrcamento(
+      () => repositorio,
+      new ArmazenamentoBrutoFake(),
+      new ConversorFake(),
+      new AgenteClassificadorFake({
+        fornecedorIdentificado: 'X',
+        formatoIdentificado: 'PDF',
+        nivelConfianca: 90,
+      }),
+      publisher,
+    );
+
+    const erro = await useCase
+      .executar(orcamentoLegado.id.toString(), TenantId.novo())
+      .catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(TenantDivergenciaError);
+    expect((erro as TenantDivergenciaError).motivo).toBe('AUSENTE');
+    expect(publisher.eventosPublicados).toHaveLength(0);
+    expect(repositorio.salvos).toHaveLength(0);
+  });
+
+  it('(spec 007, T017) lança TenantDivergenciaError (DIVERGENTE) quando o tenantId da requisição diverge do agregado', async () => {
+    const orcamento = novoOrcamentoRecebido(TenantId.novo());
+    const repositorio = new RepositorioFake(orcamento);
+    const publisher = new EventPublisherFake();
+    const useCase = new ClassificarOrcamento(
+      () => repositorio,
+      new ArmazenamentoBrutoFake(),
+      new ConversorFake(),
+      new AgenteClassificadorFake({
+        fornecedorIdentificado: 'X',
+        formatoIdentificado: 'PDF',
+        nivelConfianca: 90,
+      }),
+      publisher,
+    );
+
+    const erro = await useCase
+      .executar(orcamento.id.toString(), TenantId.novo())
+      .catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(TenantDivergenciaError);
+    expect((erro as TenantDivergenciaError).motivo).toBe('DIVERGENTE');
+    expect(publisher.eventosPublicados).toHaveLength(0);
+    expect(repositorio.salvos).toHaveLength(0);
   });
 });
