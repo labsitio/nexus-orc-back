@@ -20,6 +20,7 @@ import type { OrcamentoValidacaoRepository } from '../../../../src/bounded-conte
 import { OrcamentoValidado } from '../../../../src/bounded-contexts/validacao/domain/events/orcamento-validado.event.js';
 import { OrcamentoInconsistenciaDetectada } from '../../../../src/bounded-contexts/validacao/domain/events/orcamento-inconsistencia-detectada.event.js';
 import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
+import { OrcamentoValidacaoSemTenantIdError } from '../../../../src/bounded-contexts/validacao/domain/errors/tenant.errors.js';
 
 /**
  * T024 (#134) — Application: `ValidarOrcamento`. Unit test com mocks de
@@ -248,5 +249,27 @@ describe('ValidarOrcamento', () => {
     expect(repositorio.salvos[0]?.tenantId?.toString()).toBe(tenantOriginal.toString());
     const evento = publisher.eventosPublicados[0] as OrcamentoValidado;
     expect(evento.tenantId).toBe(tenantOriginal.toString());
+  });
+
+  it('(guarda fail-fast ADR-008, #632) rejeita publicar evento quando o agregado existente é legado e não possui tenantId persistido', async () => {
+    const existente = OrcamentoValidacao.criar(ORCAMENTO_ID, dadosConsistentes());
+    const repositorio = new OrcamentoValidacaoRepositoryFake(existente);
+    const publisher = new EventPublisherFake();
+    const useCase = new ValidarOrcamento(
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        dadosExtraidos: dadosConsistentes(),
+        tenantId: TenantId.novo(),
+      }),
+      repositorio,
+      new FornecedorCadastradoGatewayFake(true),
+      new ParametroFaixaPrecoGatewayFake(),
+      publisher,
+    );
+
+    await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).rejects.toThrow(
+      OrcamentoValidacaoSemTenantIdError,
+    );
+    expect(publisher.eventosPublicados).toHaveLength(0);
   });
 });

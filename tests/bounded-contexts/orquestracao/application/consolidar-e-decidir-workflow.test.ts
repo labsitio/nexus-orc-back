@@ -4,6 +4,7 @@ import { ConsolidarEDecidirWorkflow } from '../../../../src/bounded-contexts/orq
 import {
   ContextoIncompletoError,
   DecisaoWorkflow,
+  DecisaoWorkflowSemTenantIdError,
 } from '../../../../src/bounded-contexts/orquestracao/domain/aggregates/decisao-workflow.aggregate.js';
 import { DecisaoWorkflowEscalonadaParaComprador } from '../../../../src/bounded-contexts/orquestracao/domain/events/decisao-workflow-escalonada-para-comprador.event.js';
 import { IntegracaoExternaSolicitada } from '../../../../src/bounded-contexts/orquestracao/domain/events/integracao-externa-solicitada.event.js';
@@ -323,6 +324,36 @@ describe('ConsolidarEDecidirWorkflow', () => {
       useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() }),
     ).resolves.toBeUndefined();
 
+    expect(publisher.publicados).toHaveLength(0);
+  });
+
+  it('(guarda fail-fast ADR-008, #632) rejeita publicar desfecho quando o tenantId consolidado no agregado é indefinido — defesa contra ACL que viole seu próprio contrato de tipo', async () => {
+    const existente = agregadoComContextoConsolidado();
+    const repositorio = new DecisaoWorkflowRepositoryFake(existente);
+    const publisher = new EventPublisherFake();
+    const useCase = new ConsolidarEDecidirWorkflow(
+      // As 3 ACLs de entrada garantem tenantId sempre presente no tipo — este
+      // fake simula uma implementação de ACL com bug que viola o próprio
+      // contrato (retorna `undefined` em runtime), único jeito de alcançar
+      // este ramo de defesa em profundidade (nunca ocorre com as ACLs reais).
+      new ACLFake({
+        orcamentoId: ORCAMENTO_ID,
+        contextoValidacao: CONTEXTO_VALIDACAO,
+        tenantId: undefined as unknown as TenantId,
+      }),
+      repositorio,
+      new AgenteOrquestradorGatewayFake({
+        acao: 'APROVAR',
+        nivelConfianca: NivelConfianca.de(90),
+        criterio: 'Fornecedor recorrente, itens e condições consistentes',
+        requerIntegracaoExterna: false,
+      }),
+      publisher,
+    );
+
+    await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).rejects.toThrow(
+      DecisaoWorkflowSemTenantIdError,
+    );
     expect(publisher.publicados).toHaveLength(0);
   });
 });
