@@ -132,8 +132,10 @@ export class RegistrarDecisaoHumanaValidacao {
     const itens = validacao.dadosExtraidos.itens.map((item) => item.paraPayload());
     const condicoesComerciais = validacao.dadosExtraidos.condicoesComerciais;
 
+    const tenantId = validacao.tenantId?.toString();
+
     if (validacao.status === 'VALIDADO') {
-      return new OrcamentoValidado(orcamentoId, itens, condicoesComerciais);
+      return new OrcamentoValidado(orcamentoId, itens, condicoesComerciais, tenantId);
     }
     if (validacao.status === 'VALIDADO_COM_RESSALVA') {
       return new OrcamentoValidadoComRessalva(
@@ -141,6 +143,7 @@ export class RegistrarDecisaoHumanaValidacao {
         validacao.inconsistencias.map((inconsistencia) => inconsistencia.paraPayload()),
         itens,
         condicoesComerciais,
+        tenantId,
       );
     }
     return undefined;

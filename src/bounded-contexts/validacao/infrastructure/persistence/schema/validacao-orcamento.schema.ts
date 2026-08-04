@@ -33,6 +33,10 @@ export const validacoesOrcamento = validacaoSchema.table(
   'validacoes_orcamento',
   {
     id: uuid('id').primaryKey(),
+    // (issue #649 — expand/contract, ADR-008) Nullable até a #632 tornar
+    // `tenantId` obrigatório nos 4 BCs de uma vez (mesmo padrão de
+    // `extracoes_orcamento.tenant_id`, spec 002, #648).
+    tenantId: uuid('tenant_id'),
     status: text('status').notNull(),
     // DadosExtraidosParaValidacao — cópia imutável traduzida via ACL (T015),
     // JSONB porque não há invariante de negócio sobre linha isolada além do

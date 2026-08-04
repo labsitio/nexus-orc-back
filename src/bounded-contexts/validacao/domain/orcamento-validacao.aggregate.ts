@@ -1,3 +1,4 @@
+import type { TenantId } from '../../../shared-kernel/tenant/tenant-id.vo.js';
 import { ErroDominio } from './errors/erro-dominio.js';
 import type { DadosExtraidosParaValidacao } from './value-objects/dados-extraidos-para-validacao.vo.js';
 import type { InconsistenciaDetectada } from './value-objects/inconsistencia-detectada.vo.js';
@@ -25,6 +26,17 @@ export class TransicaoInvalidaValidacaoError extends ErroDominio {
 }
 
 /**
+ * (issue #649) `tenantId` é imutável fora do construtor de criação — mesmo
+ * padrão de `TenantIdImutavelError` do BC Extração
+ * (`extracao-orcamento.aggregate.ts`, issue #648).
+ */
+export class TenantIdImutavelError extends ErroDominio {
+  constructor() {
+    super('tenantId não pode ser sobrescrito após a criação de OrcamentoValidacao');
+  }
+}
+
+/**
  * Decisão humana registrada a partir de `PENDENTE_REVISAO_HUMANA`.
  * `CORRECAO_APLICADA` reavalia as regras com as inconsistências
  * recalculadas pela Application sobre os dados corrigidos (nunca autoaprova
@@ -46,6 +58,13 @@ export interface OrcamentoValidacaoProps {
   readonly status: StatusValidacao;
   readonly inconsistencias: readonly InconsistenciaDetectada[];
   readonly historico: readonly TentativaValidacao[];
+  /**
+   * (issue #649 — expand/contract, ADR-008) Opcional até a #632 tornar
+   * `tenantId` obrigatório nos 4 BCs de uma vez. Vem do envelope
+   * `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada` (spec 002),
+   * que ainda publica `tenantId` opcional.
+   */
+  readonly tenantId?: TenantId;
 }
 
 /**
@@ -60,6 +79,7 @@ export class OrcamentoValidacao {
   private _status: StatusValidacao;
   private _inconsistencias: readonly InconsistenciaDetectada[];
   private readonly _historico: TentativaValidacao[];
+  private readonly _tenantId: TenantId | undefined;
 
   private constructor(props: OrcamentoValidacaoProps) {
     this._orcamentoId = props.orcamentoId;
@@ -67,12 +87,14 @@ export class OrcamentoValidacao {
     this._status = props.status;
     this._inconsistencias = [...props.inconsistencias];
     this._historico = [...props.historico];
+    this._tenantId = props.tenantId;
   }
 
   /** Cria o agregado no momento em que `OrcamentoExtraido` é traduzido pelo ACL. */
   static criar(
     orcamentoId: OrcamentoId,
     dadosExtraidos: DadosExtraidosParaValidacao,
+    tenantId?: TenantId,
   ): OrcamentoValidacao {
     return new OrcamentoValidacao({
       orcamentoId,
@@ -80,6 +102,7 @@ export class OrcamentoValidacao {
       status: 'PENDENTE',
       inconsistencias: [],
       historico: [],
+      tenantId,
     });
   }
 
@@ -108,9 +131,22 @@ export class OrcamentoValidacao {
     return [...this._historico];
   }
 
+  /**
+   * (issue #649 — expand/contract) `undefined` até a #632 tornar a ausência
+   * impossível nos 4 BCs de uma vez.
+   */
+  get tenantId(): TenantId | undefined {
+    return this._tenantId;
+  }
+
   /** `dadosExtraidos` nunca é sobrescrito — correção passa por `registrarDecisaoHumana`. */
   atualizarDadosExtraidos(): never {
     throw new DadosExtraidosImutavelError('dadosExtraidos');
+  }
+
+  /** `tenantId` é imutável fora do construtor de criação — nunca há via legítima de atualização. */
+  atualizarTenantId(): never {
+    throw new TenantIdImutavelError();
   }
 
   /**

@@ -1,3 +1,4 @@
+import { TenantId } from '../../../shared-kernel/tenant/tenant-id.vo.js';
 import { ErroDominio } from '../domain/errors/erro-dominio.js';
 import { DadosExtraidosParaValidacao } from '../domain/value-objects/dados-extraidos-para-validacao.vo.js';
 import { Dinheiro } from '../domain/value-objects/dinheiro.vo.js';
@@ -56,6 +57,12 @@ interface OrcamentoExtraidoPayloadBruto {
   readonly condicoesComerciais: CondicoesComerciaisPayloadBruto;
   readonly cnpjFornecedor?: string;
   readonly dataEmissaoProposta?: string;
+  /**
+   * (issue #649 — expand/contract, ADR-008) Ainda opcional no envelope de
+   * origem (spec-002 #648). `undefined` nunca é rejeitado aqui — ver
+   * `OrcamentoExtraidoEventACLResultado.tenantId`.
+   */
+  readonly tenantId?: string;
 }
 
 function ehObjeto(valor: unknown): valor is Record<string, unknown> {
@@ -159,6 +166,9 @@ export class OrcamentoExtraidoEventACLImpl implements OrcamentoExtraidoEventACL 
     return {
       orcamentoId: OrcamentoId.de(payload.orcamentoId),
       dadosExtraidos,
+      // (issue #649) Nunca rejeitado quando ausente — ver
+      // `OrcamentoExtraidoEventACLResultado.tenantId`.
+      tenantId: payload.tenantId !== undefined ? TenantId.de(payload.tenantId) : undefined,
     };
   }
 }

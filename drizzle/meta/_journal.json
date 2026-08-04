@@ -127,6 +127,13 @@
       "when": 1785849634670,
       "tag": "0017_t648_extracoes_orcamento_tenant_id",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785866676930,
+      "tag": "0018_t649_validacoes_orcamento_tenant_id",
+      "breakpoints": true
     }
   ]
 }

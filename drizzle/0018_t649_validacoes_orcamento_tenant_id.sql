@@ -1,0 +1,1 @@
+ALTER TABLE "validacao"."validacoes_orcamento" ADD COLUMN "tenant_id" uuid;

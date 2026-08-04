@@ -19,6 +19,7 @@ import type { DomainEventEnvelope } from '../../../../src/bounded-contexts/valid
 import type { OrcamentoValidacaoRepository } from '../../../../src/bounded-contexts/validacao/domain/repositories/orcamento-validacao.repository.js';
 import { OrcamentoValidado } from '../../../../src/bounded-contexts/validacao/domain/events/orcamento-validado.event.js';
 import { OrcamentoInconsistenciaDetectada } from '../../../../src/bounded-contexts/validacao/domain/events/orcamento-inconsistencia-detectada.event.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * T024 (#134) — Application: `ValidarOrcamento`. Unit test com mocks de
@@ -186,5 +187,42 @@ describe('ValidarOrcamento', () => {
     expect(repositorio.salvos).toHaveLength(0);
     expect(fornecedorCadastrado.chamadas).toBe(0);
     expect(publisher.eventosPublicados).toHaveLength(0);
+  });
+
+  it('propaga tenantId da ACL até o evento publicado (issue #649)', async () => {
+    const tenantId = TenantId.novo();
+    const repositorio = new OrcamentoValidacaoRepositoryFake();
+    const publisher = new EventPublisherFake();
+    const useCase = new ValidarOrcamento(
+      new ACLFake({ orcamentoId: ORCAMENTO_ID, dadosExtraidos: dadosConsistentes(), tenantId }),
+      repositorio,
+      new FornecedorCadastradoGatewayFake(true),
+      new ParametroFaixaPrecoGatewayFake(),
+      publisher,
+    );
+
+    await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+    expect(repositorio.salvos[0]!.tenantId).toBe(tenantId);
+    const evento = publisher.eventosPublicados[0] as OrcamentoValidado;
+    expect(evento.tenantId).toBe(tenantId.toString());
+  });
+
+  it('nunca rejeita quando a ACL não retorna tenantId — 002 ainda publica opcional (issue #649, expand/contract)', async () => {
+    const repositorio = new OrcamentoValidacaoRepositoryFake();
+    const publisher = new EventPublisherFake();
+    const useCase = new ValidarOrcamento(
+      new ACLFake({ orcamentoId: ORCAMENTO_ID, dadosExtraidos: dadosConsistentes() }),
+      repositorio,
+      new FornecedorCadastradoGatewayFake(true),
+      new ParametroFaixaPrecoGatewayFake(),
+      publisher,
+    );
+
+    await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+    expect(repositorio.salvos[0]!.tenantId).toBeUndefined();
+    const evento = publisher.eventosPublicados[0] as OrcamentoValidado;
+    expect(evento.tenantId).toBeUndefined();
   });
 });

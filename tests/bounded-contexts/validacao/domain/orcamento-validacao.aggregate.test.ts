@@ -7,9 +7,11 @@ import { InconsistenciaDetectada } from '../../../../src/bounded-contexts/valida
 import { ItemParaValidacao } from '../../../../src/bounded-contexts/validacao/domain/value-objects/item-para-validacao.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/validacao/domain/value-objects/orcamento-id.vo.js';
 import { PeriodoValidade } from '../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import {
   DadosExtraidosImutavelError,
   OrcamentoValidacao,
+  TenantIdImutavelError,
   TransicaoInvalidaValidacaoError,
 } from '../../../../src/bounded-contexts/validacao/domain/orcamento-validacao.aggregate.js';
 import {
@@ -172,5 +174,21 @@ describe('OrcamentoValidacao', () => {
   it('dadosExtraidos nunca é sobrescrito fora do construtor de criação', () => {
     const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
     expect(() => agregado.atualizarDadosExtraidos()).toThrow(DadosExtraidosImutavelError);
+  });
+
+  it('criar() aceita tenantId opcional (issue #649, expand/contract)', () => {
+    const tenantId = TenantId.novo();
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), tenantId);
+    expect(agregado.tenantId).toBe(tenantId);
+  });
+
+  it('criar() sem tenantId deixa o campo undefined', () => {
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    expect(agregado.tenantId).toBeUndefined();
+  });
+
+  it('tenantId nunca é sobrescrito fora do construtor de criação', () => {
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TenantId.novo());
+    expect(() => agregado.atualizarTenantId()).toThrow(TenantIdImutavelError);
   });
 });
