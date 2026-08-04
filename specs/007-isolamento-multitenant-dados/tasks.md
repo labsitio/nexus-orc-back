@@ -67,7 +67,7 @@ Monorepo único, conforme `plan.md` desta spec — `src/shared-kernel/`, `src/bo
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Adicionar atributo `tenantId: TenantId` (obrigatório, imutável) ao agregado `Orcamento` em `src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.ts`; invariante `TenantIdImutavelError`.
+- [x] T014 [US1] Adicionar atributo `tenantId: TenantId` (obrigatório, imutável) ao agregado `Orcamento` em `src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.ts`; invariante `TenantIdImutavelError`. Implementado como `tenantId?: TenantId` (expand/contract): obrigatório quebraria compilação de #279/#280/#281, que ainda não preenchem o campo — PR de contrato futura torna-o obrigatório nos 4 BCs de uma vez. (#277, PR #627)
 - [ ] T015 [US1] Atualizar os 5 Domain Events de 001 (`src/bounded-contexts/ingestao-identificacao/domain/events/`) para incluir `tenantId` no payload, `schemaVersion: 2` (ADR-005).
 - [ ] T016 [US1] Atualizar `ReceberOrcamento` (Application) para receber `tenantId` obrigatório do `TenantContext` (nunca do body) e propagá-lo à criação do agregado, em `src/bounded-contexts/ingestao-identificacao/application/use-cases/receber-orcamento.ts`.
 - [ ] T017 [US1] Atualizar `ClassificarOrcamento`, `ConfirmarRevisaoHumana`, `ConsultarStatusOrcamento` para propagar/validar `tenantId` (comparação explícita contra o agregado antes de retornar dado; 404 em divergência) em `src/bounded-contexts/ingestao-identificacao/application/use-cases/`.
