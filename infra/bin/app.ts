@@ -9,6 +9,8 @@ import { DecisaoWorkflowQueueStack } from '../lib/decisao-workflow-queue-stack.t
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
 import { ExtratorLambdaRoleStack } from '../lib/extrator-lambda-role-stack.ts';
 import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
+import { IndexadorFunctionStack } from '../lib/indexador-function-stack.ts';
+import { IndexadorLambdaRoleStack } from '../lib/indexador-lambda-role-stack.ts';
 import { IndexadorQueueStack } from '../lib/indexador-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
 import { ReceberOrcamentoLambdaRoleStack } from '../lib/receber-orcamento-lambda-role-stack.ts';
@@ -111,8 +113,22 @@ new DecisaoWorkflowQueueStack(app, 'DecisaoWorkflowQueueStack', {
   dominioBus: dominioEventBusStack.dominioBus,
 });
 
-new IndexadorQueueStack(app, 'IndexadorQueueStack', {
+const indexadorQueueStack = new IndexadorQueueStack(app, 'IndexadorQueueStack', {
   description:
     'Fila indexador-queue + DLQ + alarme, roteada por regra EventBridge — spec 004, T004/T005.',
+  dominioBus: dominioEventBusStack.dominioBus,
+});
+
+const indexadorLambdaRoleStack = new IndexadorLambdaRoleStack(app, 'IndexadorLambdaRoleStack', {
+  description: 'Role IAM least-privilege da Lambda IndexarOrcamento — spec 004, issue #623.',
+  indexadorQueue: indexadorQueueStack.indexadorQueue,
+  dominioBus: dominioEventBusStack.dominioBus,
+});
+
+new IndexadorFunctionStack(app, 'IndexadorFunctionStack', {
+  description:
+    'NodejsFunction de produção do handler consumidor de indexador-queue — spec 004, issue #623 (primeira Lambda de produção do repositório, ADR-009).',
+  indexadorLambdaRole: indexadorLambdaRoleStack.indexadorLambdaRole,
+  indexadorQueue: indexadorQueueStack.indexadorQueue,
   dominioBus: dominioEventBusStack.dominioBus,
 });
