@@ -149,7 +149,7 @@ describe('extrator-queue: campo ambíguo conhecido (integração simulada, T029)
     const repositorio = new RepositorioFake();
     const publisher = new EventPublisherFake();
     const useCase = new ExtrairDadosOrcamento(
-      repositorio,
+      () => repositorio,
       new LeituraBrutaGatewayFake(),
       new MarkItDownConversaoExtracaoACLFake(),
       new AgenteExtratorGatewayFake(),

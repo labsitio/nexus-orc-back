@@ -20,6 +20,7 @@ import {
 } from '../../../../../../src/bounded-contexts/validacao/infrastructure/persistence/schema/validacao-orcamento.schema.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
+const TENANT_ID = randomUUID();
 
 // drizzle-orm embrulha o erro do driver em `Failed query: ...`; o nome da
 // constraint Postgres violada só aparece em `error.cause.message`.
@@ -80,12 +81,12 @@ describe.skipIf(!DATABASE_URL)('schema validacao.validacoes_orcamento* (Postgres
     );
     expect(indice.rows).toHaveLength(1);
 
-    // (issue #649 — expand/contract, ADR-008) `tenant_id` nullable até a #632.
+    // (issue #656 — RLS/tenant-scoped, migração 0020) `tenant_id` NOT NULL.
     const colunaTenantId = await client.query<{ is_nullable: string }>(
       `select is_nullable from information_schema.columns
        where table_schema = 'validacao' and table_name = 'validacoes_orcamento' and column_name = 'tenant_id'`,
     );
-    expect(colunaTenantId.rows).toEqual([{ is_nullable: 'YES' }]);
+    expect(colunaTenantId.rows).toEqual([{ is_nullable: 'NO' }]);
 
     const triggers = await client.query<{ tgname: string }>(
       `select tgname from pg_trigger where tgname in (
@@ -96,9 +97,35 @@ describe.skipIf(!DATABASE_URL)('schema validacao.validacoes_orcamento* (Postgres
     expect(triggers.rows).toHaveLength(2);
   });
 
+  it('RLS habilitada e política tenant_isolation presente em validacoes_orcamento / validacoes_orcamento_historico (issue #656)', async () => {
+    const rls = await client.query<{
+      relname: string;
+      relrowsecurity: boolean;
+      relforcerowsecurity: boolean;
+    }>(
+      `select relname, relrowsecurity, relforcerowsecurity from pg_class
+       where relname in ('validacoes_orcamento', 'validacoes_orcamento_historico')`,
+    );
+    expect(rls.rows).toHaveLength(2);
+    for (const linha of rls.rows) {
+      expect(linha.relrowsecurity).toBe(true);
+      expect(linha.relforcerowsecurity).toBe(true);
+    }
+
+    const politicas = await client.query<{ tablename: string; policyname: string }>(
+      `select tablename, policyname from pg_policies
+       where tablename in ('validacoes_orcamento', 'validacoes_orcamento_historico') and policyname = 'tenant_isolation'`,
+    );
+    expect(politicas.rows.map((r) => r.tablename).sort()).toEqual([
+      'validacoes_orcamento',
+      'validacoes_orcamento_historico',
+    ]);
+  });
+
   async function inserirValidacao(id: string) {
     await db.insert(validacoesOrcamento).values({
       id,
+      tenantId: TENANT_ID,
       status: 'PENDENTE',
       dadosExtraidos: { cnpjFornecedor: '11222333000181', itens: [] },
       inconsistencias: [],
@@ -121,6 +148,7 @@ describe.skipIf(!DATABASE_URL)('schema validacao.validacoes_orcamento* (Postgres
     await esperarViolacaoDeConstraint(
       db.insert(validacoesOrcamento).values({
         id: randomUUID(),
+        tenantId: TENANT_ID,
         status: 'STATUS_INEXISTENTE',
         dadosExtraidos: {},
         inconsistencias: [],
@@ -136,6 +164,7 @@ describe.skipIf(!DATABASE_URL)('schema validacao.validacoes_orcamento* (Postgres
     await esperarViolacaoDeConstraint(
       db.insert(validacoesOrcamentoHistorico).values({
         orcamentoValidacaoId: id,
+        tenantId: TENANT_ID,
         resultado: 'RESULTADO_INEXISTENTE',
         inconsistencias: [],
         ocorreuEm: new Date(),
@@ -148,6 +177,7 @@ describe.skipIf(!DATABASE_URL)('schema validacao.validacoes_orcamento* (Postgres
     await esperarViolacaoDeConstraint(
       db.insert(validacoesOrcamentoHistorico).values({
         orcamentoValidacaoId: randomUUID(),
+        tenantId: TENANT_ID,
         resultado: 'VALIDADO',
         inconsistencias: [],
         ocorreuEm: new Date(),
@@ -161,6 +191,7 @@ describe.skipIf(!DATABASE_URL)('schema validacao.validacoes_orcamento* (Postgres
     await inserirValidacao(id);
     await db.insert(validacoesOrcamentoHistorico).values({
       orcamentoValidacaoId: id,
+      tenantId: TENANT_ID,
       resultado: 'VALIDADO',
       inconsistencias: [],
       ocorreuEm: new Date(),
@@ -181,6 +212,7 @@ describe.skipIf(!DATABASE_URL)('schema validacao.validacoes_orcamento* (Postgres
     await inserirValidacao(id);
     await db.insert(validacoesOrcamentoHistorico).values({
       orcamentoValidacaoId: id,
+      tenantId: TENANT_ID,
       resultado: 'VALIDADO',
       inconsistencias: [],
       ocorreuEm: new Date(),

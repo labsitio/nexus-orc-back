@@ -22,6 +22,7 @@ import type { EventPublisher } from '../../../../src/bounded-contexts/extracao/d
 import type { DomainEventEnvelope } from '../../../../src/bounded-contexts/extracao/domain/events/domain-event.js';
 import { OrcamentoExtraido } from '../../../../src/bounded-contexts/extracao/domain/events/orcamento-extraido.event.js';
 import { ExtracaoEscalonadaParaRevisaoHumana } from '../../../../src/bounded-contexts/extracao/domain/events/extracao-escalonada-revisao-humana.event.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * T020 — Integration test: `OrcamentoClassificado` publicado → `OrcamentoExtraido`
@@ -87,6 +88,7 @@ function novaExtracaoPendente(): ExtracaoOrcamento {
       key: 'portal/arquivo.pdf',
       versionId: 'v1',
     }),
+    TenantId.novo(),
   );
 }
 

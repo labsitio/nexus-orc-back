@@ -1,5 +1,8 @@
+import type { preHandlerHookHandler } from 'fastify';
 import Fastify from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
+import { criarTenantContext } from '../../../../../src/shared-kernel/tenant/tenant-context.js';
+import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import { registrarRotaRevisaoHumanaExtracao } from '../../../../../src/bounded-contexts/extracao/interface/http/revisao-humana.controller.js';
 import {
   CaminhoConfirmacaoInvalidoError,
@@ -21,7 +24,15 @@ import { ReferenciaS3 } from '../../../../../src/bounded-contexts/extracao/domai
 import { NivelConfianca } from '../../../../../src/bounded-contexts/extracao/domain/value-objects/nivel-confianca.vo.js';
 
 const ORCAMENTO_ID = '01890a5d-ac96-774b-bcce-b302099a8057';
+const TENANT_ID = TenantId.novo();
 const confianca = NivelConfianca.de(95);
+
+/** PreHandler fake que injeta tenantContext nos testes (mesmo padrão de spec 001/007). */
+function criarPreHandlerFakeTenant(tenantId: TenantId): preHandlerHookHandler {
+  return async (request) => {
+    request.tenantContext = criarTenantContext(tenantId);
+  };
+}
 
 /** Instância mínima do agregado, já em `EXTRAIDO` após confirmação — só o
  * necessário para `paraResposta` do controller conseguir mapear a resposta. */
@@ -34,6 +45,7 @@ function extracaoExtraida(): ExtracaoOrcamento {
       agenteOrigem: 'CLASSIFICADOR',
     }),
     ReferenciaS3.de({ bucket: 'b', key: 'k', versionId: 'v' }),
+    TENANT_ID,
   );
   const item = ItemOrcamento.de({
     descricao: CampoExtraido.extraido(DescricaoProduto.de('Parafuso'), confianca, 'EXTRATOR'),
@@ -57,7 +69,9 @@ function extracaoExtraida(): ExtracaoOrcamento {
 
 function appComRota(confirmar: ConfirmarRevisaoHumanaExtracao) {
   const app = Fastify();
-  registrarRotaRevisaoHumanaExtracao(app, confirmar);
+  registrarRotaRevisaoHumanaExtracao(app, confirmar, {
+    preHandler: criarPreHandlerFakeTenant(TENANT_ID),
+  });
   return app;
 }
 
@@ -87,6 +101,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/extracao/revisao-humana', () => {
     expect(executar).toHaveBeenCalledWith({
       orcamentoId: ORCAMENTO_ID,
       camposConfirmados: corpoValido().camposConfirmados,
+      tenantId: TENANT_ID,
     });
     await app.close();
   });

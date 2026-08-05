@@ -141,7 +141,7 @@ async function processarDecisaoHumana(
 
   await repositorio.salvar(validacao);
 
-  const tenantId = validacao.tenantId!.toString();
+  const tenantId = validacao.tenantId.toString();
   if (validacao.status === 'VALIDADO') {
     await publisher.publicar(
       new OrcamentoValidado(
@@ -191,6 +191,7 @@ function dadosConsistentes(cnpjFornecedor = CNPJ_VALIDO): DadosExtraidosParaVali
 describe('Fluxo completo de resolução humana de inconsistência (T033)', () => {
   it('inconsistência conhecida (CNPJ inválido) → PENDENTE_REVISAO_HUMANA visível na consulta de status → CORRECAO_APLICADA sem inconsistência remanescente → OrcamentoValidado publicado', async () => {
     const orcamentoId = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+    const tenantId = TenantId.novo();
     const repositorio = new OrcamentoValidacaoRepositoryEmMemoria();
     const publisher = new EventPublisherFake();
     const parametroFaixaPreco = new ParametroFaixaPrecoGatewayFake();
@@ -199,9 +200,9 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new ACLFake({
         orcamentoId,
         dadosExtraidos: dadosConsistentes('11111111111111'),
-        tenantId: TenantId.novo(),
+        tenantId,
       }),
-      repositorio,
+      () => repositorio,
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
@@ -215,8 +216,8 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
     expect(eventoInconsistencia.inconsistencias.map((i) => i.regra)).toContain('CNPJ_INVALIDO');
 
     // (b) nunca "validado" silencioso; status de consulta reflete a espera.
-    const consultarStatus = new ConsultarStatusValidacao(repositorio);
-    const statusDurantePendencia = await consultarStatus.executar(orcamentoId.toString());
+    const consultarStatus = new ConsultarStatusValidacao(() => repositorio);
+    const statusDurantePendencia = await consultarStatus.executar(orcamentoId.toString(), tenantId);
     expect(statusDurantePendencia.status).toBe('PENDENTE_REVISAO_HUMANA');
 
     // (c) decisão humana explícita (correção do CNPJ) → único caminho para validado.
@@ -234,12 +235,13 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
     expect(eventoValidado.detailType).toBe(OrcamentoValidado.detailType);
     expect(eventoValidado.orcamentoId).toBe(orcamentoId.toString());
 
-    const statusFinal = await consultarStatus.executar(orcamentoId.toString());
+    const statusFinal = await consultarStatus.executar(orcamentoId.toString(), tenantId);
     expect(statusFinal.status).toBe('VALIDADO');
   });
 
   it('inconsistência conhecida → decisão humana ACEITE_COM_RESSALVA → OrcamentoValidadoComRessalva publicado, status VALIDADO_COM_RESSALVA (terminal)', async () => {
     const orcamentoId = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8058');
+    const tenantId = TenantId.novo();
     const repositorio = new OrcamentoValidacaoRepositoryEmMemoria();
     const publisher = new EventPublisherFake();
     const parametroFaixaPreco = new ParametroFaixaPrecoGatewayFake();
@@ -248,9 +250,9 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new ACLFake({
         orcamentoId,
         dadosExtraidos: dadosConsistentes('11111111111111'),
-        tenantId: TenantId.novo(),
+        tenantId,
       }),
-      repositorio,
+      () => repositorio,
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
@@ -270,13 +272,14 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
     expect(eventoComRessalva.detailType).toBe(OrcamentoValidadoComRessalva.detailType);
     expect(eventoComRessalva.inconsistencias.map((i) => i.regra)).toContain('CNPJ_INVALIDO');
 
-    const consultarStatus = new ConsultarStatusValidacao(repositorio);
-    const statusFinal = await consultarStatus.executar(orcamentoId.toString());
+    const consultarStatus = new ConsultarStatusValidacao(() => repositorio);
+    const statusFinal = await consultarStatus.executar(orcamentoId.toString(), tenantId);
     expect(statusFinal.status).toBe('VALIDADO_COM_RESSALVA');
   });
 
   it('correção humana que ainda deixa inconsistência remanescente permanece PENDENTE_REVISAO_HUMANA e não publica evento terminal (nunca autoaprova)', async () => {
     const orcamentoId = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8059');
+    const tenantId = TenantId.novo();
     const repositorio = new OrcamentoValidacaoRepositoryEmMemoria();
     const publisher = new EventPublisherFake();
     const parametroFaixaPreco = new ParametroFaixaPrecoGatewayFake();
@@ -285,9 +288,9 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new ACLFake({
         orcamentoId,
         dadosExtraidos: dadosConsistentes('11111111111111'),
-        tenantId: TenantId.novo(),
+        tenantId,
       }),
-      repositorio,
+      () => repositorio,
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
@@ -307,8 +310,8 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
     expect(validacaoFinal.status).toBe('PENDENTE_REVISAO_HUMANA');
     expect(publisher.eventosPublicados).toHaveLength(1); // nenhum evento novo.
 
-    const consultarStatus = new ConsultarStatusValidacao(repositorio);
-    const statusFinal = await consultarStatus.executar(orcamentoId.toString());
+    const consultarStatus = new ConsultarStatusValidacao(() => repositorio);
+    const statusFinal = await consultarStatus.executar(orcamentoId.toString(), tenantId);
     expect(statusFinal.status).toBe('PENDENTE_REVISAO_HUMANA');
   });
 
@@ -333,6 +336,7 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
   it('orçamento com inconsistência (PENDENTE_REVISAO_HUMANA) nunca bloqueia o processamento de um segundo orçamento consistente', async () => {
     const orcamentoPendente = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a805b');
     const orcamentoConsistente = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a805c');
+    const tenantId = TenantId.novo();
     const repositorio = new OrcamentoValidacaoRepositoryEmMemoria();
     const publisher = new EventPublisherFake();
     const parametroFaixaPreco = new ParametroFaixaPrecoGatewayFake();
@@ -341,9 +345,9 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new ACLFake({
         orcamentoId: orcamentoPendente,
         dadosExtraidos: dadosConsistentes('11111111111111'),
-        tenantId: TenantId.novo(),
+        tenantId,
       }),
-      repositorio,
+      () => repositorio,
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
@@ -354,20 +358,20 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new ACLFake({
         orcamentoId: orcamentoConsistente,
         dadosExtraidos: dadosConsistentes(CNPJ_VALIDO),
-        tenantId: TenantId.novo(),
+        tenantId,
       }),
-      repositorio,
+      () => repositorio,
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
     );
     await validarConsistente.executar({ orcamentoId: orcamentoConsistente.toString() });
 
-    const consultarStatus = new ConsultarStatusValidacao(repositorio);
-    expect((await consultarStatus.executar(orcamentoPendente.toString())).status).toBe(
+    const consultarStatus = new ConsultarStatusValidacao(() => repositorio);
+    expect((await consultarStatus.executar(orcamentoPendente.toString(), tenantId)).status).toBe(
       'PENDENTE_REVISAO_HUMANA',
     );
-    expect((await consultarStatus.executar(orcamentoConsistente.toString())).status).toBe(
+    expect((await consultarStatus.executar(orcamentoConsistente.toString(), tenantId)).status).toBe(
       'VALIDADO',
     );
   });

@@ -3,7 +3,6 @@ import type {
   DecisaoHumanaValidacao,
   OrcamentoValidacao,
 } from '../../domain/orcamento-validacao.aggregate.js';
-import { OrcamentoValidacaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 import { OrcamentoValidado } from '../../domain/events/orcamento-validado.event.js';
 import { OrcamentoValidadoComRessalva } from '../../domain/events/orcamento-validado-com-ressalva.event.js';
 import {
@@ -11,11 +10,15 @@ import {
   validarCnpjValido,
   validarPrazoCoerente,
 } from '../../domain/regras-consistencia.js';
-import type { OrcamentoValidacaoRepository } from '../../domain/repositories/orcamento-validacao.repository.js';
+import type { CriarOrcamentoValidacaoRepositorio } from '../../domain/repositories/orcamento-validacao.repository.js';
 import { DadosExtraidosParaValidacao } from '../../domain/value-objects/dados-extraidos-para-validacao.vo.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { PeriodoValidade } from '../../domain/value-objects/periodo-validade.vo.js';
-import { OrcamentoValidacaoNaoEncontradoError } from './consultar-status-validacao.js';
+import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
+import {
+  OrcamentoValidacaoNaoEncontradoError,
+  TenantDivergenciaError,
+} from './consultar-status-validacao.js';
 
 export interface DecisaoHumanaValidacaoInput {
   readonly decisao: 'CORRECAO_APLICADA' | 'ACEITE_COM_RESSALVA';
@@ -37,19 +40,32 @@ export interface DecisaoHumanaValidacaoInput {
  */
 export class RegistrarDecisaoHumanaValidacao {
   constructor(
-    private readonly repositorio: OrcamentoValidacaoRepository,
+    private readonly criarRepositorio: CriarOrcamentoValidacaoRepositorio,
     private readonly eventPublisher: EventPublisher,
   ) {}
 
-  async executar(orcamentoId: string, decisao: DecisaoHumanaValidacao): Promise<void> {
+  async executar(
+    orcamentoId: string,
+    tenantId: TenantId,
+    decisao: DecisaoHumanaValidacao,
+  ): Promise<void> {
     const id = OrcamentoId.de(orcamentoId);
-    const validacao = await this.repositorio.buscarPorOrcamentoId(id);
+    // (issue #656) Repositório construído por chamada a partir do `tenantId`
+    // já validado do parâmetro — nunca reaproveitado como campo fixo entre
+    // chamadas (ver `CriarOrcamentoValidacaoRepositorio`).
+    const repositorio = this.criarRepositorio(tenantId);
+    const validacao = await repositorio.buscarPorOrcamentoId(id);
     if (!validacao) {
       throw new OrcamentoValidacaoNaoEncontradoError(orcamentoId);
     }
 
+    // (issue #656) Defesa em profundidade — ver `TenantDivergenciaError`.
+    if (validacao.tenantId.toString() !== tenantId.toString()) {
+      throw new TenantDivergenciaError(orcamentoId);
+    }
+
     validacao.registrarDecisaoHumana(decisao);
-    await this.repositorio.salvar(validacao);
+    await repositorio.salvar(validacao);
 
     const evento = this.eventoParaStatus(validacao);
     if (evento) {
@@ -137,11 +153,10 @@ export class RegistrarDecisaoHumanaValidacao {
       return undefined;
     }
 
-    const tenantIdVo = validacao.tenantId;
-    if (!tenantIdVo) {
-      throw new OrcamentoValidacaoSemTenantIdError(orcamentoId);
-    }
-    const tenantId = tenantIdVo.toString();
+    // (issue #656 — aperto de tipo) `OrcamentoValidacao.tenantId` é
+    // obrigatório desde a criação — sempre concreto aqui (guard
+    // `OrcamentoValidacaoSemTenantIdError` removido: tornou-se inalcançável).
+    const tenantId = validacao.tenantId.toString();
 
     if (validacao.status === 'VALIDADO') {
       return new OrcamentoValidado(orcamentoId, itens, condicoesComerciais, tenantId);

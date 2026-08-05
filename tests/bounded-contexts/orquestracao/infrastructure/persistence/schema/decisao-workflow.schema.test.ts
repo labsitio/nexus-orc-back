@@ -19,6 +19,7 @@ import {
 } from '../../../../../../src/bounded-contexts/orquestracao/infrastructure/persistence/schema/decisao-workflow.schema.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
+const TENANT_ID = randomUUID();
 
 // drizzle-orm embrulha o erro do driver em `Failed query: ...`; o nome da
 // constraint Postgres violada só aparece em `error.cause.message`.
@@ -86,11 +87,44 @@ describe.skipIf(!DATABASE_URL)('schema orquestracao.decisoes_workflow* (Postgres
        )`,
     );
     expect(triggers.rows).toHaveLength(2);
+
+    // (issue #656 — RLS/tenant-scoped, migração 0020) `tenant_id` NOT NULL.
+    const colunaTenantId = await client.query<{ is_nullable: string }>(
+      `select is_nullable from information_schema.columns
+       where table_schema = 'orquestracao' and table_name = 'decisoes_workflow' and column_name = 'tenant_id'`,
+    );
+    expect(colunaTenantId.rows).toEqual([{ is_nullable: 'NO' }]);
+  });
+
+  it('RLS habilitada e política tenant_isolation presente em decisoes_workflow / decisoes_workflow_historico (issue #656)', async () => {
+    const rls = await client.query<{
+      relname: string;
+      relrowsecurity: boolean;
+      relforcerowsecurity: boolean;
+    }>(
+      `select relname, relrowsecurity, relforcerowsecurity from pg_class
+       where relname in ('decisoes_workflow', 'decisoes_workflow_historico')`,
+    );
+    expect(rls.rows).toHaveLength(2);
+    for (const linha of rls.rows) {
+      expect(linha.relrowsecurity).toBe(true);
+      expect(linha.relforcerowsecurity).toBe(true);
+    }
+
+    const politicas = await client.query<{ tablename: string; policyname: string }>(
+      `select tablename, policyname from pg_policies
+       where tablename in ('decisoes_workflow', 'decisoes_workflow_historico') and policyname = 'tenant_isolation'`,
+    );
+    expect(politicas.rows.map((r) => r.tablename).sort()).toEqual([
+      'decisoes_workflow',
+      'decisoes_workflow_historico',
+    ]);
   });
 
   async function inserirDecisaoWorkflow(id: string) {
     await db.insert(decisoesWorkflow).values({
       id,
+      tenantId: TENANT_ID,
       status: 'AGUARDANDO_CONTEXTO',
     });
   }
@@ -109,6 +143,7 @@ describe.skipIf(!DATABASE_URL)('schema orquestracao.decisoes_workflow* (Postgres
     await esperarViolacaoDeConstraint(
       db.insert(decisoesWorkflow).values({
         id: randomUUID(),
+        tenantId: TENANT_ID,
         status: 'STATUS_INEXISTENTE',
       }),
       /decisoes_workflow_status_valido/,
@@ -122,6 +157,7 @@ describe.skipIf(!DATABASE_URL)('schema orquestracao.decisoes_workflow* (Postgres
     await esperarViolacaoDeConstraint(
       db.insert(decisoesWorkflowHistorico).values({
         decisaoWorkflowId: id,
+        tenantId: TENANT_ID,
         agente: 'AGENTE_INEXISTENTE',
         motivoInsucesso: 'confiança insuficiente',
         ocorreuEm: new Date(),
@@ -137,6 +173,7 @@ describe.skipIf(!DATABASE_URL)('schema orquestracao.decisoes_workflow* (Postgres
     await esperarViolacaoDeConstraint(
       db.insert(decisoesWorkflowHistorico).values({
         decisaoWorkflowId: id,
+        tenantId: TENANT_ID,
         agente: 'ORQUESTRADOR',
         resultado: { acao: 'APROVAR' },
         motivoInsucesso: 'confiança insuficiente',
@@ -153,6 +190,7 @@ describe.skipIf(!DATABASE_URL)('schema orquestracao.decisoes_workflow* (Postgres
     await esperarViolacaoDeConstraint(
       db.insert(decisoesWorkflowHistorico).values({
         decisaoWorkflowId: id,
+        tenantId: TENANT_ID,
         agente: 'ORQUESTRADOR',
         ocorreuEm: new Date(),
       }),
@@ -164,6 +202,7 @@ describe.skipIf(!DATABASE_URL)('schema orquestracao.decisoes_workflow* (Postgres
     await esperarViolacaoDeConstraint(
       db.insert(decisoesWorkflowHistorico).values({
         decisaoWorkflowId: randomUUID(),
+        tenantId: TENANT_ID,
         agente: 'ORQUESTRADOR',
         motivoInsucesso: 'confiança insuficiente',
         ocorreuEm: new Date(),
@@ -177,6 +216,7 @@ describe.skipIf(!DATABASE_URL)('schema orquestracao.decisoes_workflow* (Postgres
     await inserirDecisaoWorkflow(id);
     await db.insert(decisoesWorkflowHistorico).values({
       decisaoWorkflowId: id,
+      tenantId: TENANT_ID,
       agente: 'ORQUESTRADOR',
       motivoInsucesso: 'confiança insuficiente',
       ocorreuEm: new Date(),
@@ -197,6 +237,7 @@ describe.skipIf(!DATABASE_URL)('schema orquestracao.decisoes_workflow* (Postgres
     await inserirDecisaoWorkflow(id);
     await db.insert(decisoesWorkflowHistorico).values({
       decisaoWorkflowId: id,
+      tenantId: TENANT_ID,
       agente: 'ORQUESTRADOR',
       motivoInsucesso: 'confiança insuficiente',
       ocorreuEm: new Date(),

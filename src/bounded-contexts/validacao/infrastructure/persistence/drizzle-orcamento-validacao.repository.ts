@@ -1,5 +1,7 @@
 import { asc, count, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { DrizzleTenantScopedRepositoryBase } from '../../../../shared-kernel/tenant/drizzle-tenant-scoped-repository-base.js';
+import type { TenantContext } from '../../../../shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import {
   OrcamentoValidacao,
@@ -82,7 +84,7 @@ function agregadoDaLinha(
     status: linha.status as StatusValidacao,
     inconsistencias: inconsistenciasDaLinha(linha.inconsistencias),
     historico,
-    tenantId: linha.tenantId !== null ? TenantId.de(linha.tenantId) : undefined,
+    tenantId: TenantId.de(linha.tenantId),
   };
   return OrcamentoValidacao.reconstituir(props);
 }
@@ -100,8 +102,16 @@ function agregadoDaLinha(
  * concorrente do mesmo agregado (retry de handler Lambda sobre a mesma
  * mensagem SQS).
  */
-export class DrizzleOrcamentoValidacaoRepository implements OrcamentoValidacaoRepository {
-  constructor(private readonly db: NodePgDatabase) {}
+export class DrizzleOrcamentoValidacaoRepository
+  extends DrizzleTenantScopedRepositoryBase
+  implements OrcamentoValidacaoRepository
+{
+  private readonly tenantId: string;
+
+  constructor(db: NodePgDatabase, tenantContext: TenantContext) {
+    super(db, tenantContext);
+    this.tenantId = tenantContext.tenantId.toString();
+  }
 
   async salvar(orcamentoValidacao: OrcamentoValidacao): Promise<void> {
     const id = orcamentoValidacao.orcamentoId.toString();
@@ -110,7 +120,7 @@ export class DrizzleOrcamentoValidacaoRepository implements OrcamentoValidacaoRe
       inconsistencia.paraPayload(),
     );
 
-    await this.db.transaction(async (tx) => {
+    await this.transacaoTenantScoped(async (tx) => {
       // Serializa `salvar` concorrente do mesmo agregado — sem este lock, duas
       // transações poderiam ler a mesma contagem de histórico já persistida e
       // duplicar a mesma tentativa nova. Linha inexistente (1º save) não
@@ -125,10 +135,10 @@ export class DrizzleOrcamentoValidacaoRepository implements OrcamentoValidacaoRe
         .insert(validacoesOrcamento)
         .values({
           id,
-          // (issue #649) `tenantId` é imutável após a criação — nunca entra
+          // (issue #656) `tenantId` é imutável após a criação — nunca entra
           // no `set` do onConflictDoUpdate abaixo (mesmo padrão de
-          // `DrizzleExtracaoOrcamentoRepository`, spec 002, #648).
-          tenantId: orcamentoValidacao.tenantId?.toString() ?? null,
+          // `DrizzleExtracaoOrcamentoRepository`, spec 002).
+          tenantId: this.tenantId,
           status: orcamentoValidacao.status,
           dadosExtraidos: dadosExtraidosPayload,
           inconsistencias: inconsistenciasPayload,
@@ -154,6 +164,7 @@ export class DrizzleOrcamentoValidacaoRepository implements OrcamentoValidacaoRe
       await tx.insert(validacoesOrcamentoHistorico).values(
         novasTentativas.map((tentativa) => ({
           orcamentoValidacaoId: id,
+          tenantId: this.tenantId,
           resultado: tentativa.resultado,
           inconsistencias: tentativa.inconsistencias.map((inconsistencia) =>
             inconsistencia.paraPayload(),
@@ -165,20 +176,22 @@ export class DrizzleOrcamentoValidacaoRepository implements OrcamentoValidacaoRe
   }
 
   async buscarPorOrcamentoId(orcamentoId: OrcamentoId): Promise<OrcamentoValidacao | undefined> {
-    const [linha] = await this.db
-      .select()
-      .from(validacoesOrcamento)
-      .where(eq(validacoesOrcamento.id, orcamentoId.toString()));
-    if (!linha) {
-      return undefined;
-    }
+    return this.transacaoTenantScoped(async (tx) => {
+      const [linha] = await tx
+        .select()
+        .from(validacoesOrcamento)
+        .where(eq(validacoesOrcamento.id, orcamentoId.toString()));
+      if (!linha) {
+        return undefined;
+      }
 
-    const linhasHistorico = await this.db
-      .select()
-      .from(validacoesOrcamentoHistorico)
-      .where(eq(validacoesOrcamentoHistorico.orcamentoValidacaoId, orcamentoId.toString()))
-      .orderBy(asc(validacoesOrcamentoHistorico.ocorreuEm), asc(validacoesOrcamentoHistorico.id));
+      const linhasHistorico = await tx
+        .select()
+        .from(validacoesOrcamentoHistorico)
+        .where(eq(validacoesOrcamentoHistorico.orcamentoValidacaoId, orcamentoId.toString()))
+        .orderBy(asc(validacoesOrcamentoHistorico.ocorreuEm), asc(validacoesOrcamentoHistorico.id));
 
-    return agregadoDaLinha(linha, linhasHistorico.map(tentativaDaLinha));
+      return agregadoDaLinha(linha, linhasHistorico.map(tentativaDaLinha));
+    });
   }
 }

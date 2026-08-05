@@ -31,10 +31,11 @@ export const extracoesOrcamento = extracaoSchema.table(
   'extracoes_orcamento',
   {
     id: uuid('id').primaryKey(),
-    // (issue #648 — expand/contract, ADR-008) Nullable até a #632 tornar
-    // `tenantId` obrigatório nos 4 BCs de uma vez (mesmo padrão de
-    // `orcamentos.tenant_id`, spec 001, antes de #279/#280/#281).
-    tenantId: uuid('tenant_id'),
+    // (issue #656 — RLS/repositório tenant-scoped, spec 007 ADR-008
+    // amendment) `NOT NULL` desde a migração 0020: zero linha em produção
+    // (#587/#297), sem passo de backfill — mesmo padrão de
+    // `orcamentos.tenant_id` (spec 001, migração 0013).
+    tenantId: uuid('tenant_id').notNull(),
     status: text('status').notNull(),
     referenciaClassificacaoFornecedorIdentificado: text(
       'referencia_classificacao_fornecedor_identificado',
@@ -51,7 +52,8 @@ export const extracoesOrcamento = extracaoSchema.table(
     // CondicoesComerciais — ausente até a 1ª tentativa (ExtracaoOrcamento.criar()).
     condicoesComerciais: jsonb('condicoes_comerciais'),
   },
-  () => [
+  (table) => [
+    index('extracoes_orcamento_tenant_id_idx').on(table.tenantId),
     check('extracoes_orcamento_status_valido', emValoresValidos('status', STATUS_EXTRACAO)),
     check(
       'extracoes_orcamento_ref_classificacao_agente_valido',
@@ -74,6 +76,10 @@ export const extracoesOrcamentoHistorico = extracaoSchema.table(
     extracaoOrcamentoId: uuid('extracao_orcamento_id')
       .notNull()
       .references(() => extracoesOrcamento.id),
+    // (issue #656) Mesmo padrão de `orcamentos_historico.tenant_id` (spec 001,
+    // migração 0013) — RLS sobre o histórico exige a própria coluna, nunca
+    // depende de join com a tabela de estado atual.
+    tenantId: uuid('tenant_id').notNull(),
     agente: text('agente').notNull(),
     ocorreuEm: timestamp('ocorreu_em', { withTimezone: true }).notNull(),
     resultado: text('resultado'),
@@ -81,6 +87,7 @@ export const extracoesOrcamentoHistorico = extracaoSchema.table(
   },
   (table) => [
     index('extracoes_orcamento_historico_extracao_orcamento_id_idx').on(table.extracaoOrcamentoId),
+    index('extracoes_orcamento_historico_tenant_id_idx').on(table.tenantId),
     check(
       'extracoes_orcamento_historico_agente_valido',
       emValoresValidos('agente', AGENTES_ORIGEM_CAMPO),

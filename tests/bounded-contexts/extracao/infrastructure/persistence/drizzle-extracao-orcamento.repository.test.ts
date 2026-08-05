@@ -30,9 +30,11 @@ import {
   extracoesOrcamento,
   extracoesOrcamentoHistorico,
 } from '../../../../../src/bounded-contexts/extracao/infrastructure/persistence/schema/extracao-orcamento.schema.js';
+import { criarTenantContext } from '../../../../../src/shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
+const TENANT_ID = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
 
 const confiancaAlta = NivelConfianca.de(95);
 const confiancaBaixa = NivelConfianca.de(20);
@@ -107,7 +109,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
     client = new Client({ connectionString: DATABASE_URL });
     await client.connect();
     db = drizzle(client);
-    repo = new DrizzleExtracaoOrcamentoRepository(db);
+    repo = new DrizzleExtracaoOrcamentoRepository(db, criarTenantContext(TENANT_ID));
   });
 
   afterAll(async () => {
@@ -137,36 +139,20 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
     await expect(repo.buscarPorOrcamentoId(orcamentoIdDeTeste())).resolves.toBeUndefined();
   });
 
-  it('(issue #648) roundtrip do tenantId opcional — persiste e recarrega o mesmo valor', async () => {
+  it('(issue #656 — aperto de tipo) tenantId é obrigatório e persiste/recarrega o mesmo valor', async () => {
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
-    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
 
     const extracao = ExtracaoOrcamento.criar(
       id,
       referenciaClassificacao(),
       referenciaBruta('doc-tenant.pdf'),
-      tenantId,
+      TENANT_ID,
     );
     await repo.salvar(extracao);
 
     const carregado = await repo.buscarPorOrcamentoId(id);
-    expect(carregado?.tenantId?.toString()).toBe(tenantId.toString());
-  });
-
-  it('(issue #648) tenantId ausente na criação é persistido e recarregado como undefined', async () => {
-    const id = orcamentoIdDeTeste();
-    idsParaLimpar.push(id.toString());
-
-    const extracao = ExtracaoOrcamento.criar(
-      id,
-      referenciaClassificacao(),
-      referenciaBruta('doc-sem-tenant.pdf'),
-    );
-    await repo.salvar(extracao);
-
-    const carregado = await repo.buscarPorOrcamentoId(id);
-    expect(carregado?.tenantId).toBeUndefined();
+    expect(carregado?.tenantId.toString()).toBe(TENANT_ID.toString());
   });
 
   it('salva PENDENTE e recarrega EXTRAIDO com itens/condições completos e 1 entrada de histórico', async () => {
@@ -177,6 +163,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
       id,
       referenciaClassificacao(),
       referenciaBruta('doc-1.pdf'),
+      TENANT_ID,
     );
     await repo.salvar(extracao);
 
@@ -207,6 +194,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
       id,
       referenciaClassificacao(),
       referenciaBruta('doc-2.pdf'),
+      TENANT_ID,
     );
     extracao.registrarTentativaExtrator([itemIncompleto()], condicoesCompletas());
     expect(extracao.status).toBe('PENDENTE_REVISAO_HUMANA');
@@ -235,6 +223,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
       id,
       referenciaClassificacao(),
       referenciaBruta('doc-3.pdf'),
+      TENANT_ID,
     );
     extracao.registrarTentativaExtrator([itemCompleto()], condicoesCompletas());
     await repo.salvar(extracao);
@@ -252,13 +241,17 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
 
     const clienteB = new Client({ connectionString: DATABASE_URL });
     await clienteB.connect();
-    const repoB = new DrizzleExtracaoOrcamentoRepository(drizzle(clienteB));
+    const repoB = new DrizzleExtracaoOrcamentoRepository(
+      drizzle(clienteB),
+      criarTenantContext(TENANT_ID),
+    );
 
     try {
       const agregadoA = ExtracaoOrcamento.criar(
         id,
         referenciaClassificacao(),
         referenciaBruta('doc-4.pdf'),
+        TENANT_ID,
       );
       agregadoA.registrarTentativaExtrator([itemCompleto()], condicoesCompletas());
 
@@ -266,6 +259,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleExtracaoOrcamentoRepository (Postgres rea
         id,
         referenciaClassificacao(),
         referenciaBruta('doc-4.pdf'),
+        TENANT_ID,
       );
       agregadoB.registrarTentativaExtrator([itemCompleto()], condicoesCompletas());
 

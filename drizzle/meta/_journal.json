@@ -141,6 +141,13 @@
       "when": 1785870654330,
       "tag": "0019_t650_decisoes_workflow_tenant_id",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785934613078,
+      "tag": "0020_t656_isolamento_estrutural_002_003_005",
+      "breakpoints": true
     }
   ]
 }

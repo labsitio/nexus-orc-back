@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import {
   ConsultarStatusValidacao,
   OrcamentoValidacaoNaoEncontradoError,
+  TenantDivergenciaError,
 } from '../../application/use-cases/consultar-status-validacao.js';
 import type { OrcamentoValidacao } from '../../domain/orcamento-validacao.aggregate.js';
 import { OrcamentoIdInvalidoError } from '../../domain/value-objects/orcamento-id.vo.js';
@@ -54,12 +55,32 @@ export function registrarRotaStatusValidacao(
       }
 
       try {
-        const orcamentoValidacao = await consultarStatusValidacao.executar(params.data.orcamentoId);
+        // (issue #656) `request.tenantContext` é populado por
+        // `TenantContextMiddleware` a partir do JWT Cognito. Nunca vem de
+        // query/path/body — isso seria escalação de privilégio. Middleware
+        // retorna 401 se ausente/inválido antes de chegar aqui.
+        const tenantId = request.tenantContext?.tenantId;
+        if (!tenantId) {
+          // Não deveria acontecer: TenantContextMiddleware já rejeitou. Fallback defensivo.
+          const problema: ProblemDetails = {
+            type: 'https://nexo.internal/problems/nao-autenticado',
+            title: 'Contexto de tenant ausente',
+            status: 401,
+          };
+          await reply.status(401).type('application/problem+json').send(problema);
+          return;
+        }
+
+        const orcamentoValidacao = await consultarStatusValidacao.executar(
+          params.data.orcamentoId,
+          tenantId,
+        );
         await reply.status(200).send(paraResposta(orcamentoValidacao));
       } catch (erro) {
         if (
           erro instanceof OrcamentoValidacaoNaoEncontradoError ||
-          erro instanceof OrcamentoIdInvalidoError
+          erro instanceof OrcamentoIdInvalidoError ||
+          erro instanceof TenantDivergenciaError
         ) {
           const problema: ProblemDetails = {
             type: 'https://nexo.internal/problems/nao-encontrado',

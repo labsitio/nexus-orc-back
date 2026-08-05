@@ -1,7 +1,4 @@
-import {
-  DecisaoWorkflow,
-  DecisaoWorkflowSemTenantIdError,
-} from '../../domain/aggregates/decisao-workflow.aggregate.js';
+import { DecisaoWorkflow } from '../../domain/aggregates/decisao-workflow.aggregate.js';
 import type { StatusDecisaoWorkflow } from '../../domain/aggregates/decisao-workflow.aggregate.js';
 import { DecisaoWorkflowEscalonadaParaComprador } from '../../domain/events/decisao-workflow-escalonada-para-comprador.event.js';
 import type { DomainEventEnvelope } from '../../domain/events/domain-event.js';
@@ -12,7 +9,7 @@ import { OrcamentoReenvioSolicitado } from '../../domain/events/orcamento-reenvi
 import type { AgenteOrquestradorGateway } from '../../domain/gateways/agente-orquestrador.gateway.js';
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import type { OrcamentoValidadoEventACL } from '../../domain/gateways/orcamento-validado-event.acl.js';
-import type { DecisaoWorkflowRepository } from '../../domain/repositories/decisao-workflow.repository.js';
+import type { CriarDecisaoWorkflowRepositorio } from '../../domain/repositories/decisao-workflow.repository.js';
 import type { AcaoRoteamento } from '../../domain/value-objects/decisao-roteamento.vo.js';
 
 /**
@@ -40,17 +37,21 @@ import type { AcaoRoteamento } from '../../domain/value-objects/decisao-roteamen
 export class ConsolidarEDecidirWorkflow {
   constructor(
     private readonly acl: OrcamentoValidadoEventACL,
-    private readonly repositorio: DecisaoWorkflowRepository,
+    private readonly criarRepositorio: CriarDecisaoWorkflowRepositorio,
     private readonly agenteOrquestrador: AgenteOrquestradorGateway,
     private readonly publisher: EventPublisher,
   ) {}
 
   async executar(payloadBruto: unknown): Promise<void> {
     const { orcamentoId, contextoValidacao, tenantId } = this.acl.traduzir(payloadBruto);
+    // (issue #656) Repositório construído por chamada a partir do `tenantId`
+    // já validado pela ACL — nunca reaproveitado como campo fixo entre
+    // chamadas (mesmo padrão de `RegistrarContextoClassificacao`).
+    const repositorio = this.criarRepositorio(tenantId);
 
     const decisaoWorkflow =
-      (await this.repositorio.buscarPorOrcamentoId(orcamentoId)) ??
-      DecisaoWorkflow.criar(orcamentoId);
+      (await repositorio.buscarPorOrcamentoId(orcamentoId)) ??
+      DecisaoWorkflow.criar(orcamentoId, tenantId);
 
     decisaoWorkflow.registrarContextoValidacao(contextoValidacao, tenantId);
 
@@ -59,7 +60,7 @@ export class ConsolidarEDecidirWorkflow {
     } finally {
       // Persiste mesmo em caso de ContextoIncompletoError: o contexto de
       // validação já registrado não pode se perder à espera dos demais.
-      await this.repositorio.salvar(decisaoWorkflow);
+      await repositorio.salvar(decisaoWorkflow);
     }
 
     const statusAposConsolidar: StatusDecisaoWorkflow = decisaoWorkflow.status;
@@ -79,16 +80,12 @@ export class ConsolidarEDecidirWorkflow {
     });
 
     decisaoWorkflow.registrarTentativaOrquestrador(resultado);
-    await this.repositorio.salvar(decisaoWorkflow);
+    await repositorio.salvar(decisaoWorkflow);
 
-    // (spec 007, ADR-008 — cutover de contract, #632) As 3 ACLs upstream
-    // (001/002/003) já rejeitam evento sem `tenantId` — chegar aqui sem ele
-    // seria falha de invariante, nunca caminho esperado.
-    const tenantIdConsolidado = decisaoWorkflow.tenantId;
-    if (!tenantIdConsolidado) {
-      throw new DecisaoWorkflowSemTenantIdError(orcamentoId.toString());
-    }
-    const tenantIdParaEventos = tenantIdConsolidado.toString();
+    // (issue #656 — aperto de tipo) `DecisaoWorkflow.tenantId` é obrigatório
+    // desde a criação (as 3 ACLs upstream já garantem o campo) — nunca mais
+    // `undefined` aqui, diferente do guard removido nesta issue.
+    const tenantIdParaEventos = decisaoWorkflow.tenantId.toString();
 
     if (decisaoWorkflow.status === 'PENDENTE_REVISAO_HUMANA') {
       await this.publisher.publicar(

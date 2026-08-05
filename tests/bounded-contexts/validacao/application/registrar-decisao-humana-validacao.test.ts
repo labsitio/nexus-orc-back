@@ -50,6 +50,7 @@ class EventPublisherFake implements EventPublisher {
 }
 
 const ORCAMENTO_ID = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8057');
+const TENANT_ID = TenantId.novo();
 
 function dadosExtraidos(): DadosExtraidosParaValidacao {
   return DadosExtraidosParaValidacao.de({
@@ -68,7 +69,7 @@ function dadosExtraidos(): DadosExtraidosParaValidacao {
   });
 }
 
-function orcamentoPendenteRevisaoHumana(tenantId: TenantId = TenantId.novo()): OrcamentoValidacao {
+function orcamentoPendenteRevisaoHumana(tenantId: TenantId = TENANT_ID): OrcamentoValidacao {
   const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dadosExtraidos(), tenantId);
   validacao.avaliarRegrasDeConsistencia([
     InconsistenciaDetectada.de('PRAZO_INCOERENTE', 'Período de validade anterior à emissão'),
@@ -80,9 +81,9 @@ describe('RegistrarDecisaoHumanaValidacao', () => {
   it('publica OrcamentoValidado quando CORRECAO_APLICADA reavalia sem inconsistências restantes', async () => {
     const repositorio = new OrcamentoValidacaoRepositoryFake(orcamentoPendenteRevisaoHumana());
     const publisher = new EventPublisherFake();
-    const useCase = new RegistrarDecisaoHumanaValidacao(repositorio, publisher);
+    const useCase = new RegistrarDecisaoHumanaValidacao(() => repositorio, publisher);
 
-    await useCase.executar(ORCAMENTO_ID.toString(), {
+    await useCase.executar(ORCAMENTO_ID.toString(), TENANT_ID, {
       tipo: 'CORRECAO_APLICADA',
       inconsistencias: [],
     });
@@ -97,9 +98,9 @@ describe('RegistrarDecisaoHumanaValidacao', () => {
   it('publica OrcamentoValidadoComRessalva quando a decisão é ACEITE_COM_RESSALVA', async () => {
     const repositorio = new OrcamentoValidacaoRepositoryFake(orcamentoPendenteRevisaoHumana());
     const publisher = new EventPublisherFake();
-    const useCase = new RegistrarDecisaoHumanaValidacao(repositorio, publisher);
+    const useCase = new RegistrarDecisaoHumanaValidacao(() => repositorio, publisher);
 
-    await useCase.executar(ORCAMENTO_ID.toString(), { tipo: 'ACEITE_COM_RESSALVA' });
+    await useCase.executar(ORCAMENTO_ID.toString(), TENANT_ID, { tipo: 'ACEITE_COM_RESSALVA' });
 
     expect(repositorio.salvos[0]!.status).toBe('VALIDADO_COM_RESSALVA');
     expect(publisher.eventosPublicados).toHaveLength(1);
@@ -111,9 +112,9 @@ describe('RegistrarDecisaoHumanaValidacao', () => {
   it('nunca publica evento quando a correção ainda deixa inconsistência (permanece em revisão humana)', async () => {
     const repositorio = new OrcamentoValidacaoRepositoryFake(orcamentoPendenteRevisaoHumana());
     const publisher = new EventPublisherFake();
-    const useCase = new RegistrarDecisaoHumanaValidacao(repositorio, publisher);
+    const useCase = new RegistrarDecisaoHumanaValidacao(() => repositorio, publisher);
 
-    await useCase.executar(ORCAMENTO_ID.toString(), {
+    await useCase.executar(ORCAMENTO_ID.toString(), TENANT_ID, {
       tipo: 'CORRECAO_APLICADA',
       inconsistencias: [
         InconsistenciaDetectada.de('PRAZO_INCOERENTE', 'Ainda incoerente após correção'),
@@ -125,14 +126,14 @@ describe('RegistrarDecisaoHumanaValidacao', () => {
   });
 
   it('lança TransicaoInvalidaValidacaoError quando o agregado não está em PENDENTE_REVISAO_HUMANA', async () => {
-    const validado = OrcamentoValidacao.criar(ORCAMENTO_ID, dadosExtraidos());
+    const validado = OrcamentoValidacao.criar(ORCAMENTO_ID, dadosExtraidos(), TENANT_ID);
     validado.avaliarRegrasDeConsistencia([]);
     const repositorio = new OrcamentoValidacaoRepositoryFake(validado);
     const publisher = new EventPublisherFake();
-    const useCase = new RegistrarDecisaoHumanaValidacao(repositorio, publisher);
+    const useCase = new RegistrarDecisaoHumanaValidacao(() => repositorio, publisher);
 
     await expect(
-      useCase.executar(ORCAMENTO_ID.toString(), { tipo: 'ACEITE_COM_RESSALVA' }),
+      useCase.executar(ORCAMENTO_ID.toString(), TENANT_ID, { tipo: 'ACEITE_COM_RESSALVA' }),
     ).rejects.toThrow(TransicaoInvalidaValidacaoError);
     expect(publisher.eventosPublicados).toHaveLength(0);
   });
@@ -140,10 +141,10 @@ describe('RegistrarDecisaoHumanaValidacao', () => {
   it('lança OrcamentoValidacaoNaoEncontradoError para orcamentoId inexistente', async () => {
     const repositorio = new OrcamentoValidacaoRepositoryFake();
     const publisher = new EventPublisherFake();
-    const useCase = new RegistrarDecisaoHumanaValidacao(repositorio, publisher);
+    const useCase = new RegistrarDecisaoHumanaValidacao(() => repositorio, publisher);
 
     await expect(
-      useCase.executar(ORCAMENTO_ID.toString(), { tipo: 'ACEITE_COM_RESSALVA' }),
+      useCase.executar(ORCAMENTO_ID.toString(), TENANT_ID, { tipo: 'ACEITE_COM_RESSALVA' }),
     ).rejects.toThrow(OrcamentoValidacaoNaoEncontradoError);
   });
 
@@ -153,9 +154,9 @@ describe('RegistrarDecisaoHumanaValidacao', () => {
       orcamentoPendenteRevisaoHumana(tenantId),
     );
     const publisher = new EventPublisherFake();
-    const useCase = new RegistrarDecisaoHumanaValidacao(repositorio, publisher);
+    const useCase = new RegistrarDecisaoHumanaValidacao(() => repositorio, publisher);
 
-    await useCase.executar(ORCAMENTO_ID.toString(), { tipo: 'ACEITE_COM_RESSALVA' });
+    await useCase.executar(ORCAMENTO_ID.toString(), tenantId, { tipo: 'ACEITE_COM_RESSALVA' });
 
     const evento = publisher.eventosPublicados[0] as OrcamentoValidadoComRessalva;
     expect(evento.tenantId).toBe(tenantId.toString());
@@ -184,7 +185,7 @@ describe('RegistrarDecisaoHumanaValidacao.construirDecisao', () => {
       dataEmissaoProposta: new Date('2026-01-10T00:00:00.000Z'),
       periodoValidade: PeriodoValidade.de(new Date('2026-02-10T00:00:00.000Z')),
     });
-    const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dados);
+    const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dados, TENANT_ID);
     validacao.avaliarRegrasDeConsistencia([
       InconsistenciaDetectada.de('CNPJ_INVALIDO', 'dígito verificador incorreto'),
     ]);
@@ -193,7 +194,7 @@ describe('RegistrarDecisaoHumanaValidacao.construirDecisao', () => {
 
   it('ACEITE_COM_RESSALVA carrega a justificativa, sem tocar dadosExtraidos', () => {
     const useCase = new RegistrarDecisaoHumanaValidacao(
-      new OrcamentoValidacaoRepositoryFake(),
+      () => new OrcamentoValidacaoRepositoryFake(),
       new EventPublisherFake(),
     );
 
@@ -210,7 +211,7 @@ describe('RegistrarDecisaoHumanaValidacao.construirDecisao', () => {
 
   it('CORRECAO_APLICADA com cnpjFornecedor corrigido limpa CNPJ_INVALIDO', () => {
     const useCase = new RegistrarDecisaoHumanaValidacao(
-      new OrcamentoValidacaoRepositoryFake(),
+      () => new OrcamentoValidacaoRepositoryFake(),
       new EventPublisherFake(),
     );
 
@@ -229,7 +230,7 @@ describe('RegistrarDecisaoHumanaValidacao.construirDecisao', () => {
 
   it('CORRECAO_APLICADA sem corrigir o campo relevante mantém a mesma inconsistência (nunca autoaprova)', () => {
     const useCase = new RegistrarDecisaoHumanaValidacao(
-      new OrcamentoValidacaoRepositoryFake(),
+      () => new OrcamentoValidacaoRepositoryFake(),
       new EventPublisherFake(),
     );
 
@@ -263,7 +264,7 @@ describe('RegistrarDecisaoHumanaValidacao.construirDecisao', () => {
       dataEmissaoProposta: new Date('2026-01-10T00:00:00.000Z'),
       periodoValidade: PeriodoValidade.de(new Date('2026-02-10T00:00:00.000Z')),
     });
-    const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dados);
+    const validacao = OrcamentoValidacao.criar(ORCAMENTO_ID, dados, TENANT_ID);
     const precoForaFaixa = InconsistenciaDetectada.de(
       'PRECO_FORA_DE_FAIXA',
       'preço unitário fora da faixa esperada',
@@ -271,7 +272,7 @@ describe('RegistrarDecisaoHumanaValidacao.construirDecisao', () => {
     validacao.avaliarRegrasDeConsistencia([precoForaFaixa]);
 
     const useCase = new RegistrarDecisaoHumanaValidacao(
-      new OrcamentoValidacaoRepositoryFake(),
+      () => new OrcamentoValidacaoRepositoryFake(),
       new EventPublisherFake(),
     );
 
@@ -288,7 +289,7 @@ describe('RegistrarDecisaoHumanaValidacao.construirDecisao', () => {
 
   it('CORRECAO_APLICADA com dadosCorrigidos.periodoValidade inválido lança PeriodoValidadeInvalidoError', () => {
     const useCase = new RegistrarDecisaoHumanaValidacao(
-      new OrcamentoValidacaoRepositoryFake(),
+      () => new OrcamentoValidacaoRepositoryFake(),
       new EventPublisherFake(),
     );
 

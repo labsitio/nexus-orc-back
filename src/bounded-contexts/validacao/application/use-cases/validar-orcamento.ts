@@ -11,10 +11,9 @@ import {
   validarPrazoCoerente,
   validarPrecoDentroDaFaixa,
 } from '../../domain/regras-consistencia.js';
-import type { OrcamentoValidacaoRepository } from '../../domain/repositories/orcamento-validacao.repository.js';
+import type { CriarOrcamentoValidacaoRepositorio } from '../../domain/repositories/orcamento-validacao.repository.js';
 import { CNPJ } from '../../domain/value-objects/cnpj.vo.js';
 import { InconsistenciaDetectada } from '../../domain/value-objects/inconsistencia-detectada.vo.js';
-import { OrcamentoValidacaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 
 /**
  * Consumidor dos eventos `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`
@@ -39,7 +38,7 @@ import { OrcamentoValidacaoSemTenantIdError } from '../../domain/errors/tenant.e
 export class ValidarOrcamento {
   constructor(
     private readonly acl: OrcamentoExtraidoEventACL,
-    private readonly repositorio: OrcamentoValidacaoRepository,
+    private readonly criarRepositorio: CriarOrcamentoValidacaoRepositorio,
     private readonly fornecedorCadastrado: FornecedorCadastradoGateway,
     private readonly parametroFaixaPreco: ParametroFaixaPrecoGateway,
     private readonly eventPublisher: EventPublisher,
@@ -47,8 +46,12 @@ export class ValidarOrcamento {
 
   async executar(payloadBruto: unknown): Promise<void> {
     const { orcamentoId, dadosExtraidos, tenantId } = this.acl.traduzir(payloadBruto);
+    // (issue #656) Repositório construído por chamada a partir do `tenantId`
+    // já validado pela ACL — nunca reaproveitado como campo fixo entre
+    // chamadas (mesmo padrão de `CriarExtracaoOrcamentoRepositorio`).
+    const repositorio = this.criarRepositorio(tenantId);
 
-    const existente = await this.repositorio.buscarPorOrcamentoId(orcamentoId);
+    const existente = await repositorio.buscarPorOrcamentoId(orcamentoId);
     if (existente && existente.status !== 'PENDENTE') {
       // Entrega duplicada da fila SQS (at-least-once): já avaliado — nunca
       // reavalia nem republica (mesma disciplina de ADR-001).
@@ -84,20 +87,14 @@ export class ValidarOrcamento {
     ];
 
     validacao.avaliarRegrasDeConsistencia(inconsistencias);
-    await this.repositorio.salvar(validacao);
+    await repositorio.salvar(validacao);
 
-    // (spec 007, ADR-008 — cutover de contract, #632; achado MAJOR do
-    // backend-reviewer) O evento carrega o `tenantId` já persistido no
-    // agregado (fonte da verdade, imutável desde a criação) — nunca o
-    // `tenantId` desestruturado da tradução desta invocação: numa reentrega
-    // com `tenantId` divergente do já registrado, o evento nunca deve
-    // reportar um tenant diferente do dono real do agregado (mesmo padrão de
-    // `extrair-dados-orcamento.ts`/`confirmar-revisao-humana-extracao.ts`).
-    const tenantIdPersistido = validacao.tenantId;
-    if (!tenantIdPersistido) {
-      throw new OrcamentoValidacaoSemTenantIdError(validacao.orcamentoId.toString());
-    }
-    const tenantIdParaEvento = tenantIdPersistido.toString();
+    // (issue #656 — aperto de tipo) O evento carrega o `tenantId` já
+    // persistido no agregado (fonte da verdade, imutável desde a criação) —
+    // sempre concreto desde `OrcamentoValidacao.tenantId` deixar de ser
+    // opcional (guard `OrcamentoValidacaoSemTenantIdError` removido: tornou-se
+    // inalcançável).
+    const tenantIdParaEvento = validacao.tenantId.toString();
 
     const evento =
       validacao.status === 'VALIDADO'

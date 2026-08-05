@@ -25,7 +25,6 @@ import type { ExtracaoOrcamentoRepository } from '../../../../src/bounded-contex
 import { OrcamentoExtraido } from '../../../../src/bounded-contexts/extracao/domain/events/orcamento-extraido.event.js';
 import { ExtracaoEscalonadaParaRevisaoHumana } from '../../../../src/bounded-contexts/extracao/domain/events/extracao-escalonada-revisao-humana.event.js';
 import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
-import { ExtracaoSemTenantIdError } from '../../../../src/bounded-contexts/extracao/domain/errors/tenant.errors.js';
 
 const AGENTE_EXTRATOR_ORIGEM = 'EXTRATOR' as const;
 const ORCAMENTO_ID = '01890a5d-ac96-774b-bcce-b302099a8057';
@@ -142,7 +141,7 @@ describe('ExtrairDadosOrcamento', () => {
     const repositorio = new RepositorioFake();
     const publisher = new EventPublisherFake();
     const useCase = new ExtrairDadosOrcamento(
-      repositorio,
+      () => repositorio,
       new LeituraBrutaGatewayFake(),
       new MarkItDownConversaoExtracaoACLFake(),
       new AgenteExtratorGatewayFake({
@@ -167,7 +166,7 @@ describe('ExtrairDadosOrcamento', () => {
     const repositorio = new RepositorioFake();
     const publisher = new EventPublisherFake();
     const useCase = new ExtrairDadosOrcamento(
-      repositorio,
+      () => repositorio,
       new LeituraBrutaGatewayFake(),
       new MarkItDownConversaoExtracaoACLFake(),
       new AgenteExtratorGatewayFake({
@@ -196,7 +195,7 @@ describe('ExtrairDadosOrcamento', () => {
     const repositorio = new RepositorioFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ExtrairDadosOrcamento(
-      repositorio,
+      () => repositorio,
       new LeituraBrutaGatewayFake(),
       new MarkItDownConversaoExtracaoACLFake(),
       new AgenteExtratorGatewayFake({
@@ -218,6 +217,7 @@ describe('ExtrairDadosOrcamento', () => {
       OrcamentoId.de(ORCAMENTO_ID),
       ReferenciaClassificacao.de(PARAMS_BASE.referenciaClassificacao),
       ReferenciaS3.de(PARAMS_BASE.referenciaBrutaS3),
+      PARAMS_BASE.tenantId,
     );
     existente.registrarTentativaExtrator([itemCompleto()], condicoesCompletas());
     const repositorio = new RepositorioFake(existente);
@@ -228,7 +228,7 @@ describe('ExtrairDadosOrcamento', () => {
       condicoesComerciais: condicoesCompletas(),
     });
     const useCase = new ExtrairDadosOrcamento(
-      repositorio,
+      () => repositorio,
       leituraBruta,
       new MarkItDownConversaoExtracaoACLFake(),
       agenteExtrator,
@@ -248,7 +248,7 @@ describe('ExtrairDadosOrcamento', () => {
     const repositorio = new RepositorioFake();
     const publisher = new EventPublisherFake();
     const useCase = new ExtrairDadosOrcamento(
-      repositorio,
+      () => repositorio,
       new LeituraBrutaGatewayFake(),
       new MarkItDownConversaoExtracaoACLFake(),
       new AgenteExtratorGatewayFake({
@@ -260,7 +260,7 @@ describe('ExtrairDadosOrcamento', () => {
 
     await useCase.executar({ ...PARAMS_BASE, tenantId });
 
-    expect(repositorio.salvos[0]?.tenantId?.toString()).toBe(tenantId.toString());
+    expect(repositorio.salvos[0]?.tenantId.toString()).toBe(tenantId.toString());
     const evento = publisher.eventosPublicados[0] as OrcamentoExtraido;
     expect(evento.tenantId).toBe(tenantId.toString());
   });
@@ -277,7 +277,7 @@ describe('ExtrairDadosOrcamento', () => {
     const repositorio = new RepositorioFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ExtrairDadosOrcamento(
-      repositorio,
+      () => repositorio,
       new LeituraBrutaGatewayFake(),
       new MarkItDownConversaoExtracaoACLFake(),
       new AgenteExtratorGatewayFake({
@@ -289,33 +289,13 @@ describe('ExtrairDadosOrcamento', () => {
 
     await useCase.executar({ ...PARAMS_BASE, tenantId: tenantDivergente });
 
-    expect(repositorio.salvos[0]?.tenantId?.toString()).toBe(tenantOriginal.toString());
+    expect(repositorio.salvos[0]?.tenantId.toString()).toBe(tenantOriginal.toString());
     const evento = publisher.eventosPublicados[0] as OrcamentoExtraido;
     expect(evento.tenantId).toBe(tenantOriginal.toString());
   });
 
-  it('(guarda fail-fast ADR-008, #632) rejeita publicar evento quando o agregado existente é legado e não possui tenantId persistido', async () => {
-    const existente = ExtracaoOrcamento.criar(
-      OrcamentoId.de(ORCAMENTO_ID),
-      ReferenciaClassificacao.de(PARAMS_BASE.referenciaClassificacao),
-      ReferenciaS3.de(PARAMS_BASE.referenciaBrutaS3),
-    );
-    const repositorio = new RepositorioFake(existente);
-    const publisher = new EventPublisherFake();
-    const useCase = new ExtrairDadosOrcamento(
-      repositorio,
-      new LeituraBrutaGatewayFake(),
-      new MarkItDownConversaoExtracaoACLFake(),
-      new AgenteExtratorGatewayFake({
-        itens: [itemCompleto()],
-        condicoesComerciais: condicoesCompletas(),
-      }),
-      publisher,
-    );
-
-    await expect(
-      useCase.executar({ ...PARAMS_BASE, tenantId: TenantId.de(ORCAMENTO_ID) }),
-    ).rejects.toThrow(ExtracaoSemTenantIdError);
-    expect(publisher.eventosPublicados).toHaveLength(0);
-  });
+  // (issue #656 — aperto de tipo) O teste de guarda fail-fast do ADR-008
+  // (`ExtracaoSemTenantIdError`) foi removido: `ExtracaoOrcamento.criar` exige
+  // `tenantId` desde o tipo, então o cenário de agregado legado sem tenantId
+  // não é mais representável — a garantia agora vem do compilador.
 });

@@ -34,6 +34,8 @@ import {
 } from '../../domain/value-objects/referencia-classificacao.vo.js';
 import { ReferenciaS3 } from '../../domain/value-objects/referencia-s3.vo.js';
 import { TentativaExtracao } from '../../domain/value-objects/tentativa-extracao.vo.js';
+import { DrizzleTenantScopedRepositoryBase } from '../../../../shared-kernel/tenant/drizzle-tenant-scoped-repository-base.js';
+import type { TenantContext } from '../../../../shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import {
   extracoesOrcamento,
@@ -114,7 +116,7 @@ function agregadoDaLinha(
     itens: itensPayload.map(itemDoPayload),
     condicoesComerciais: condicoesComerciaisDaLinha(linha),
     historico,
-    tenantId: linha.tenantId !== null ? TenantId.de(linha.tenantId) : undefined,
+    tenantId: TenantId.de(linha.tenantId),
   };
   return ExtracaoOrcamento.reconstituir(props);
 }
@@ -130,15 +132,29 @@ function agregadoDaLinha(
  * persistidas — mesmo padrão de `DrizzleOrcamentoRepository` (spec 001,
  * T011), incluindo o lock `FOR UPDATE` que serializa `salvar` concorrente do
  * mesmo agregado (retry de handler Lambda sobre a mesma mensagem SQS).
+ *
+ * **Issue #656 (retrofit)**: estende `DrizzleTenantScopedRepositoryBase`
+ * (spec 007/T008) — toda transação usa `transacaoTenantScoped`, mesmo padrão
+ * de `DrizzleOrcamentoRepository` (spec 001, T018). Uma instância por
+ * chamada, nunca um singleton reaproveitado entre tenants — ver
+ * `CriarExtracaoOrcamentoRepositorio`.
  */
-export class DrizzleExtracaoOrcamentoRepository implements ExtracaoOrcamentoRepository {
-  constructor(private readonly db: NodePgDatabase) {}
+export class DrizzleExtracaoOrcamentoRepository
+  extends DrizzleTenantScopedRepositoryBase
+  implements ExtracaoOrcamentoRepository
+{
+  private readonly tenantId: string;
+
+  constructor(db: NodePgDatabase, tenantContext: TenantContext) {
+    super(db, tenantContext);
+    this.tenantId = tenantContext.tenantId.toString();
+  }
 
   async salvar(extracao: ExtracaoOrcamento): Promise<void> {
     const itensPayload = extracao.itens.map((item) => item.paraPayload());
     const condicoesComerciaisPayload = extracao.condicoesComerciais?.paraPayload() ?? null;
 
-    await this.db.transaction(async (tx) => {
+    await this.transacaoTenantScoped(async (tx) => {
       // Serializa `salvar` concorrente do mesmo agregado — sem este lock, duas
       // transações poderiam ler a mesma contagem de histórico já persistida e
       // duplicar a mesma tentativa nova. Linha inexistente (1º save) não
@@ -156,10 +172,10 @@ export class DrizzleExtracaoOrcamentoRepository implements ExtracaoOrcamentoRepo
         .insert(extracoesOrcamento)
         .values({
           id: extracao.orcamentoId.toString(),
-          // (issue #648) `tenantId` é imutável após a criação — nunca entra
+          // (issue #656) `tenantId` é imutável após a criação — nunca entra
           // no `set` do onConflictDoUpdate abaixo (mesmo padrão de
           // `DrizzleOrcamentoRepository`, spec 001, T011).
-          tenantId: extracao.tenantId?.toString() ?? null,
+          tenantId: this.tenantId,
           status: extracao.status,
           referenciaClassificacaoFornecedorIdentificado:
             referenciaClassificacao.fornecedorIdentificado,
@@ -195,6 +211,7 @@ export class DrizzleExtracaoOrcamentoRepository implements ExtracaoOrcamentoRepo
       await tx.insert(extracoesOrcamentoHistorico).values(
         novasTentativas.map((tentativa) => ({
           extracaoOrcamentoId: extracao.orcamentoId.toString(),
+          tenantId: this.tenantId,
           agente: tentativa.agente,
           ocorreuEm: tentativa.timestamp,
           resultado: tentativa.resultado ?? null,
@@ -205,20 +222,22 @@ export class DrizzleExtracaoOrcamentoRepository implements ExtracaoOrcamentoRepo
   }
 
   async buscarPorOrcamentoId(orcamentoId: OrcamentoId): Promise<ExtracaoOrcamento | undefined> {
-    const [linha] = await this.db
-      .select()
-      .from(extracoesOrcamento)
-      .where(eq(extracoesOrcamento.id, orcamentoId.toString()));
-    if (!linha) {
-      return undefined;
-    }
+    return this.transacaoTenantScoped(async (tx) => {
+      const [linha] = await tx
+        .select()
+        .from(extracoesOrcamento)
+        .where(eq(extracoesOrcamento.id, orcamentoId.toString()));
+      if (!linha) {
+        return undefined;
+      }
 
-    const linhasHistorico = await this.db
-      .select()
-      .from(extracoesOrcamentoHistorico)
-      .where(eq(extracoesOrcamentoHistorico.extracaoOrcamentoId, orcamentoId.toString()))
-      .orderBy(asc(extracoesOrcamentoHistorico.ocorreuEm), asc(extracoesOrcamentoHistorico.id));
+      const linhasHistorico = await tx
+        .select()
+        .from(extracoesOrcamentoHistorico)
+        .where(eq(extracoesOrcamentoHistorico.extracaoOrcamentoId, orcamentoId.toString()))
+        .orderBy(asc(extracoesOrcamentoHistorico.ocorreuEm), asc(extracoesOrcamentoHistorico.id));
 
-    return agregadoDaLinha(linha, linhasHistorico.map(tentativaDaLinha));
+      return agregadoDaLinha(linha, linhasHistorico.map(tentativaDaLinha));
+    });
   }
 }

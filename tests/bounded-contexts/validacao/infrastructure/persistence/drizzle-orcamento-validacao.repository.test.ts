@@ -22,9 +22,11 @@ import { OrcamentoId } from '../../../../../src/bounded-contexts/validacao/domai
 import { PeriodoValidade } from '../../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
 import { DrizzleOrcamentoValidacaoRepository } from '../../../../../src/bounded-contexts/validacao/infrastructure/persistence/drizzle-orcamento-validacao.repository.js';
 import { validacoesOrcamentoHistorico } from '../../../../../src/bounded-contexts/validacao/infrastructure/persistence/schema/validacao-orcamento.schema.js';
+import { criarTenantContext } from '../../../../../src/shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
+const TENANT_ID = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
 
 /** BC Validação nunca gera `OrcamentoId` (é sempre reutilizado da Ingestão) — gerado só para teste. */
 function orcamentoIdDeTeste(): OrcamentoId {
@@ -65,7 +67,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoValidacaoRepository (Postgres re
     client = new Client({ connectionString: DATABASE_URL });
     await client.connect();
     db = drizzle(client);
-    repo = new DrizzleOrcamentoValidacaoRepository(db);
+    repo = new DrizzleOrcamentoValidacaoRepository(db, criarTenantContext(TENANT_ID));
   });
 
   afterAll(async () => {
@@ -95,34 +97,22 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoValidacaoRepository (Postgres re
     await expect(repo.buscarPorOrcamentoId(orcamentoIdDeTeste())).resolves.toBeUndefined();
   });
 
-  it('(issue #649) roundtrip do tenantId opcional — persiste e recarrega o mesmo valor', async () => {
-    const id = orcamentoIdDeTeste();
-    idsParaLimpar.push(id.toString());
-    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
-
-    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste(), tenantId);
-    await repo.salvar(agregado);
-
-    const carregado = await repo.buscarPorOrcamentoId(id);
-    expect(carregado?.tenantId?.toString()).toBe(tenantId.toString());
-  });
-
-  it('(issue #649) tenantId ausente na criação é persistido e recarregado como undefined', async () => {
+  it('(issue #656 — aperto de tipo) tenantId é obrigatório e persiste/recarrega o mesmo valor', async () => {
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
 
-    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste());
+    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste(), TENANT_ID);
     await repo.salvar(agregado);
 
     const carregado = await repo.buscarPorOrcamentoId(id);
-    expect(carregado?.tenantId).toBeUndefined();
+    expect(carregado?.tenantId.toString()).toBe(TENANT_ID.toString());
   });
 
   it('salva PENDENTE e recarrega VALIDADO com 1 entrada de histórico', async () => {
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
 
-    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste());
+    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste(), TENANT_ID);
     await repo.salvar(agregado);
 
     const pendente = await repo.buscarPorOrcamentoId(id);
@@ -143,7 +133,11 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoValidacaoRepository (Postgres re
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
 
-    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste('11222333000180'));
+    const agregado = OrcamentoValidacao.criar(
+      id,
+      dadosExtraidosDeTeste('11222333000180'),
+      TENANT_ID,
+    );
     const inconsistencia = InconsistenciaDetectada.de(
       'CNPJ_INVALIDO',
       'dígito verificador incorreto',
@@ -171,7 +165,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoValidacaoRepository (Postgres re
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
 
-    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste());
+    const agregado = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste(), TENANT_ID);
     agregado.avaliarRegrasDeConsistencia([]);
     await repo.salvar(agregado);
 
@@ -188,13 +182,16 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoValidacaoRepository (Postgres re
 
     const clienteB = new Client({ connectionString: DATABASE_URL });
     await clienteB.connect();
-    const repoB = new DrizzleOrcamentoValidacaoRepository(drizzle(clienteB));
+    const repoB = new DrizzleOrcamentoValidacaoRepository(
+      drizzle(clienteB),
+      criarTenantContext(TENANT_ID),
+    );
 
     try {
-      const agregadoA = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste());
+      const agregadoA = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste(), TENANT_ID);
       agregadoA.avaliarRegrasDeConsistencia([]);
 
-      const agregadoB = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste());
+      const agregadoB = OrcamentoValidacao.criar(id, dadosExtraidosDeTeste(), TENANT_ID);
       agregadoB.avaliarRegrasDeConsistencia([]);
 
       await Promise.all([repo.salvar(agregadoA), repoB.salvar(agregadoB)]);

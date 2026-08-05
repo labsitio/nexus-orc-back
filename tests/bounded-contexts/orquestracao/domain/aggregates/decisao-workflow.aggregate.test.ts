@@ -20,6 +20,8 @@ import { NivelConfianca } from '../../../../../src/bounded-contexts/orquestracao
 import { OrcamentoId } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/orcamento-id.vo.js';
 
 const orcamentoId = OrcamentoId.de('018f5b3a-1234-7abc-89ab-0123456789ab');
+const tenantIdA = TenantId.de('01912e2e-7f3a-7c3a-89ab-0123456789ab');
+const tenantIdB = TenantId.de('01912e2e-7f3a-7c3a-89ab-0123456789cd');
 
 const contextoClassificacao = ContextoClassificacao.de({
   fornecedorIdentificado: 'Fornecedor XPTO',
@@ -54,17 +56,17 @@ const contextoValidacaoComRessalva = ContextoValidacao.de({
 function criarComContextoConsolidado(
   contextoValidacao = contextoValidacaoAprovavel,
 ): DecisaoWorkflow {
-  const decisao = DecisaoWorkflow.criar(orcamentoId);
-  decisao.registrarContextoClassificacao(contextoClassificacao);
-  decisao.registrarContextoExtracao(contextoExtracao);
-  decisao.registrarContextoValidacao(contextoValidacao);
+  const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
+  decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
+  decisao.registrarContextoExtracao(contextoExtracao, tenantIdA);
+  decisao.registrarContextoValidacao(contextoValidacao, tenantIdA);
   decisao.consolidarContexto();
   return decisao;
 }
 
 describe('DecisaoWorkflow', () => {
   it('inicia em AGUARDANDO_CONTEXTO, sem contexto, sem decisão, sem histórico', () => {
-    const decisao = DecisaoWorkflow.criar(orcamentoId);
+    const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
     expect(decisao.status).toBe('AGUARDANDO_CONTEXTO');
     expect(decisao.contextoClassificacao).toBeUndefined();
     expect(decisao.contextoExtracao).toBeUndefined();
@@ -75,14 +77,14 @@ describe('DecisaoWorkflow', () => {
 
   describe('registrarContexto*', () => {
     it('registra os 3 contextos sem transicionar status por si só', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
-      decisao.registrarContextoClassificacao(contextoClassificacao);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
+      decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
       expect(decisao.status).toBe('AGUARDANDO_CONTEXTO');
 
-      decisao.registrarContextoExtracao(contextoExtracao);
+      decisao.registrarContextoExtracao(contextoExtracao, tenantIdA);
       expect(decisao.status).toBe('AGUARDANDO_CONTEXTO');
 
-      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdA);
       expect(decisao.status).toBe('AGUARDANDO_CONTEXTO');
 
       expect(decisao.contextoClassificacao).toBe(contextoClassificacao);
@@ -91,78 +93,74 @@ describe('DecisaoWorkflow', () => {
     });
 
     it('é idempotente — reaplicar o mesmo contexto não lança erro', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
-      decisao.registrarContextoClassificacao(contextoClassificacao);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
+      decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
 
-      expect(() => decisao.registrarContextoClassificacao(contextoClassificacao)).not.toThrow();
+      expect(() =>
+        decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA),
+      ).not.toThrow();
       expect(decisao.contextoClassificacao).toBe(contextoClassificacao);
     });
 
     it('rejeita reentrega com payload divergente do já registrado — ContextoImutavelError (classificação)', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
-      decisao.registrarContextoClassificacao(contextoClassificacao);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
+      decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
 
-      expect(() => decisao.registrarContextoClassificacao(outroContextoClassificacao)).toThrow(
-        ContextoImutavelError,
-      );
+      expect(() =>
+        decisao.registrarContextoClassificacao(outroContextoClassificacao, tenantIdA),
+      ).toThrow(ContextoImutavelError);
       expect(decisao.contextoClassificacao).toBe(contextoClassificacao);
     });
 
     it('rejeita reentrega com payload divergente do já registrado — ContextoImutavelError (extração)', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
-      decisao.registrarContextoExtracao(contextoExtracao);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
+      decisao.registrarContextoExtracao(contextoExtracao, tenantIdA);
 
-      expect(() => decisao.registrarContextoExtracao(outroContextoExtracao)).toThrow(
+      expect(() => decisao.registrarContextoExtracao(outroContextoExtracao, tenantIdA)).toThrow(
         ContextoImutavelError,
       );
       expect(decisao.contextoExtracao).toBe(contextoExtracao);
     });
 
     it('rejeita reentrega com payload divergente do já registrado — ContextoImutavelError (validação)', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
-      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdA);
 
-      expect(() => decisao.registrarContextoValidacao(outroContextoValidacao)).toThrow(
+      expect(() => decisao.registrarContextoValidacao(outroContextoValidacao, tenantIdA)).toThrow(
         ContextoImutavelError,
       );
       expect(decisao.contextoValidacao).toBe(contextoValidacaoAprovavel);
     });
   });
 
-  describe('tenantId (issue #650 — consolidação entre os 3 upstreams)', () => {
-    const tenantIdA = TenantId.de('01912e2e-7f3a-7c3a-89ab-0123456789ab');
-    const tenantIdB = TenantId.de('01912e2e-7f3a-7c3a-89ab-0123456789cd');
+  describe('tenantId (issue #656 — aperto de tipo, obrigatório desde a criação)', () => {
+    it('tenantId de criar() fica disponível imediatamente, sem nenhum upstream ter registrado contexto', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
 
-    it('permanece undefined quando nenhum upstream traz tenantId — ausência nunca rejeitada', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
-      decisao.registrarContextoClassificacao(contextoClassificacao);
-      decisao.registrarContextoExtracao(contextoExtracao);
-      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
-
-      expect(decisao.tenantId).toBeUndefined();
+      expect(decisao.tenantId.equals(tenantIdA)).toBe(true);
     });
 
-    it('consolida o tenantId do primeiro upstream que o traz, mesmo que os demais não tragam', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
+    it('consolida o tenantId dos 3 upstreams quando todos concordam com o valor de criar()', () => {
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
       decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
-      decisao.registrarContextoExtracao(contextoExtracao);
-      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
+      decisao.registrarContextoExtracao(contextoExtracao, tenantIdA);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdA);
 
-      expect(decisao.tenantId?.equals(tenantIdA)).toBe(true);
+      expect(decisao.tenantId.equals(tenantIdA)).toBe(true);
     });
 
     it('aceita o mesmo tenantId vindo de mais de um upstream — idempotente, nunca diverge', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
       decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
 
       expect(() =>
         decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdA),
       ).not.toThrow();
-      expect(decisao.tenantId?.equals(tenantIdA)).toBe(true);
+      expect(decisao.tenantId.equals(tenantIdA)).toBe(true);
     });
 
     it('rejeita com TenantIdDivergenteError quando um segundo upstream traz tenantId diferente', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
       decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
 
       expect(() =>
@@ -171,22 +169,22 @@ describe('DecisaoWorkflow', () => {
     });
 
     it('não registra o contexto quando o tenantId diverge — fail fast, nenhuma mutação parcial', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
       decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
 
       expect(() =>
         decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdB),
       ).toThrow(TenantIdDivergenteError);
       expect(decisao.contextoValidacao).toBeUndefined();
-      expect(decisao.tenantId?.equals(tenantIdA)).toBe(true);
+      expect(decisao.tenantId.equals(tenantIdA)).toBe(true);
     });
 
     it('tenantId ausente num upstream posterior nunca sobrescreve o já consolidado', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
       decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
-      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdA);
 
-      expect(decisao.tenantId?.equals(tenantIdA)).toBe(true);
+      expect(decisao.tenantId.equals(tenantIdA)).toBe(true);
     });
   });
 
@@ -197,17 +195,17 @@ describe('DecisaoWorkflow', () => {
     });
 
     it('lança ContextoIncompletoError e permanece AGUARDANDO_CONTEXTO quando falta contexto', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
-      decisao.registrarContextoClassificacao(contextoClassificacao);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
+      decisao.registrarContextoClassificacao(contextoClassificacao, tenantIdA);
 
       expect(() => decisao.consolidarContexto()).toThrow(ContextoIncompletoError);
       expect(decisao.status).toBe('AGUARDANDO_CONTEXTO');
     });
 
     it('lança ContextoIncompletoError quando falta especificamente contextoClassificacao', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
-      decisao.registrarContextoExtracao(contextoExtracao);
-      decisao.registrarContextoValidacao(contextoValidacaoAprovavel);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
+      decisao.registrarContextoExtracao(contextoExtracao, tenantIdA);
+      decisao.registrarContextoValidacao(contextoValidacaoAprovavel, tenantIdA);
 
       expect(() => decisao.consolidarContexto()).toThrow(ContextoIncompletoError);
       expect(decisao.status).toBe('AGUARDANDO_CONTEXTO');
@@ -247,7 +245,7 @@ describe('DecisaoWorkflow', () => {
 
   describe('registrarTentativaOrquestrador', () => {
     it('só pode ser chamado a partir de CONTEXTO_CONSOLIDADO', () => {
-      const decisao = DecisaoWorkflow.criar(orcamentoId);
+      const decisao = DecisaoWorkflow.criar(orcamentoId, tenantIdA);
 
       expect(() =>
         decisao.registrarTentativaOrquestrador({
@@ -384,6 +382,7 @@ describe('DecisaoWorkflow', () => {
         contextoExtracao,
         status: 'CONTEXTO_CONSOLIDADO',
         historico: [],
+        tenantId: tenantIdA,
       });
 
       expect(() =>
@@ -499,6 +498,7 @@ describe('DecisaoWorkflow', () => {
         status: decisao.status,
         decisaoAtual: decisao.decisaoAtual,
         historico: decisao.historico,
+        tenantId: decisao.tenantId,
       });
 
       expect(reidratado.status).toBe('DECIDIDO');
@@ -512,6 +512,7 @@ describe('DecisaoWorkflow', () => {
         orcamentoId,
         status: 'AGUARDANDO_CONTEXTO',
         historico: historicoOrigem,
+        tenantId: tenantIdA,
       });
 
       historicoOrigem.push(historicoOrigem[0] as never);

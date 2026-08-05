@@ -12,6 +12,7 @@ import { Dinheiro } from '../../../../src/bounded-contexts/validacao/domain/valu
 import { InconsistenciaDetectada } from '../../../../src/bounded-contexts/validacao/domain/value-objects/inconsistencia-detectada.vo.js';
 import { ItemParaValidacao } from '../../../../src/bounded-contexts/validacao/domain/value-objects/item-para-validacao.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/validacao/domain/value-objects/orcamento-id.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import { PeriodoValidade } from '../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
 import {
   OrcamentoValidacao,
@@ -63,7 +64,11 @@ function dadosExtraidos(): DadosExtraidosParaValidacao {
 }
 
 function agregadoEmStatus(status: StatusValidacao): OrcamentoValidacao {
-  const agregado = OrcamentoValidacao.criar(OrcamentoId.de(ORCAMENTO_ID), dadosExtraidos());
+  const agregado = OrcamentoValidacao.criar(
+    OrcamentoId.de(ORCAMENTO_ID),
+    dadosExtraidos(),
+    TenantId.novo(),
+  );
 
   if (status === 'PENDENTE') {
     return agregado;
