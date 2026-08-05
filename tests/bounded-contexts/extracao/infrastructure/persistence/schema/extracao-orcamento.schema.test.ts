@@ -94,6 +94,31 @@ describe.skipIf(!DATABASE_URL)('schema extracao.extracoes_orcamento* (Postgres r
     expect(triggers.rows).toHaveLength(2);
   });
 
+  it('RLS habilitada e política tenant_isolation presente em extracoes_orcamento / extracoes_orcamento_historico (issue #656)', async () => {
+    const rls = await client.query<{
+      relname: string;
+      relrowsecurity: boolean;
+      relforcerowsecurity: boolean;
+    }>(
+      `select relname, relrowsecurity, relforcerowsecurity from pg_class
+       where relname in ('extracoes_orcamento', 'extracoes_orcamento_historico')`,
+    );
+    expect(rls.rows).toHaveLength(2);
+    for (const linha of rls.rows) {
+      expect(linha.relrowsecurity).toBe(true);
+      expect(linha.relforcerowsecurity).toBe(true);
+    }
+
+    const politicas = await client.query<{ tablename: string; policyname: string }>(
+      `select tablename, policyname from pg_policies
+       where tablename in ('extracoes_orcamento', 'extracoes_orcamento_historico') and policyname = 'tenant_isolation'`,
+    );
+    expect(politicas.rows.map((r) => r.tablename).sort()).toEqual([
+      'extracoes_orcamento',
+      'extracoes_orcamento_historico',
+    ]);
+  });
+
   async function inserirExtracao(id: string) {
     await db.insert(extracoesOrcamento).values({
       id,
