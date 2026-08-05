@@ -96,6 +96,7 @@ export function criarIndexadorQueueHandler(
 
     for (const record of event.Records) {
       let orcamentoId: string | undefined;
+      let tenantId: string | undefined;
       const logDaMensagem = logger.child({ messageId: record.messageId });
       try {
         const corpo: unknown = JSON.parse(record.body);
@@ -108,16 +109,18 @@ export function criarIndexadorQueueHandler(
         const detailType = corpo['detail-type'];
         const traduzido = acl.traduzir(detailType, corpo.detail);
         orcamentoId = traduzido.orcamentoId.toString();
+        tenantId = traduzido.tenantId.toString();
 
-        const logDoOrcamento = logDaMensagem.child({
-          orcamentoId,
-          tenantId: traduzido.tenantId.toString(),
-        });
+        const logDoOrcamento = logDaMensagem.child({ orcamentoId, tenantId });
         logDoOrcamento.info('Indexando orçamento validado');
         await indexarOrcamento.executar(traduzido.tenantId, detailType, corpo.detail);
         logDoOrcamento.info('Orçamento processado pelo indexador (indexado ou falha registrada)');
       } catch (erro) {
-        logDaMensagem.error({ orcamentoId, err: erro }, 'Falha ao indexar orçamento');
+        // (backend-reviewer, PR #660) tenantId incluído mesmo quando a falha
+        // ocorre depois da tradução (ex.: erro de infra em
+        // IndexarOrcamento.executar) — correlação por tenant nunca se perde
+        // no log de erro, onde mais importa em ambiente multi-tenant.
+        logDaMensagem.error({ orcamentoId, tenantId, err: erro }, 'Falha ao indexar orçamento');
         falhas.push({ itemIdentifier: record.messageId });
       }
     }
