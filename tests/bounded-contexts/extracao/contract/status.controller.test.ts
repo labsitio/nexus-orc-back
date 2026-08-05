@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import type { preHandlerHookHandler } from 'fastify';
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { criarTenantContext } from '../../../../src/shared-kernel/tenant/tenant-context.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import { ConsultarStatusExtracao } from '../../../../src/bounded-contexts/extracao/application/use-cases/consultar-status-extracao.js';
 import { ExtracaoOrcamento } from '../../../../src/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.js';
 import type { ExtracaoOrcamentoRepository } from '../../../../src/bounded-contexts/extracao/domain/repositories/extracao-orcamento.repository.js';
@@ -39,6 +42,14 @@ function novoIdV7(): OrcamentoId {
 }
 
 const confiancaAlta = NivelConfianca.de(95);
+const TENANT_ID = TenantId.novo();
+
+/** PreHandler fake que injeta tenantContext nos testes (mesmo padrão de spec 001/007). */
+function criarPreHandlerFakeTenant(tenantId: TenantId): preHandlerHookHandler {
+  return async (request) => {
+    request.tenantContext = criarTenantContext(tenantId);
+  };
+}
 
 function novaExtracao(id: OrcamentoId): ExtracaoOrcamento {
   return ExtracaoOrcamento.criar(
@@ -53,6 +64,7 @@ function novaExtracao(id: OrcamentoId): ExtracaoOrcamento {
       key: 'portal-web/2026/07/30/orcamento.pdf',
       versionId: 'v1',
     }),
+    TENANT_ID,
   );
 }
 
@@ -87,7 +99,9 @@ describe('GET /v1/orcamentos/{orcamentoId}/extracao/status — controller', () =
   beforeEach(() => {
     repositorio = new ExtracaoOrcamentoRepositoryFake();
     app = Fastify();
-    registrarRotaStatusExtracao(app, new ConsultarStatusExtracao(repositorio));
+    registrarRotaStatusExtracao(app, new ConsultarStatusExtracao(() => repositorio), {
+      preHandler: criarPreHandlerFakeTenant(TENANT_ID),
+    });
   });
 
   afterEach(async () => {
@@ -169,7 +183,8 @@ describe('GET /v1/orcamentos/{orcamentoId}/extracao/status — controller', () =
     };
     registrarRotaStatusExtracao(
       appComRepositorioQuebrado,
-      new ConsultarStatusExtracao(repositorioQuebrado),
+      new ConsultarStatusExtracao(() => repositorioQuebrado),
+      { preHandler: criarPreHandlerFakeTenant(TENANT_ID) },
     );
 
     const resposta = await appComRepositorioQuebrado.inject({

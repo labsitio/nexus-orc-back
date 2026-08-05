@@ -70,22 +70,6 @@ export class TenantIdDivergenteError extends ErroDominio {
   }
 }
 
-/**
- * (spec 007, ADR-008 — cutover de contract, #632) Disparado quando
- * `consolidarContexto()` já concluiu (`CONTEXTO_CONSOLIDADO`) mas nenhum dos 3
- * upstreams registrou `tenantId` — nunca deveria ocorrer desde o cutover
- * (001/002/003 publicam `tenantId` obrigatório em `schemaVersion: 2`, e as 3
- * ACLs cross-BC rejeitam evento sem o campo antes de chegar aqui). Fail-fast
- * em vez de publicar o desfecho de workflow com `tenantId` ausente.
- */
-export class DecisaoWorkflowSemTenantIdError extends ErroDominio {
-  constructor(orcamentoId: string) {
-    super(
-      `DecisaoWorkflow ${orcamentoId} consolidada sem tenantId — nenhum dos 3 upstreams o registrou (ADR-008)`,
-    );
-  }
-}
-
 /** Resultado reportado pelo `AgenteOrquestradorGateway` — ainda não é uma `DecisaoRoteamento` válida (depende do limiar de confiança ser atingido). */
 export interface ResultadoOrquestrador {
   readonly acao: AcaoRoteamento;
@@ -111,8 +95,14 @@ export interface DecisaoWorkflowProps {
   readonly status: StatusDecisaoWorkflow;
   readonly decisaoAtual?: DecisaoRoteamento;
   readonly historico: readonly TentativaDecisaoWorkflow[];
-  /** (issue #650) `tenantId` consolidado dos 3 upstreams — ver `registrarTenantId`. */
-  readonly tenantId?: TenantId;
+  /**
+   * (issue #656 — aperto de tipo, spec 007 ADR-008 amendment) Obrigatório
+   * desde a criação: as 3 ACLs upstream (001/002/003) já garantem `tenantId`
+   * presente e as 3 rejeitam evento sem o campo antes de chegar aqui —
+   * `registrarTenantId` segue existindo só para detectar divergência entre
+   * os 3 upstreams (`TenantIdDivergenteError`), nunca para suprir ausência.
+   */
+  readonly tenantId: TenantId;
 }
 
 /**
@@ -139,7 +129,7 @@ export class DecisaoWorkflow {
   private _status: StatusDecisaoWorkflow;
   private _decisaoAtual: DecisaoRoteamento | undefined;
   private readonly _historico: TentativaDecisaoWorkflow[];
-  private _tenantId: TenantId | undefined;
+  private _tenantId: TenantId;
 
   private constructor(
     readonly orcamentoId: OrcamentoId,
@@ -154,12 +144,16 @@ export class DecisaoWorkflow {
     this._tenantId = props.tenantId;
   }
 
-  /** Cria o agregado no momento em que o primeiro dos 3 eventos upstream chega. */
-  static criar(orcamentoId: OrcamentoId): DecisaoWorkflow {
+  /**
+   * Cria o agregado no momento em que o primeiro dos 3 eventos upstream
+   * chega — `tenantId` vem sempre da ACL desse evento (issue #656).
+   */
+  static criar(orcamentoId: OrcamentoId, tenantId: TenantId): DecisaoWorkflow {
     return new DecisaoWorkflow(orcamentoId, {
       orcamentoId,
       status: 'AGUARDANDO_CONTEXTO',
       historico: [],
+      tenantId,
     });
   }
 
@@ -188,7 +182,7 @@ export class DecisaoWorkflow {
     return this._decisaoAtual;
   }
 
-  get tenantId(): TenantId | undefined {
+  get tenantId(): TenantId {
     return this._tenantId;
   }
 
@@ -198,29 +192,25 @@ export class DecisaoWorkflow {
   }
 
   /**
-   * (issue #650) Consolida `tenantId` entre os 3 upstreams — ausência
-   * (`undefined`) nunca é rejeitada nem sobrescreve o já registrado; só um
-   * valor concreto divergente do já consolidado lança
-   * `TenantIdDivergenteError`. Chamado antes de qualquer mutação de contexto
-   * pelos 3 `registrarContexto*` (fail fast: divergência nunca deixa o
-   * contexto parcialmente registrado).
+   * (issue #656 — aperto de tipo) `tenantId` é sempre concreto desde a
+   * criação do agregado (`criar` exige o parâmetro). Único papel restante
+   * deste método: detectar divergência entre os 3 upstreams — um valor
+   * diferente do já consolidado lança `TenantIdDivergenteError`. Chamado
+   * antes de qualquer mutação de contexto pelos 3 `registrarContexto*` (fail
+   * fast: divergência nunca deixa o contexto parcialmente registrado).
    */
-  private registrarTenantId(tenantId: TenantId | undefined): void {
-    if (!tenantId) {
-      return;
-    }
-    if (this._tenantId && !this._tenantId.equals(tenantId)) {
+  private registrarTenantId(tenantId: TenantId): void {
+    if (!this._tenantId.equals(tenantId)) {
       throw new TenantIdDivergenteError(
         this.orcamentoId.toString(),
         this._tenantId.toString(),
         tenantId.toString(),
       );
     }
-    this._tenantId = tenantId;
   }
 
   /** Idempotente: reaplicar o mesmo contexto não duplica nem sobrescreve; nunca dispara decisão por si só. */
-  registrarContextoClassificacao(contexto: ContextoClassificacao, tenantId?: TenantId): void {
+  registrarContextoClassificacao(contexto: ContextoClassificacao, tenantId: TenantId): void {
     this.registrarTenantId(tenantId);
     if (this._contextoClassificacao && !this._contextoClassificacao.equals(contexto)) {
       throw new ContextoImutavelError('contextoClassificacao');
@@ -229,7 +219,7 @@ export class DecisaoWorkflow {
   }
 
   /** Idempotente: reaplicar o mesmo contexto não duplica nem sobrescreve; nunca dispara decisão por si só. */
-  registrarContextoExtracao(contexto: ContextoExtracao, tenantId?: TenantId): void {
+  registrarContextoExtracao(contexto: ContextoExtracao, tenantId: TenantId): void {
     this.registrarTenantId(tenantId);
     if (this._contextoExtracao && !this._contextoExtracao.equals(contexto)) {
       throw new ContextoImutavelError('contextoExtracao');
@@ -238,7 +228,7 @@ export class DecisaoWorkflow {
   }
 
   /** Idempotente: reaplicar o mesmo contexto não duplica nem sobrescreve; nunca dispara decisão por si só. */
-  registrarContextoValidacao(contexto: ContextoValidacao, tenantId?: TenantId): void {
+  registrarContextoValidacao(contexto: ContextoValidacao, tenantId: TenantId): void {
     this.registrarTenantId(tenantId);
     if (this._contextoValidacao && !this._contextoValidacao.equals(contexto)) {
       throw new ContextoImutavelError('contextoValidacao');

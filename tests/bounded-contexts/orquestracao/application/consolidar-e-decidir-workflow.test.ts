@@ -4,7 +4,6 @@ import { ConsolidarEDecidirWorkflow } from '../../../../src/bounded-contexts/orq
 import {
   ContextoIncompletoError,
   DecisaoWorkflow,
-  DecisaoWorkflowSemTenantIdError,
 } from '../../../../src/bounded-contexts/orquestracao/domain/aggregates/decisao-workflow.aggregate.js';
 import { DecisaoWorkflowEscalonadaParaComprador } from '../../../../src/bounded-contexts/orquestracao/domain/events/decisao-workflow-escalonada-para-comprador.event.js';
 import { IntegracaoExternaSolicitada } from '../../../../src/bounded-contexts/orquestracao/domain/events/integracao-externa-solicitada.event.js';
@@ -75,12 +74,13 @@ const TENANT_ID = TenantId.novo();
 const CONTEXTO_VALIDACAO = ContextoValidacao.de({ resultado: 'VALIDADO' });
 
 function agregadoComContextoConsolidado(): DecisaoWorkflow {
-  const agregado = DecisaoWorkflow.criar(ORCAMENTO_ID);
+  const agregado = DecisaoWorkflow.criar(ORCAMENTO_ID, TENANT_ID);
   agregado.registrarContextoClassificacao(
     ContextoClassificacao.de({
       fornecedorIdentificado: 'Fornecedor XYZ',
       formatoIdentificado: 'PDF',
     }),
+    TENANT_ID,
   );
   agregado.registrarContextoExtracao(
     ContextoExtracao.de({
@@ -88,6 +88,7 @@ function agregadoComContextoConsolidado(): DecisaoWorkflow {
       condicoesComerciaisResumo: '30 dias',
       houvePendenciaConfirmada: false,
     }),
+    TENANT_ID,
   );
   return agregado;
 }
@@ -103,7 +104,7 @@ describe('ConsolidarEDecidirWorkflow', () => {
         contextoValidacao: CONTEXTO_VALIDACAO,
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
         nivelConfianca: NivelConfianca.de(90),
@@ -121,13 +122,13 @@ describe('ConsolidarEDecidirWorkflow', () => {
   });
 
   it('(issue #650) propaga tenantId consolidado do agregado ao evento de desfecho publicado', async () => {
-    const tenantId = TenantId.de('01912e2e-7f3a-7c3a-89ab-0123456789ab');
+    const tenantId = TENANT_ID;
     const existente = agregadoComContextoConsolidado();
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const publisher = new EventPublisherFake();
     const useCase = new ConsolidarEDecidirWorkflow(
       new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoValidacao: CONTEXTO_VALIDACAO, tenantId }),
-      repositorio,
+      () => repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
         nivelConfianca: NivelConfianca.de(90),
@@ -152,7 +153,7 @@ describe('ConsolidarEDecidirWorkflow', () => {
         contextoValidacao: CONTEXTO_VALIDACAO,
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
         nivelConfianca: NivelConfianca.de(40),
@@ -179,7 +180,7 @@ describe('ConsolidarEDecidirWorkflow', () => {
         contextoValidacao: CONTEXTO_VALIDACAO,
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'ENCAMINHAR_COMPRADOR',
         nivelConfianca: NivelConfianca.de(85),
@@ -206,7 +207,7 @@ describe('ConsolidarEDecidirWorkflow', () => {
         contextoValidacao: CONTEXTO_VALIDACAO,
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'SOLICITAR_REENVIO',
         nivelConfianca: NivelConfianca.de(95),
@@ -233,7 +234,7 @@ describe('ConsolidarEDecidirWorkflow', () => {
         contextoValidacao: CONTEXTO_VALIDACAO,
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
       new AgenteOrquestradorGatewayFake({
         acao: 'APROVAR',
         nivelConfianca: NivelConfianca.de(90),
@@ -255,7 +256,7 @@ describe('ConsolidarEDecidirWorkflow', () => {
 
   it('reentrega SQS pós-decisão (DECIDIDO): nunca reinvoca o Orquestrador nem republica o desfecho', async () => {
     const existente = agregadoComContextoConsolidado();
-    existente.registrarContextoValidacao(CONTEXTO_VALIDACAO);
+    existente.registrarContextoValidacao(CONTEXTO_VALIDACAO, TENANT_ID);
     existente.consolidarContexto();
     existente.registrarTentativaOrquestrador({
       acao: 'APROVAR',
@@ -278,7 +279,7 @@ describe('ConsolidarEDecidirWorkflow', () => {
         contextoValidacao: CONTEXTO_VALIDACAO,
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
       agenteOrquestrador,
       publisher,
     );
@@ -292,7 +293,7 @@ describe('ConsolidarEDecidirWorkflow', () => {
 
   it('reentrega SQS pós-escalonamento (PENDENTE_REVISAO_HUMANA): nunca reinvoca o Orquestrador', async () => {
     const existente = agregadoComContextoConsolidado();
-    existente.registrarContextoValidacao(CONTEXTO_VALIDACAO);
+    existente.registrarContextoValidacao(CONTEXTO_VALIDACAO, TENANT_ID);
     existente.consolidarContexto();
     existente.registrarTentativaOrquestrador({
       acao: 'APROVAR',
@@ -315,7 +316,7 @@ describe('ConsolidarEDecidirWorkflow', () => {
         contextoValidacao: CONTEXTO_VALIDACAO,
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
       agenteOrquestrador,
       publisher,
     );
@@ -327,33 +328,9 @@ describe('ConsolidarEDecidirWorkflow', () => {
     expect(publisher.publicados).toHaveLength(0);
   });
 
-  it('(guarda fail-fast ADR-008, #632) rejeita publicar desfecho quando o tenantId consolidado no agregado é indefinido — defesa contra ACL que viole seu próprio contrato de tipo', async () => {
-    const existente = agregadoComContextoConsolidado();
-    const repositorio = new DecisaoWorkflowRepositoryFake(existente);
-    const publisher = new EventPublisherFake();
-    const useCase = new ConsolidarEDecidirWorkflow(
-      // As 3 ACLs de entrada garantem tenantId sempre presente no tipo — este
-      // fake simula uma implementação de ACL com bug que viola o próprio
-      // contrato (retorna `undefined` em runtime), único jeito de alcançar
-      // este ramo de defesa em profundidade (nunca ocorre com as ACLs reais).
-      new ACLFake({
-        orcamentoId: ORCAMENTO_ID,
-        contextoValidacao: CONTEXTO_VALIDACAO,
-        tenantId: undefined as unknown as TenantId,
-      }),
-      repositorio,
-      new AgenteOrquestradorGatewayFake({
-        acao: 'APROVAR',
-        nivelConfianca: NivelConfianca.de(90),
-        criterio: 'Fornecedor recorrente, itens e condições consistentes',
-        requerIntegracaoExterna: false,
-      }),
-      publisher,
-    );
-
-    await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).rejects.toThrow(
-      DecisaoWorkflowSemTenantIdError,
-    );
-    expect(publisher.publicados).toHaveLength(0);
-  });
+  // (issue #656 — aperto de tipo) O teste de guarda fail-fast do ADR-008
+  // (`DecisaoWorkflowSemTenantIdError`) foi removido: `DecisaoWorkflow.tenantId`
+  // deixou de ser opcional, então o cenário que esse guard cobria (aggregate
+  // consolidado sem tenantId) não é mais representável no tipo — a garantia
+  // agora vem do compilador, não de um guard em runtime.
 });

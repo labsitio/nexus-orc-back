@@ -6,9 +6,8 @@ import type { MarkItDownConversaoExtracaoACL } from '../../domain/gateways/marki
 import { ExtracaoEscalonadaParaRevisaoHumana } from '../../domain/events/extracao-escalonada-revisao-humana.event.js';
 import { OrcamentoExtraido } from '../../domain/events/orcamento-extraido.event.js';
 import { ErroDominio } from '../../domain/errors/erro-dominio.js';
-import { ExtracaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 import { ExtracaoOrcamento } from '../../domain/extracao-orcamento.aggregate.js';
-import type { ExtracaoOrcamentoRepository } from '../../domain/repositories/extracao-orcamento.repository.js';
+import type { CriarExtracaoOrcamentoRepositorio } from '../../domain/repositories/extracao-orcamento.repository.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import {
   ReferenciaClassificacao,
@@ -56,7 +55,7 @@ export class ExtracaoInconsistenteError extends ErroDominio {
  */
 export class ExtrairDadosOrcamento {
   constructor(
-    private readonly repositorio: ExtracaoOrcamentoRepository,
+    private readonly criarRepositorio: CriarExtracaoOrcamentoRepositorio,
     private readonly leituraBruta: LeituraBrutaGateway,
     private readonly conversor: MarkItDownConversaoExtracaoACL,
     private readonly agenteExtrator: AgenteExtratorGateway,
@@ -65,7 +64,12 @@ export class ExtrairDadosOrcamento {
 
   async executar(params: ExtrairDadosOrcamentoParams): Promise<void> {
     const orcamentoId = OrcamentoId.de(params.orcamentoId);
-    const existente = await this.repositorio.buscarPorOrcamentoId(orcamentoId);
+    // (issue #656) Repositório construído por chamada a partir do
+    // `params.tenantId` já validado pelo handler — nunca reaproveitado como
+    // campo fixo entre chamadas (mesmo padrão de `CriarOrcamentoRepositorio`,
+    // spec 001).
+    const repositorio = this.criarRepositorio(params.tenantId);
+    const existente = await repositorio.buscarPorOrcamentoId(orcamentoId);
 
     if (existente && existente.status !== 'PENDENTE') {
       // Entrega duplicada da fila (at-least-once): a extração já avançou além
@@ -73,15 +77,10 @@ export class ExtrairDadosOrcamento {
       return;
     }
 
-    // ponytail: se `existente` já tiver tenantId e `params.tenantId` divergir
-    // (replay malformado/bug upstream — orcamentoId é UUID v7, colisão real
-    // entre tenants não é um cenário esperado), o novo valor é descartado
-    // silenciosamente aqui: `ExtracaoOrcamento` nunca sobrescreve tenantId
-    // (imutável, `atualizarTenantId` sempre lança). Seguro, mas sem log de
-    // anomalia — este use case não tem dependência de Logger hoje (nenhum
-    // caso de uso de application a tem no código-base). Se o backend-reviewer
-    // apontar necessidade real de observabilidade aqui, promover para
-    // parâmetro de Logger nesta issue de retrofit, não antes.
+    // (issue #656 — aperto de tipo) `existente` só é retornado pelo
+    // repositório se pertencer ao mesmo tenant desta chamada (RLS via
+    // `transacaoTenantScoped`, T008) — `ExtracaoOrcamento.criar` sempre usa
+    // `params.tenantId`, nunca há divergência a descartar silenciosamente.
     const extracao =
       existente ??
       ExtracaoOrcamento.criar(
@@ -99,18 +98,14 @@ export class ExtrairDadosOrcamento {
     });
 
     extracao.registrarTentativaExtrator(resultado.itens, resultado.condicoesComerciais);
-    await this.repositorio.salvar(extracao);
+    await repositorio.salvar(extracao);
 
-    // (spec 007, ADR-008 — cutover de contract, #632) O evento carrega o
-    // `tenantId` já persistido no agregado (fonte da verdade, imutável desde
-    // a criação) — nunca `params.tenantId` diretamente: numa reentrega com
-    // `tenantId` divergente do já registrado (ponytail acima, silenciosamente
-    // descartado), o evento nunca deve reportar um tenant diferente do dono
-    // real do agregado.
+    // (issue #656 — aperto de tipo) O evento carrega o `tenantId` já
+    // persistido no agregado (fonte da verdade, imutável desde a criação) —
+    // sempre concreto desde `ExtracaoOrcamento.tenantId` deixar de ser
+    // opcional (guard `ExtracaoSemTenantIdError` removido: tornou-se
+    // inalcançável).
     const tenantId = extracao.tenantId;
-    if (!tenantId) {
-      throw new ExtracaoSemTenantIdError(extracao.orcamentoId.toString());
-    }
 
     let evento: OrcamentoExtraido | ExtracaoEscalonadaParaRevisaoHumana;
     if (extracao.status === 'EXTRAIDO') {

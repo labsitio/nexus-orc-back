@@ -47,11 +47,12 @@ export interface ExtracaoOrcamentoProps {
   readonly condicoesComerciais?: CondicoesComerciais;
   readonly historico: readonly TentativaExtracao[];
   /**
-   * (issue #648 — expand/contract, ADR-008) Opcional até a #632 tornar
-   * `tenantId` obrigatório nos 4 BCs de uma vez. Vem do envelope
-   * `OrcamentoClassificado` (spec 001), que ainda publica `tenantId` opcional.
+   * (issue #656 — aperto de tipo, spec 007 ADR-008 amendment) Obrigatório
+   * desde a criação: `criar` sempre recebe o `tenantId` já extraído do
+   * envelope `OrcamentoClassificado` (spec 001, obrigatório desde
+   * `schemaVersion: 2`) pelo handler da fila (T023/#88).
    */
-  readonly tenantId?: TenantId;
+  readonly tenantId: TenantId;
 }
 
 /** Todos os itens e as condições comerciais têm todo campo obrigatório extraído. */
@@ -81,7 +82,7 @@ export class ExtracaoOrcamento {
   private _itens: readonly ItemOrcamento[];
   private _condicoesComerciais: CondicoesComerciais | undefined;
   private readonly _historico: TentativaExtracao[];
-  private readonly _tenantId: TenantId | undefined;
+  private readonly _tenantId: TenantId;
 
   private constructor(props: ExtracaoOrcamentoProps) {
     this._orcamentoId = props.orcamentoId;
@@ -99,7 +100,7 @@ export class ExtracaoOrcamento {
     orcamentoId: OrcamentoId,
     referenciaClassificacao: ReferenciaClassificacao,
     referenciaBrutaS3: ReferenciaS3,
-    tenantId?: TenantId,
+    tenantId: TenantId,
   ): ExtracaoOrcamento {
     return new ExtracaoOrcamento({
       orcamentoId,
@@ -146,11 +147,7 @@ export class ExtracaoOrcamento {
     return [...this._historico];
   }
 
-  /**
-   * (issue #648 — expand/contract) `undefined` até a #632 tornar a ausência
-   * impossível nos 4 BCs de uma vez.
-   */
-  get tenantId(): TenantId | undefined {
+  get tenantId(): TenantId {
     return this._tenantId;
   }
 

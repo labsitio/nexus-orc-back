@@ -1,5 +1,8 @@
+import type { preHandlerHookHandler } from 'fastify';
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { criarTenantContext } from '../../../../src/shared-kernel/tenant/tenant-context.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 import { ConsultarStatusValidacao } from '../../../../src/bounded-contexts/validacao/application/use-cases/consultar-status-validacao.js';
 import { OrcamentoValidacao } from '../../../../src/bounded-contexts/validacao/domain/orcamento-validacao.aggregate.js';
 import type { OrcamentoValidacaoRepository } from '../../../../src/bounded-contexts/validacao/domain/repositories/orcamento-validacao.repository.js';
@@ -40,6 +43,15 @@ const dadosExtraidos = () =>
     periodoValidade: PeriodoValidade.de(new Date('2026-02-10T00:00:00.000Z')),
   });
 
+const TENANT_ID = TenantId.novo();
+
+/** PreHandler fake que injeta tenantContext nos testes (mesmo padrão de spec 001/007). */
+function criarPreHandlerFakeTenant(tenantId: TenantId): preHandlerHookHandler {
+  return async (request) => {
+    request.tenantContext = criarTenantContext(tenantId);
+  };
+}
+
 describe('GET /v1/orcamentos/{orcamentoId}/validacao/status — controller', () => {
   let app: ReturnType<typeof Fastify>;
   let repositorio: OrcamentoValidacaoRepositoryFake;
@@ -47,7 +59,9 @@ describe('GET /v1/orcamentos/{orcamentoId}/validacao/status — controller', () 
   beforeEach(() => {
     repositorio = new OrcamentoValidacaoRepositoryFake();
     app = Fastify();
-    registrarRotaStatusValidacao(app, new ConsultarStatusValidacao(repositorio));
+    registrarRotaStatusValidacao(app, new ConsultarStatusValidacao(() => repositorio), {
+      preHandler: criarPreHandlerFakeTenant(TENANT_ID),
+    });
   });
 
   afterEach(async () => {
@@ -56,7 +70,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/validacao/status — controller', () 
 
   it('200 PENDENTE — sem inconsistências ainda, histórico vazio', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a1');
-    await repositorio.salvar(OrcamentoValidacao.criar(id, dadosExtraidos()));
+    await repositorio.salvar(OrcamentoValidacao.criar(id, dadosExtraidos(), TENANT_ID));
 
     const resposta = await app.inject({
       method: 'GET',
@@ -74,7 +88,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/validacao/status — controller', () 
 
   it('200 VALIDADO — todas as regras passaram na mesma tentativa', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a2');
-    const orcamentoValidacao = OrcamentoValidacao.criar(id, dadosExtraidos());
+    const orcamentoValidacao = OrcamentoValidacao.criar(id, dadosExtraidos(), TENANT_ID);
     orcamentoValidacao.avaliarRegrasDeConsistencia([]);
     await repositorio.salvar(orcamentoValidacao);
 
@@ -92,7 +106,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/validacao/status — controller', () 
 
   it('200 PENDENTE_REVISAO_HUMANA — inconsistência identifica a regra específica que falhou', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a3');
-    const orcamentoValidacao = OrcamentoValidacao.criar(id, dadosExtraidos());
+    const orcamentoValidacao = OrcamentoValidacao.criar(id, dadosExtraidos(), TENANT_ID);
     const inconsistencia = InconsistenciaDetectada.de(
       'CNPJ_INVALIDO',
       'CNPJ do fornecedor com dígito verificador incorreto',
@@ -117,7 +131,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/validacao/status — controller', () 
 
   it('200 VALIDADO_COM_RESSALVA — decisão humana explícita registrada no histórico', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a4');
-    const orcamentoValidacao = OrcamentoValidacao.criar(id, dadosExtraidos());
+    const orcamentoValidacao = OrcamentoValidacao.criar(id, dadosExtraidos(), TENANT_ID);
     const inconsistencia = InconsistenciaDetectada.de(
       'PRAZO_INCOERENTE',
       'prazo de validade anterior à data de emissão da proposta',
@@ -173,7 +187,8 @@ describe('GET /v1/orcamentos/{orcamentoId}/validacao/status — controller', () 
     };
     registrarRotaStatusValidacao(
       appComRepositorioQuebrado,
-      new ConsultarStatusValidacao(repositorioQuebrado),
+      new ConsultarStatusValidacao(() => repositorioQuebrado),
+      { preHandler: criarPreHandlerFakeTenant(TENANT_ID) },
     );
 
     const resposta = await appComRepositorioQuebrado.inject({

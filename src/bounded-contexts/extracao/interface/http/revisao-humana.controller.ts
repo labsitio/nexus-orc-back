@@ -7,6 +7,7 @@ import {
   ConfirmarRevisaoHumanaExtracao,
   ExtracaoNaoEncontradaError,
 } from '../../application/use-cases/confirmar-revisao-humana-extracao.js';
+import { TenantDivergenciaError } from '../../application/use-cases/consultar-status-extracao.js';
 import type { ProblemDetails, StatusExtracaoResponse } from './status.schema.js';
 import { orcamentoIdParamSchema, statusExtracaoResponseSchema } from './status.schema.js';
 import { revisaoHumanaExtracaoBodySchema } from './revisao-humana.schema.js';
@@ -85,15 +86,33 @@ export function registrarRotaRevisaoHumanaExtracao(
       }
 
       try {
+        // (issue #656) `request.tenantContext` é populado por
+        // `TenantContextMiddleware` a partir do JWT Cognito. Nunca vem de
+        // query/path/body — isso seria escalação de privilégio. Middleware
+        // retorna 401 se ausente/inválido antes de chegar aqui.
+        const tenantId = request.tenantContext?.tenantId;
+        if (!tenantId) {
+          // Não deveria acontecer: TenantContextMiddleware já rejeitou. Fallback defensivo.
+          const problema: ProblemDetails = {
+            type: 'https://nexo.internal/problems/nao-autenticado',
+            title: 'Contexto de tenant ausente',
+            status: 401,
+          };
+          await reply.status(401).type('application/problem+json').send(problema);
+          return;
+        }
+
         const extracao = await confirmarRevisaoHumanaExtracao.executar({
           orcamentoId: params.data.orcamentoId,
           camposConfirmados: body.data.camposConfirmados,
+          tenantId,
         });
         await reply.status(200).send(paraResposta(extracao));
       } catch (erro) {
         if (
           erro instanceof ExtracaoNaoEncontradaError ||
-          erro instanceof OrcamentoIdInvalidoError
+          erro instanceof OrcamentoIdInvalidoError ||
+          erro instanceof TenantDivergenciaError
         ) {
           const problema: ProblemDetails = {
             type: 'https://nexo.internal/problems/nao-encontrado',

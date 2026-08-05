@@ -57,7 +57,7 @@ describe('RegistrarContextoClassificacao', () => {
         contextoClassificacao: contexto(),
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
     );
 
     await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
@@ -69,7 +69,7 @@ describe('RegistrarContextoClassificacao', () => {
   });
 
   it('reutiliza o agregado existente quando outro contexto já chegou antes', async () => {
-    const existente = DecisaoWorkflow.criar(ORCAMENTO_ID);
+    const existente = DecisaoWorkflow.criar(ORCAMENTO_ID, TENANT_ID);
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const useCase = new RegistrarContextoClassificacao(
       new ACLFake({
@@ -77,7 +77,7 @@ describe('RegistrarContextoClassificacao', () => {
         contextoClassificacao: contexto(),
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
     );
 
     await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
@@ -88,8 +88,8 @@ describe('RegistrarContextoClassificacao', () => {
   });
 
   it('é idempotente: reaplicar o mesmo contexto não lança erro e persiste normalmente', async () => {
-    const existente = DecisaoWorkflow.criar(ORCAMENTO_ID);
-    existente.registrarContextoClassificacao(contexto());
+    const existente = DecisaoWorkflow.criar(ORCAMENTO_ID, TENANT_ID);
+    existente.registrarContextoClassificacao(contexto(), TENANT_ID);
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const useCase = new RegistrarContextoClassificacao(
       new ACLFake({
@@ -97,7 +97,7 @@ describe('RegistrarContextoClassificacao', () => {
         contextoClassificacao: contexto(),
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
     );
 
     await expect(
@@ -107,8 +107,8 @@ describe('RegistrarContextoClassificacao', () => {
   });
 
   it('propaga ContextoImutavelError quando o payload reentregue diverge do já registrado', async () => {
-    const existente = DecisaoWorkflow.criar(ORCAMENTO_ID);
-    existente.registrarContextoClassificacao(contexto('Fornecedor Original'));
+    const existente = DecisaoWorkflow.criar(ORCAMENTO_ID, TENANT_ID);
+    existente.registrarContextoClassificacao(contexto('Fornecedor Original'), TENANT_ID);
     const repositorio = new DecisaoWorkflowRepositoryFake(existente);
     const useCase = new RegistrarContextoClassificacao(
       new ACLFake({
@@ -116,7 +116,7 @@ describe('RegistrarContextoClassificacao', () => {
         contextoClassificacao: contexto('Fornecedor Divergente'),
         tenantId: TENANT_ID,
       }),
-      repositorio,
+      () => repositorio,
     );
 
     await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).rejects.toThrow(
@@ -130,11 +130,11 @@ describe('RegistrarContextoClassificacao', () => {
     const repositorio = new DecisaoWorkflowRepositoryFake();
     const useCase = new RegistrarContextoClassificacao(
       new ACLFake({ orcamentoId: ORCAMENTO_ID, contextoClassificacao: contexto(), tenantId }),
-      repositorio,
+      () => repositorio,
     );
 
     await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
 
-    expect(repositorio.salvos[0]!.tenantId?.equals(tenantId)).toBe(true);
+    expect(repositorio.salvos[0]!.tenantId.equals(tenantId)).toBe(true);
   });
 });

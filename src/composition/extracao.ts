@@ -8,6 +8,8 @@ import type { MarkItDownConversaoExtracaoACL } from '../bounded-contexts/extraca
 import { EventBridgePublisher } from '../bounded-contexts/extracao/infrastructure/eventbridge.publisher.js';
 import { DrizzleExtracaoOrcamentoRepository } from '../bounded-contexts/extracao/infrastructure/persistence/drizzle-extracao-orcamento.repository.js';
 import { S3LeituraBrutaGateway } from '../bounded-contexts/extracao/infrastructure/s3-leitura-bruta.gateway.js';
+import { criarTenantContext } from '../shared-kernel/tenant/tenant-context.js';
+import type { TenantId } from '../shared-kernel/tenant/tenant-id.vo.js';
 
 /**
  * Composition root do BC Extração. Simétrico ao de Ingestão e deliberadamente
@@ -30,9 +32,17 @@ export interface Extracao {
 }
 
 export function criarExtracao(deps: ExtracaoDeps): Extracao {
+  // (issue #656, spec 007/T008) `DrizzleExtracaoOrcamentoRepository` estende
+  // `DrizzleTenantScopedRepositoryBase` — o `TenantContext` é fixado no
+  // construtor e MUST NUNCA ser reaproveitado entre tenants, então esta
+  // composition root só constrói uma fábrica `(tenantId) => repo`, mesmo
+  // padrão de `criarIngestaoIdentificacao` (spec 001/T018).
+  const criarRepositorioExtracao = (tenantId: TenantId) =>
+    new DrizzleExtracaoOrcamentoRepository(deps.db, criarTenantContext(tenantId));
+
   return {
     extrairDadosOrcamento: new ExtrairDadosOrcamento(
-      new DrizzleExtracaoOrcamentoRepository(deps.db),
+      criarRepositorioExtracao,
       new S3LeituraBrutaGateway(deps.s3),
       deps.conversor,
       deps.extrator,

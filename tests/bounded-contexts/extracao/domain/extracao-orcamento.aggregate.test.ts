@@ -20,6 +20,7 @@ import { ReferenciaS3 } from '../../../../src/bounded-contexts/extracao/domain/v
 
 const confiancaAlta = NivelConfianca.de(95);
 const confiancaBaixa = NivelConfianca.de(20);
+const TENANT_ID = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
 
 function novaExtracao(): ExtracaoOrcamento {
   return ExtracaoOrcamento.criar(
@@ -34,6 +35,7 @@ function novaExtracao(): ExtracaoOrcamento {
       key: 'portal/arquivo.pdf',
       versionId: 'v1',
     }),
+    TENANT_ID,
   );
 }
 
@@ -77,8 +79,8 @@ describe('ExtracaoOrcamento.criar', () => {
     expect(extracao.historico).toHaveLength(0);
   });
 
-  it('(issue #648) nasce sem tenantId quando omitido — estado normal pré-#632 (ADR-008)', () => {
-    expect(novaExtracao().tenantId).toBeUndefined();
+  it('(issue #656 — aperto de tipo) nasce com o tenantId obrigatório', () => {
+    expect(novaExtracao().tenantId.toString()).toBe(TENANT_ID.toString());
   });
 
   it('(issue #648) nasce com o tenantId informado', () => {
@@ -97,7 +99,7 @@ describe('ExtracaoOrcamento.criar', () => {
       }),
       tenantId,
     );
-    expect(extracao.tenantId?.toString()).toBe(tenantId.toString());
+    expect(extracao.tenantId.toString()).toBe(tenantId.toString());
   });
 });
 

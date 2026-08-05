@@ -59,12 +59,12 @@ export interface OrcamentoValidacaoProps {
   readonly inconsistencias: readonly InconsistenciaDetectada[];
   readonly historico: readonly TentativaValidacao[];
   /**
-   * (issue #649 — expand/contract, ADR-008) Opcional até a #632 tornar
-   * `tenantId` obrigatório nos 4 BCs de uma vez. Vem do envelope
-   * `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada` (spec 002),
-   * que ainda publica `tenantId` opcional.
+   * (issue #656 — aperto de tipo, spec 007 ADR-008 amendment) Obrigatório
+   * desde a criação: `criar` sempre recebe o `tenantId` já extraído pela ACL
+   * do evento `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`
+   * (spec 002, obrigatório desde `schemaVersion: 2`).
    */
-  readonly tenantId?: TenantId;
+  readonly tenantId: TenantId;
 }
 
 /**
@@ -79,7 +79,7 @@ export class OrcamentoValidacao {
   private _status: StatusValidacao;
   private _inconsistencias: readonly InconsistenciaDetectada[];
   private readonly _historico: TentativaValidacao[];
-  private readonly _tenantId: TenantId | undefined;
+  private readonly _tenantId: TenantId;
 
   private constructor(props: OrcamentoValidacaoProps) {
     this._orcamentoId = props.orcamentoId;
@@ -94,7 +94,7 @@ export class OrcamentoValidacao {
   static criar(
     orcamentoId: OrcamentoId,
     dadosExtraidos: DadosExtraidosParaValidacao,
-    tenantId?: TenantId,
+    tenantId: TenantId,
   ): OrcamentoValidacao {
     return new OrcamentoValidacao({
       orcamentoId,
@@ -131,11 +131,7 @@ export class OrcamentoValidacao {
     return [...this._historico];
   }
 
-  /**
-   * (issue #649 — expand/contract) `undefined` até a #632 tornar a ausência
-   * impossível nos 4 BCs de uma vez.
-   */
-  get tenantId(): TenantId | undefined {
+  get tenantId(): TenantId {
     return this._tenantId;
   }
 

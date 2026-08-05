@@ -33,10 +33,10 @@ export const validacoesOrcamento = validacaoSchema.table(
   'validacoes_orcamento',
   {
     id: uuid('id').primaryKey(),
-    // (issue #649 — expand/contract, ADR-008) Nullable até a #632 tornar
-    // `tenantId` obrigatório nos 4 BCs de uma vez (mesmo padrão de
-    // `extracoes_orcamento.tenant_id`, spec 002, #648).
-    tenantId: uuid('tenant_id'),
+    // (issue #656 — RLS/repositório tenant-scoped, spec 007 ADR-008
+    // amendment) `NOT NULL` desde a migração 0020: zero linha em produção
+    // (#587/#297), sem passo de backfill.
+    tenantId: uuid('tenant_id').notNull(),
     status: text('status').notNull(),
     // DadosExtraidosParaValidacao — cópia imutável traduzida via ACL (T015),
     // JSONB porque não há invariante de negócio sobre linha isolada além do
@@ -46,7 +46,10 @@ export const validacoesOrcamento = validacaoSchema.table(
     // acumulada (plan.md: "nunca acumulada a cada nova tentativa").
     inconsistencias: jsonb('inconsistencias').notNull().default([]),
   },
-  () => [check('validacoes_orcamento_status_valido', emValoresValidos('status', STATUS_VALIDACAO))],
+  (table) => [
+    index('validacoes_orcamento_tenant_id_idx').on(table.tenantId),
+    check('validacoes_orcamento_status_valido', emValoresValidos('status', STATUS_VALIDACAO)),
+  ],
 );
 
 /**
@@ -60,6 +63,9 @@ export const validacoesOrcamentoHistorico = validacaoSchema.table(
   {
     id: bigserial('id', { mode: 'bigint' }).primaryKey(),
     orcamentoValidacaoId: uuid('orcamento_validacao_id').notNull(),
+    // (issue #656) Mesmo padrão de `orcamentos_historico.tenant_id` (spec 001,
+    // migração 0013) — RLS sobre o histórico exige a própria coluna.
+    tenantId: uuid('tenant_id').notNull(),
     resultado: text('resultado').notNull(),
     inconsistencias: jsonb('inconsistencias').notNull().default([]),
     ocorreuEm: timestamp('ocorreu_em', { withTimezone: true }).notNull(),
@@ -68,6 +74,7 @@ export const validacoesOrcamentoHistorico = validacaoSchema.table(
     index('validacoes_orcamento_historico_orcamento_validacao_id_idx').on(
       table.orcamentoValidacaoId,
     ),
+    index('validacoes_orcamento_historico_tenant_id_idx').on(table.tenantId),
     check(
       'validacoes_orcamento_historico_resultado_valido',
       emValoresValidos('resultado', RESULTADOS_TENTATIVA_VALIDACAO),

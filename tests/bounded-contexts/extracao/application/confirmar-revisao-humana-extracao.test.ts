@@ -28,6 +28,7 @@ import { OrcamentoExtraidoComPendenciaConfirmada } from '../../../../src/bounded
 import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const ORCAMENTO_ID = '01890a5d-ac96-774b-bcce-b302099a8057';
+const TENANT_ID = TenantId.novo();
 const confiancaAlta = NivelConfianca.de(95);
 const confiancaBaixa = NivelConfianca.de(20);
 
@@ -64,7 +65,7 @@ function condicoesCompletas(): CondicoesComerciais {
 }
 
 /** Extração já escalada para PENDENTE_REVISAO_HUMANA — precoUnitario do item 0 pendente. */
-function extracaoPendente(tenantId: TenantId = TenantId.novo()): ExtracaoOrcamento {
+function extracaoPendente(tenantId: TenantId = TENANT_ID): ExtracaoOrcamento {
   const extracao = ExtracaoOrcamento.criar(
     OrcamentoId.de(ORCAMENTO_ID),
     ReferenciaClassificacao.de({
@@ -101,9 +102,7 @@ function itemCompleto(): ItemOrcamento {
 }
 
 /** Extração PENDENTE_REVISAO_HUMANA com itens completos, mas `prazoValidade` pendente. */
-function extracaoPendenteCondicoesComerciais(
-  tenantId: TenantId = TenantId.novo(),
-): ExtracaoOrcamento {
+function extracaoPendenteCondicoesComerciais(tenantId: TenantId = TENANT_ID): ExtracaoOrcamento {
   const extracao = ExtracaoOrcamento.criar(
     OrcamentoId.de(ORCAMENTO_ID),
     ReferenciaClassificacao.de({
@@ -126,13 +125,14 @@ function extracaoPendenteCondicoesComerciais(
 describe('ConfirmarRevisaoHumanaExtracao', () => {
   it('lança ExtracaoNaoEncontradaError quando orcamentoId não existe', async () => {
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(undefined),
+      () => new RepositorioFake(undefined),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [
           {
             caminho: 'itens[0].precoUnitario',
@@ -148,10 +148,11 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
     const extracao = extracaoPendente();
     const repositorio = new RepositorioFake(extracao);
     const publisher = new EventPublisherFake();
-    const caso = new ConfirmarRevisaoHumanaExtracao(repositorio, publisher);
+    const caso = new ConfirmarRevisaoHumanaExtracao(() => repositorio, publisher);
 
     await caso.executar({
       orcamentoId: ORCAMENTO_ID,
+      tenantId: TENANT_ID,
       camposConfirmados: [
         {
           caminho: 'itens[0].precoUnitario',
@@ -172,10 +173,11 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
     const extracao = extracaoPendente(tenantId);
     const repositorio = new RepositorioFake(extracao);
     const publisher = new EventPublisherFake();
-    const caso = new ConfirmarRevisaoHumanaExtracao(repositorio, publisher);
+    const caso = new ConfirmarRevisaoHumanaExtracao(() => repositorio, publisher);
 
     await caso.executar({
       orcamentoId: ORCAMENTO_ID,
+      tenantId,
       camposConfirmados: [
         {
           caminho: 'itens[0].precoUnitario',
@@ -193,10 +195,11 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
     const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
     const extracao = extracaoPendente(tenantId);
     const publisher = new EventPublisherFake();
-    const caso = new ConfirmarRevisaoHumanaExtracao(new RepositorioFake(extracao), publisher);
+    const caso = new ConfirmarRevisaoHumanaExtracao(() => new RepositorioFake(extracao), publisher);
 
     await caso.executar({
       orcamentoId: ORCAMENTO_ID,
+      tenantId,
       camposConfirmados: [{ caminho: 'itens[0].precoUnitario', valor: null, indisponivel: true }],
     });
 
@@ -207,10 +210,11 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
   it('indisponibilidade confirmada → EXTRAIDO_COM_PENDENCIA_CONFIRMADA, publica OrcamentoExtraidoComPendenciaConfirmada', async () => {
     const extracao = extracaoPendente();
     const publisher = new EventPublisherFake();
-    const caso = new ConfirmarRevisaoHumanaExtracao(new RepositorioFake(extracao), publisher);
+    const caso = new ConfirmarRevisaoHumanaExtracao(() => new RepositorioFake(extracao), publisher);
 
     await caso.executar({
       orcamentoId: ORCAMENTO_ID,
+      tenantId: TENANT_ID,
       camposConfirmados: [{ caminho: 'itens[0].precoUnitario', valor: null, indisponivel: true }],
     });
 
@@ -223,13 +227,14 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
   it('rejeita caminho para campo já extraído com sucesso (nunca reabre)', async () => {
     const extracao = extracaoPendente();
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [
           { caminho: 'itens[0].descricao', valor: { descricao: 'outro' }, indisponivel: false },
         ],
@@ -240,13 +245,14 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
   it('rejeita índice de item fora do intervalo', async () => {
     const extracao = extracaoPendente();
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [
           {
             caminho: 'itens[5].precoUnitario',
@@ -261,13 +267,14 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
   it('rejeita caminho em formato desconhecido', async () => {
     const extracao = extracaoPendente();
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [{ caminho: 'campo-inexistente', valor: 'x', indisponivel: false }],
       }),
     ).rejects.toThrow(CaminhoConfirmacaoInvalidoError);
@@ -286,16 +293,18 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
         key: 'portal/arquivo.pdf',
         versionId: 'v1',
       }),
+      TENANT_ID,
     );
     // status PENDENTE: sem itens/condicoesComerciais ainda registrados pelo Extrator
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [
           {
             caminho: 'itens[0].precoUnitario',
@@ -313,13 +322,14 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
     expect(extracao.status).toBe('EXTRAIDO_COM_PENDENCIA_CONFIRMADA');
 
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [
           {
             caminho: 'itens[0].precoUnitario',
@@ -334,13 +344,14 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
   it('rejeita valor com shape inválido (precoUnitario com moeda ausente) — nunca deixa TypeError vazar da borda', async () => {
     const extracao = extracaoPendente();
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [
           { caminho: 'itens[0].precoUnitario', valor: { valorCentavos: 100 }, indisponivel: false },
         ],
@@ -351,13 +362,14 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
   it('rejeita valor de tipo errado (precoUnitario como número solto em vez de objeto)', async () => {
     const extracao = extracaoPendente();
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [{ caminho: 'itens[0].precoUnitario', valor: 100, indisponivel: false }],
       }),
     ).rejects.toThrow(CaminhoConfirmacaoInvalidoError);
@@ -366,13 +378,14 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
   it('rejeita prazoValidade com data ISO inválida', async () => {
     const extracao = extracaoPendenteCondicoesComerciais();
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [
           {
             caminho: 'condicoesComerciais.prazoValidade',
@@ -397,7 +410,7 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
         key: 'portal/arquivo.pdf',
         versionId: 'v1',
       }),
-      TenantId.novo(),
+      TENANT_ID,
     );
     const itemComDescricaoEQuantidadePendentes = ItemOrcamento.de({
       descricao: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
@@ -409,12 +422,13 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
       condicoesCompletas(),
     );
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await caso.executar({
       orcamentoId: ORCAMENTO_ID,
+      tenantId: TENANT_ID,
       camposConfirmados: [
         {
           caminho: 'itens[0].descricao',
@@ -441,7 +455,7 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
         key: 'portal/arquivo.pdf',
         versionId: 'v1',
       }),
-      TenantId.novo(),
+      TENANT_ID,
     );
     const condicoesIncompletas = CondicoesComerciais.de({
       condicoesPagamento: CampoExtraido.naoExtraido(confiancaBaixa, 'EXTRATOR'),
@@ -454,12 +468,13 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
     });
     extracao.registrarTentativaExtrator([itemCompleto()], condicoesIncompletas);
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await caso.executar({
       orcamentoId: ORCAMENTO_ID,
+      tenantId: TENANT_ID,
       camposConfirmados: [
         {
           caminho: 'condicoesComerciais.condicoesPagamento',
@@ -476,12 +491,13 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
   it('confirma prazoValidade pendente com data ISO válida', async () => {
     const extracao = extracaoPendenteCondicoesComerciais();
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracao),
+      () => new RepositorioFake(extracao),
       new EventPublisherFake(),
     );
 
     await caso.executar({
       orcamentoId: ORCAMENTO_ID,
+      tenantId: TENANT_ID,
       camposConfirmados: [
         {
           caminho: 'condicoesComerciais.prazoValidade',
@@ -511,15 +527,17 @@ describe('ConfirmarRevisaoHumanaExtracao', () => {
       itens: [itemCompleto()],
       condicoesComerciais: undefined,
       historico: [],
+      tenantId: TENANT_ID,
     });
     const caso = new ConfirmarRevisaoHumanaExtracao(
-      new RepositorioFake(extracaoInconsistente),
+      () => new RepositorioFake(extracaoInconsistente),
       new EventPublisherFake(),
     );
 
     await expect(
       caso.executar({
         orcamentoId: ORCAMENTO_ID,
+        tenantId: TENANT_ID,
         camposConfirmados: [
           {
             caminho: 'condicoesComerciais.prazoValidade',

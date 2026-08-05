@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import {
   ConsultarStatusValidacao,
   OrcamentoValidacaoNaoEncontradoError,
+  TenantDivergenciaError,
 } from '../../application/use-cases/consultar-status-validacao.js';
 import { RegistrarDecisaoHumanaValidacao } from '../../application/use-cases/registrar-decisao-humana-validacao.js';
 import { TransicaoInvalidaValidacaoError } from '../../domain/orcamento-validacao.aggregate.js';
@@ -79,19 +80,40 @@ export function registrarRotaDecisaoHumanaValidacao(
       }
 
       try {
-        const validacaoAtual = await consultarStatusValidacao.executar(params.data.orcamentoId);
+        // (issue #656) `request.tenantContext` é populado por
+        // `TenantContextMiddleware` a partir do JWT Cognito. Nunca vem de
+        // query/path/body — isso seria escalação de privilégio. Middleware
+        // retorna 401 se ausente/inválido antes de chegar aqui.
+        const tenantId = request.tenantContext?.tenantId;
+        if (!tenantId) {
+          // Não deveria acontecer: TenantContextMiddleware já rejeitou. Fallback defensivo.
+          const problema: ProblemDetails = {
+            type: 'https://nexo.internal/problems/nao-autenticado',
+            title: 'Contexto de tenant ausente',
+            status: 401,
+          };
+          await reply.status(401).type('application/problem+json').send(problema);
+          return;
+        }
+
+        const validacaoAtual = await consultarStatusValidacao.executar(
+          params.data.orcamentoId,
+          tenantId,
+        );
         const decisao = registrarDecisaoHumanaValidacao.construirDecisao(validacaoAtual, body.data);
 
-        await registrarDecisaoHumanaValidacao.executar(params.data.orcamentoId, decisao);
+        await registrarDecisaoHumanaValidacao.executar(params.data.orcamentoId, tenantId, decisao);
 
         const validacaoAtualizada = await consultarStatusValidacao.executar(
           params.data.orcamentoId,
+          tenantId,
         );
         await reply.status(200).send(paraResposta(validacaoAtualizada));
       } catch (erro) {
         if (
           erro instanceof OrcamentoValidacaoNaoEncontradoError ||
-          erro instanceof OrcamentoIdInvalidoError
+          erro instanceof OrcamentoIdInvalidoError ||
+          erro instanceof TenantDivergenciaError
         ) {
           const problema: ProblemDetails = {
             type: 'https://nexo.internal/problems/nao-encontrado',

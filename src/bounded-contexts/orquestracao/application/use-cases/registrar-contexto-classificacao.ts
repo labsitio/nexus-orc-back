@@ -1,6 +1,6 @@
 import { DecisaoWorkflow } from '../../domain/aggregates/decisao-workflow.aggregate.js';
 import type { OrcamentoClassificadoEventACL } from '../../domain/gateways/orcamento-classificado-event.acl.js';
-import type { DecisaoWorkflowRepository } from '../../domain/repositories/decisao-workflow.repository.js';
+import type { CriarDecisaoWorkflowRepositorio } from '../../domain/repositories/decisao-workflow.repository.js';
 
 /**
  * Consumidor do evento `OrcamentoClassificado` (via SQS `contexto-classificacao-queue`,
@@ -19,18 +19,22 @@ import type { DecisaoWorkflowRepository } from '../../domain/repositories/decisa
 export class RegistrarContextoClassificacao {
   constructor(
     private readonly acl: OrcamentoClassificadoEventACL,
-    private readonly repositorio: DecisaoWorkflowRepository,
+    private readonly criarRepositorio: CriarDecisaoWorkflowRepositorio,
   ) {}
 
   async executar(payloadBruto: unknown): Promise<void> {
     const { orcamentoId, contextoClassificacao, tenantId } = this.acl.traduzir(payloadBruto);
+    // (issue #656) Repositório construído por chamada a partir do `tenantId`
+    // já validado pela ACL — nunca reaproveitado como campo fixo entre
+    // chamadas (mesmo padrão de `CriarOrcamentoRepositorio`, spec 001).
+    const repositorio = this.criarRepositorio(tenantId);
 
     const decisaoWorkflow =
-      (await this.repositorio.buscarPorOrcamentoId(orcamentoId)) ??
-      DecisaoWorkflow.criar(orcamentoId);
+      (await repositorio.buscarPorOrcamentoId(orcamentoId)) ??
+      DecisaoWorkflow.criar(orcamentoId, tenantId);
 
     decisaoWorkflow.registrarContextoClassificacao(contextoClassificacao, tenantId);
 
-    await this.repositorio.salvar(decisaoWorkflow);
+    await repositorio.salvar(decisaoWorkflow);
   }
 }

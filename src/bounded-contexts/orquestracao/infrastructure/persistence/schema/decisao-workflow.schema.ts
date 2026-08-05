@@ -45,13 +45,15 @@ export const decisoesWorkflow = orquestracaoSchema.table(
     contextoValidacao: jsonb('contexto_validacao'),
     // DecisaoRoteamento — presente só a partir de `DECIDIDO`.
     decisaoAtual: jsonb('decisao_atual'),
-    // (issue #650) `tenantId` obrigatório nos 4 BCs de uma vez (mesmo padrão de
-    // `extracoes_orcamento.tenant_id`/`validacoes_orcamento.tenant_id`, specs
-    // 002/003, #648/#649) — imutável após o primeiro upstream que o traz
-    // (`DrizzleDecisaoWorkflowRepository.salvar`, fora do `set` de update).
-    tenantId: uuid('tenant_id'),
+    // (issue #656 — RLS/repositório tenant-scoped, spec 007 ADR-008
+    // amendment) `NOT NULL` desde a migração 0020: zero linha em produção
+    // (#587/#297), sem passo de backfill — imutável após o primeiro upstream
+    // que o traz (`DrizzleDecisaoWorkflowRepository.salvar`, fora do `set` de
+    // update).
+    tenantId: uuid('tenant_id').notNull(),
   },
-  () => [
+  (table) => [
+    index('decisoes_workflow_tenant_id_idx').on(table.tenantId),
     check('decisoes_workflow_status_valido', emValoresValidos('status', STATUS_DECISAO_WORKFLOW)),
   ],
 );
@@ -68,6 +70,9 @@ export const decisoesWorkflowHistorico = orquestracaoSchema.table(
   {
     id: bigserial('id', { mode: 'bigint' }).primaryKey(),
     decisaoWorkflowId: uuid('decisao_workflow_id').notNull(),
+    // (issue #656) Mesmo padrão de `orcamentos_historico.tenant_id` (spec 001,
+    // migração 0013) — RLS sobre o histórico exige a própria coluna.
+    tenantId: uuid('tenant_id').notNull(),
     agente: text('agente').notNull(),
     // DecisaoRoteamento completa quando a tentativa teve sucesso; mutuamente
     // exclusiva com `motivo_insucesso` (TentativaDecisaoWorkflow.de —
@@ -78,6 +83,7 @@ export const decisoesWorkflowHistorico = orquestracaoSchema.table(
   },
   (table) => [
     index('decisoes_workflow_historico_decisao_workflow_id_idx').on(table.decisaoWorkflowId),
+    index('decisoes_workflow_historico_tenant_id_idx').on(table.tenantId),
     check(
       'decisoes_workflow_historico_agente_valido',
       emValoresValidos('agente', AGENTES_ORIGEM_DECISAO),

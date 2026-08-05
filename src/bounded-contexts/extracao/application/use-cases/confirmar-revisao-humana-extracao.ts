@@ -1,6 +1,5 @@
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import { ErroDominio } from '../../domain/errors/erro-dominio.js';
-import { ExtracaoSemTenantIdError } from '../../domain/errors/tenant.errors.js';
 import type {
   ExtracaoOrcamento,
   StatusExtracao,
@@ -23,7 +22,9 @@ import { NivelConfianca } from '../../domain/value-objects/nivel-confianca.vo.js
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { PeriodoValidade } from '../../domain/value-objects/periodo-validade.vo.js';
 import { Quantidade } from '../../domain/value-objects/quantidade.vo.js';
-import type { ExtracaoOrcamentoRepository } from '../../domain/repositories/extracao-orcamento.repository.js';
+import type { CriarExtracaoOrcamentoRepositorio } from '../../domain/repositories/extracao-orcamento.repository.js';
+import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
+import { TenantDivergenciaError } from './consultar-status-extracao.js';
 
 /** Confiança atribuída à decisão humana — nunca a confiança de uma extração automática. */
 const CONFIANCA_DECISAO_HUMANA = NivelConfianca.de(100);
@@ -39,6 +40,12 @@ export interface CampoConfirmadoParams {
 export interface ConfirmarRevisaoHumanaExtracaoParams {
   readonly orcamentoId: string;
   readonly camposConfirmados: readonly CampoConfirmadoParams[];
+  /**
+   * (issue #656) Vem sempre do `TenantContext` já validado (JWT Cognito no
+   * controller HTTP) — nunca do body da requisição (mesmo padrão de
+   * `ConfirmarRevisaoHumanaParams`, BC Ingestão & Identificação).
+   */
+  readonly tenantId: TenantId;
 }
 
 export class ExtracaoNaoEncontradaError extends ErroDominio {
@@ -285,15 +292,24 @@ function aplicarConfirmacoes(
  */
 export class ConfirmarRevisaoHumanaExtracao {
   constructor(
-    private readonly repositorio: ExtracaoOrcamentoRepository,
+    private readonly criarRepositorio: CriarExtracaoOrcamentoRepositorio,
     private readonly eventPublisher: EventPublisher,
   ) {}
 
   async executar(params: ConfirmarRevisaoHumanaExtracaoParams): Promise<ExtracaoOrcamento> {
     const orcamentoId = OrcamentoId.de(params.orcamentoId);
-    const extracao = await this.repositorio.buscarPorOrcamentoId(orcamentoId);
+    // (issue #656) Repositório construído por chamada a partir do `tenantId`
+    // já validado do parâmetro — nunca reaproveitado como campo fixo entre
+    // chamadas (ver `CriarExtracaoOrcamentoRepositorio`).
+    const repositorio = this.criarRepositorio(params.tenantId);
+    const extracao = await repositorio.buscarPorOrcamentoId(orcamentoId);
     if (!extracao) {
       throw new ExtracaoNaoEncontradaError(params.orcamentoId);
+    }
+
+    // (issue #656) Defesa em profundidade — ver `TenantDivergenciaError`.
+    if (extracao.tenantId.toString() !== params.tenantId.toString()) {
+      throw new TenantDivergenciaError(params.orcamentoId);
     }
 
     if (statusDe(extracao) !== 'PENDENTE_REVISAO_HUMANA') {
@@ -305,12 +321,10 @@ export class ConfirmarRevisaoHumanaExtracao {
       throw new ExtracaoSemCondicoesComerciaisError(params.orcamentoId);
     }
 
-    // (spec 007, ADR-008 — cutover de contract, #632) Capturado antes de
-    // `registrarConfirmacaoHumana` mutar o agregado — mesma indireção de
-    // `statusDe` (getter perde narrowing após chamada de método mutável).
-    // Guarda de ausência só é aplicada mais abaixo, perto da publicação do
-    // evento: erros de validação do próprio `camposConfirmados` (caminho,
-    // shape) têm precedência sobre a checagem de `tenantId`.
+    // (issue #656 — aperto de tipo) `ExtracaoOrcamento.tenantId` é obrigatório
+    // desde a criação — capturado antes de `registrarConfirmacaoHumana` mutar
+    // o agregado por consistência com o padrão de `statusDe` (getter perde
+    // narrowing após chamada de método mutável).
     const tenantId = extracao.tenantId;
 
     const { itens, condicoesComerciais } = aplicarConfirmacoes(
@@ -320,11 +334,7 @@ export class ConfirmarRevisaoHumanaExtracao {
     );
 
     extracao.registrarConfirmacaoHumana(itens, condicoesComerciais);
-    await this.repositorio.salvar(extracao);
-
-    if (!tenantId) {
-      throw new ExtracaoSemTenantIdError(params.orcamentoId);
-    }
+    await repositorio.salvar(extracao);
 
     const evento =
       statusDe(extracao) === 'EXTRAIDO'

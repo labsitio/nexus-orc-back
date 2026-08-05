@@ -22,6 +22,7 @@ import {
 } from '../../../../src/bounded-contexts/validacao/domain/regras-consistencia.js';
 
 const orcamentoId = () => OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a1');
+const TENANT_ID = TenantId.novo();
 
 const dadosExtraidos = () =>
   DadosExtraidosParaValidacao.de({
@@ -44,14 +45,14 @@ const inconsistencia = () =>
 
 describe('OrcamentoValidacao', () => {
   it('criar() inicia em PENDENTE, sem inconsistências, sem histórico', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     expect(agregado.status).toBe('PENDENTE');
     expect(agregado.inconsistencias).toHaveLength(0);
     expect(agregado.historico).toHaveLength(0);
   });
 
   it('avaliarRegrasDeConsistencia sem inconsistências transita para VALIDADO e anexa histórico', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     agregado.avaliarRegrasDeConsistencia([]);
     expect(agregado.status).toBe('VALIDADO');
     expect(agregado.historico).toHaveLength(1);
@@ -79,7 +80,7 @@ describe('OrcamentoValidacao', () => {
       periodoValidade: PeriodoValidade.de(new Date('2026-02-10T00:00:00.000Z')),
     });
 
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dados);
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dados, TENANT_ID);
     const inconsistencias = [
       ...validarCnpjValido(dados),
       ...validarCamposObrigatorios(dados),
@@ -93,7 +94,7 @@ describe('OrcamentoValidacao', () => {
   });
 
   it('avaliarRegrasDeConsistencia com 1+ inconsistência transita direto para PENDENTE_REVISAO_HUMANA', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     agregado.avaliarRegrasDeConsistencia([inconsistencia()]);
     expect(agregado.status).toBe('PENDENTE_REVISAO_HUMANA');
     expect(agregado.inconsistencias).toHaveLength(1);
@@ -101,7 +102,7 @@ describe('OrcamentoValidacao', () => {
   });
 
   it('avaliarRegrasDeConsistencia com múltiplas regras falhando transita direto para PENDENTE_REVISAO_HUMANA (nunca segunda tentativa automática) e inconsistencias lista cada regra específica', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     const cnpjInvalido = InconsistenciaDetectada.de(
       'CNPJ_INVALIDO',
       'dígito verificador incorreto',
@@ -127,7 +128,7 @@ describe('OrcamentoValidacao', () => {
   });
 
   it('nunca transita para VALIDADO com inconsistência pendente — força segunda avaliação e espera erro de domínio', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     agregado.avaliarRegrasDeConsistencia([inconsistencia()]);
     expect(agregado.status).toBe('PENDENTE_REVISAO_HUMANA');
 
@@ -136,7 +137,7 @@ describe('OrcamentoValidacao', () => {
   });
 
   it('registrarDecisaoHumana CORRECAO_APLICADA sem inconsistência remanescente transita para VALIDADO', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     agregado.avaliarRegrasDeConsistencia([inconsistencia()]);
     agregado.registrarDecisaoHumana({ tipo: 'CORRECAO_APLICADA', inconsistencias: [] });
     expect(agregado.status).toBe('VALIDADO');
@@ -144,7 +145,7 @@ describe('OrcamentoValidacao', () => {
   });
 
   it('registrarDecisaoHumana CORRECAO_APLICADA que ainda falha permanece em PENDENTE_REVISAO_HUMANA (nunca autoaprova)', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     agregado.avaliarRegrasDeConsistencia([inconsistencia()]);
     agregado.registrarDecisaoHumana({
       tipo: 'CORRECAO_APLICADA',
@@ -155,7 +156,7 @@ describe('OrcamentoValidacao', () => {
   });
 
   it('registrarDecisaoHumana ACEITE_COM_RESSALVA transita para VALIDADO_COM_RESSALVA (terminal)', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     agregado.avaliarRegrasDeConsistencia([inconsistencia()]);
     agregado.registrarDecisaoHumana({ tipo: 'ACEITE_COM_RESSALVA' });
     expect(agregado.status).toBe('VALIDADO_COM_RESSALVA');
@@ -165,26 +166,21 @@ describe('OrcamentoValidacao', () => {
   });
 
   it('registrarDecisaoHumana só é válida a partir de PENDENTE_REVISAO_HUMANA', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     expect(() => agregado.registrarDecisaoHumana({ tipo: 'ACEITE_COM_RESSALVA' })).toThrow(
       TransicaoInvalidaValidacaoError,
     );
   });
 
   it('dadosExtraidos nunca é sobrescrito fora do construtor de criação', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
+    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), TENANT_ID);
     expect(() => agregado.atualizarDadosExtraidos()).toThrow(DadosExtraidosImutavelError);
   });
 
-  it('criar() aceita tenantId opcional (issue #649, expand/contract)', () => {
+  it('criar() aceita tenantId obrigatório (issue #656 — aperto de tipo)', () => {
     const tenantId = TenantId.novo();
     const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos(), tenantId);
     expect(agregado.tenantId).toBe(tenantId);
-  });
-
-  it('criar() sem tenantId deixa o campo undefined', () => {
-    const agregado = OrcamentoValidacao.criar(orcamentoId(), dadosExtraidos());
-    expect(agregado.tenantId).toBeUndefined();
   });
 
   it('tenantId nunca é sobrescrito fora do construtor de criação', () => {

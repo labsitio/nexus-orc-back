@@ -26,6 +26,8 @@ import { NivelConfianca } from '../../domain/value-objects/nivel-confianca.vo.js
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import { TentativaDecisaoWorkflow } from '../../domain/value-objects/tentativa-decisao-workflow.vo.js';
 import type { DecisaoWorkflowRepository } from '../../domain/repositories/decisao-workflow.repository.js';
+import { DrizzleTenantScopedRepositoryBase } from '../../../../shared-kernel/tenant/drizzle-tenant-scoped-repository-base.js';
+import type { TenantContext } from '../../../../shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import { decisoesWorkflow, decisoesWorkflowHistorico } from './schema/decisao-workflow.schema.js';
 
@@ -131,7 +133,7 @@ function agregadoDaLinha(
     ...(contextoExtracao !== undefined ? { contextoExtracao } : {}),
     ...(contextoValidacao !== undefined ? { contextoValidacao } : {}),
     ...(decisaoAtual !== undefined ? { decisaoAtual } : {}),
-    ...(linha.tenantId !== null ? { tenantId: TenantId.de(linha.tenantId) } : {}),
+    tenantId: TenantId.de(linha.tenantId),
   };
   return DecisaoWorkflow.reconstituir(props);
 }
@@ -149,9 +151,29 @@ function agregadoDaLinha(
  * incluindo o lock `FOR UPDATE` que serializa `salvar` concorrente do mesmo
  * agregado (retry de handler Lambda sobre a mesma mensagem SQS/reentrega de
  * evento upstream).
+ *
+ * **Issue #656 (retrofit)**: estende `DrizzleTenantScopedRepositoryBase`
+ * (spec 007/T008) — toda transação usa `transacaoTenantScoped`, mesmo padrão
+ * dos demais repositórios deste retrofit. Diferente de
+ * `DrizzleOrcamentoValidacaoRepository`/`DrizzleExtracaoOrcamentoRepository`,
+ * `this.tenantId` vem do `TenantContext` já resolvido pela ACL do evento que
+ * disparou a chamada (`CriarDecisaoWorkflowRepositorio`), nunca de
+ * `decisaoWorkflow.tenantId` — a consolidação entre os 3 upstreams
+ * (`registrarTenantId`, divergência rejeitada no Domain antes de chegar
+ * aqui) só precisa garantir que o valor já resolvido é consistente, a
+ * gravação em si sempre usa o tenant da chamada atual. Uma instância por
+ * chamada, nunca um singleton reaproveitado entre tenants.
  */
-export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowRepository {
-  constructor(private readonly db: NodePgDatabase) {}
+export class DrizzleDecisaoWorkflowRepository
+  extends DrizzleTenantScopedRepositoryBase
+  implements DecisaoWorkflowRepository
+{
+  private readonly tenantId: string;
+
+  constructor(db: NodePgDatabase, tenantContext: TenantContext) {
+    super(db, tenantContext);
+    this.tenantId = tenantContext.tenantId.toString();
+  }
 
   async salvar(decisaoWorkflow: DecisaoWorkflow): Promise<void> {
     const id = decisaoWorkflow.orcamentoId.toString();
@@ -161,17 +183,8 @@ export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowReposito
     const decisaoAtualPayload = decisaoWorkflow.decisaoAtual
       ? decisaoRoteamentoParaPayload(decisaoWorkflow.decisaoAtual)
       : null;
-    // (issue #650) Diferente de `extracoes_orcamento`/`validacoes_orcamento`
-    // (specs 002/003, tenantId sempre conhecido na criação, nunca sai do
-    // `set` do onConflictDoUpdate): aqui o agregado é salvo várias vezes
-    // conforme os 3 upstreams chegam em qualquer ordem, então o primeiro
-    // `salvar` pode não conhecer `tenantId` ainda. `tenantIdPayload` só entra
-    // no `set` quando definido — nunca regride um valor já persistido para
-    // null, e divergência entre upstreams já foi rejeitada no Domain
-    // (`registrarTenantId`) antes de chegar aqui.
-    const tenantIdPayload = decisaoWorkflow.tenantId?.toString();
 
-    await this.db.transaction(async (tx) => {
+    await this.transacaoTenantScoped(async (tx) => {
       // Serializa `salvar` concorrente do mesmo agregado — sem este lock, duas
       // transações poderiam ler a mesma contagem de histórico já persistida e
       // duplicar a mesma tentativa nova. Linha inexistente (1º save) não
@@ -187,7 +200,10 @@ export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowReposito
           contextoExtracao: contextoExtracaoPayload,
           contextoValidacao: contextoValidacaoPayload,
           decisaoAtual: decisaoAtualPayload,
-          tenantId: tenantIdPayload ?? null,
+          // (issue #656) `tenantId` é imutável após a criação — nunca entra
+          // no `set` do onConflictDoUpdate abaixo (mesmo padrão dos demais
+          // repositórios deste retrofit).
+          tenantId: this.tenantId,
         })
         .onConflictDoUpdate({
           target: decisoesWorkflow.id,
@@ -197,7 +213,6 @@ export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowReposito
             contextoExtracao: contextoExtracaoPayload,
             contextoValidacao: contextoValidacaoPayload,
             decisaoAtual: decisaoAtualPayload,
-            ...(tenantIdPayload !== undefined ? { tenantId: tenantIdPayload } : {}),
           },
         });
 
@@ -214,6 +229,7 @@ export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowReposito
       await tx.insert(decisoesWorkflowHistorico).values(
         novasTentativas.map((tentativa) => ({
           decisaoWorkflowId: id,
+          tenantId: this.tenantId,
           agente: tentativa.agente,
           resultado: tentativa.resultado ? decisaoRoteamentoParaPayload(tentativa.resultado) : null,
           motivoInsucesso: tentativa.motivoInsucesso ?? null,
@@ -224,20 +240,22 @@ export class DrizzleDecisaoWorkflowRepository implements DecisaoWorkflowReposito
   }
 
   async buscarPorOrcamentoId(orcamentoId: OrcamentoId): Promise<DecisaoWorkflow | undefined> {
-    const [linha] = await this.db
-      .select()
-      .from(decisoesWorkflow)
-      .where(eq(decisoesWorkflow.id, orcamentoId.toString()));
-    if (!linha) {
-      return undefined;
-    }
+    return this.transacaoTenantScoped(async (tx) => {
+      const [linha] = await tx
+        .select()
+        .from(decisoesWorkflow)
+        .where(eq(decisoesWorkflow.id, orcamentoId.toString()));
+      if (!linha) {
+        return undefined;
+      }
 
-    const linhasHistorico = await this.db
-      .select()
-      .from(decisoesWorkflowHistorico)
-      .where(eq(decisoesWorkflowHistorico.decisaoWorkflowId, orcamentoId.toString()))
-      .orderBy(asc(decisoesWorkflowHistorico.ocorreuEm), asc(decisoesWorkflowHistorico.id));
+      const linhasHistorico = await tx
+        .select()
+        .from(decisoesWorkflowHistorico)
+        .where(eq(decisoesWorkflowHistorico.decisaoWorkflowId, orcamentoId.toString()))
+        .orderBy(asc(decisoesWorkflowHistorico.ocorreuEm), asc(decisoesWorkflowHistorico.id));
 
-    return agregadoDaLinha(linha, linhasHistorico.map(tentativaDaLinha));
+      return agregadoDaLinha(linha, linhasHistorico.map(tentativaDaLinha));
+    });
   }
 }

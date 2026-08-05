@@ -4,6 +4,7 @@ import { OrcamentoIdInvalidoError } from '../../domain/value-objects/orcamento-i
 import {
   ConsultarStatusExtracao,
   ExtracaoNaoEncontradaError,
+  TenantDivergenciaError,
 } from '../../application/use-cases/consultar-status-extracao.js';
 import type { RotaOpts } from './route-opts.js';
 import type { ProblemDetails, StatusExtracaoResponse } from './status.schema.js';
@@ -54,12 +55,30 @@ export function registrarRotaStatusExtracao(
       }
 
       try {
-        const extracao = await consultarStatusExtracao.executar(params.data.orcamentoId);
+        // (issue #656) `request.tenantContext` é populado por
+        // `TenantContextMiddleware` a partir do JWT Cognito. Nunca vem de
+        // query/path/body — isso seria escalação de privilégio. Middleware
+        // retorna 401 se ausente/inválido antes de chegar aqui (mesmo padrão
+        // de `ingestao-identificacao/interface/http/status.controller.ts`).
+        const tenantId = request.tenantContext?.tenantId;
+        if (!tenantId) {
+          // Não deveria acontecer: TenantContextMiddleware já rejeitou. Fallback defensivo.
+          const problema: ProblemDetails = {
+            type: 'https://nexo.internal/problems/nao-autenticado',
+            title: 'Contexto de tenant ausente',
+            status: 401,
+          };
+          await reply.status(401).type('application/problem+json').send(problema);
+          return;
+        }
+
+        const extracao = await consultarStatusExtracao.executar(params.data.orcamentoId, tenantId);
         await reply.status(200).send(paraResposta(extracao));
       } catch (erro) {
         if (
           erro instanceof ExtracaoNaoEncontradaError ||
-          erro instanceof OrcamentoIdInvalidoError
+          erro instanceof OrcamentoIdInvalidoError ||
+          erro instanceof TenantDivergenciaError
         ) {
           const problema: ProblemDetails = {
             type: 'https://nexo.internal/problems/nao-encontrado',

@@ -10,6 +10,9 @@ import { Dinheiro } from '../../../../src/bounded-contexts/validacao/domain/valu
 import { ItemParaValidacao } from '../../../../src/bounded-contexts/validacao/domain/value-objects/item-para-validacao.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/validacao/domain/value-objects/orcamento-id.vo.js';
 import { PeriodoValidade } from '../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
+import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
+
+const TENANT_ID = TenantId.novo();
 
 /**
  * (T026/#136): fake in-memory de `OrcamentoValidacaoRepository` — o real
@@ -48,14 +51,14 @@ const dadosExtraidos = () =>
 describe('ConsultarStatusValidacao', () => {
   it('retorna o agregado consultável por orcamentoId', async () => {
     const repositorio = new OrcamentoValidacaoRepositoryFake();
-    const consultar = new ConsultarStatusValidacao(repositorio);
+    const consultar = new ConsultarStatusValidacao(() => repositorio);
 
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a1');
-    const orcamentoValidacao = OrcamentoValidacao.criar(id, dadosExtraidos());
+    const orcamentoValidacao = OrcamentoValidacao.criar(id, dadosExtraidos(), TENANT_ID);
     orcamentoValidacao.avaliarRegrasDeConsistencia([]);
     await repositorio.salvar(orcamentoValidacao);
 
-    const consultado = await consultar.executar(id.toString());
+    const consultado = await consultar.executar(id.toString(), TENANT_ID);
 
     expect(consultado.status).toBe('VALIDADO');
     expect(consultado.historico).toHaveLength(1);
@@ -63,10 +66,10 @@ describe('ConsultarStatusValidacao', () => {
 
   it('lança OrcamentoValidacaoNaoEncontradoError para orcamentoId inexistente', async () => {
     const repositorio = new OrcamentoValidacaoRepositoryFake();
-    const consultar = new ConsultarStatusValidacao(repositorio);
+    const consultar = new ConsultarStatusValidacao(() => repositorio);
 
-    await expect(consultar.executar('01890a5d-ac96-774b-bcce-b02c8f2726a2')).rejects.toThrow(
-      OrcamentoValidacaoNaoEncontradoError,
-    );
+    await expect(
+      consultar.executar('01890a5d-ac96-774b-bcce-b02c8f2726a2', TENANT_ID),
+    ).rejects.toThrow(OrcamentoValidacaoNaoEncontradoError);
   });
 });

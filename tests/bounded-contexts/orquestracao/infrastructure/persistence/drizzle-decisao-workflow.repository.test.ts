@@ -21,9 +21,11 @@ import { NivelConfianca } from '../../../../../src/bounded-contexts/orquestracao
 import { OrcamentoId } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/orcamento-id.vo.js';
 import { DrizzleDecisaoWorkflowRepository } from '../../../../../src/bounded-contexts/orquestracao/infrastructure/persistence/drizzle-decisao-workflow.repository.js';
 import { decisoesWorkflowHistorico } from '../../../../../src/bounded-contexts/orquestracao/infrastructure/persistence/schema/decisao-workflow.schema.js';
+import { criarTenantContext } from '../../../../../src/shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
+const TENANT_ID = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
 
 /** BC Orquestração nunca gera `OrcamentoId` (é sempre reutilizado da Ingestão) — gerado só para teste. */
 function orcamentoIdDeTeste(): OrcamentoId {
@@ -47,10 +49,10 @@ const contextoExtracao = ContextoExtracao.de({
 const contextoValidacao = ContextoValidacao.de({ resultado: 'VALIDADO' });
 
 function decisaoConsolidada(id: OrcamentoId): DecisaoWorkflow {
-  const decisao = DecisaoWorkflow.criar(id);
-  decisao.registrarContextoClassificacao(contextoClassificacao);
-  decisao.registrarContextoExtracao(contextoExtracao);
-  decisao.registrarContextoValidacao(contextoValidacao);
+  const decisao = DecisaoWorkflow.criar(id, TENANT_ID);
+  decisao.registrarContextoClassificacao(contextoClassificacao, TENANT_ID);
+  decisao.registrarContextoExtracao(contextoExtracao, TENANT_ID);
+  decisao.registrarContextoValidacao(contextoValidacao, TENANT_ID);
   decisao.consolidarContexto();
   return decisao;
 }
@@ -67,7 +69,7 @@ describe.skipIf(!DATABASE_URL)('DrizzleDecisaoWorkflowRepository (Postgres real)
     client = new Client({ connectionString: DATABASE_URL });
     await client.connect();
     db = drizzle(client);
-    repo = new DrizzleDecisaoWorkflowRepository(db);
+    repo = new DrizzleDecisaoWorkflowRepository(db, criarTenantContext(TENANT_ID));
   });
 
   afterAll(async () => {
@@ -101,15 +103,15 @@ describe.skipIf(!DATABASE_URL)('DrizzleDecisaoWorkflowRepository (Postgres real)
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
 
-    const decisao = DecisaoWorkflow.criar(id);
+    const decisao = DecisaoWorkflow.criar(id, TENANT_ID);
     await repo.salvar(decisao);
 
     const aguardando = await repo.buscarPorOrcamentoId(id);
     expect(aguardando?.status).toBe('AGUARDANDO_CONTEXTO');
 
-    aguardando!.registrarContextoClassificacao(contextoClassificacao);
-    aguardando!.registrarContextoExtracao(contextoExtracao);
-    aguardando!.registrarContextoValidacao(contextoValidacao);
+    aguardando!.registrarContextoClassificacao(contextoClassificacao, TENANT_ID);
+    aguardando!.registrarContextoExtracao(contextoExtracao, TENANT_ID);
+    aguardando!.registrarContextoValidacao(contextoValidacao, TENANT_ID);
     aguardando!.consolidarContexto();
     await repo.salvar(aguardando!);
 
@@ -201,7 +203,10 @@ describe.skipIf(!DATABASE_URL)('DrizzleDecisaoWorkflowRepository (Postgres real)
 
     const clienteB = new Client({ connectionString: DATABASE_URL });
     await clienteB.connect();
-    const repoB = new DrizzleDecisaoWorkflowRepository(drizzle(clienteB));
+    const repoB = new DrizzleDecisaoWorkflowRepository(
+      drizzle(clienteB),
+      criarTenantContext(TENANT_ID),
+    );
 
     try {
       const decisaoA = decisaoConsolidada(id);
@@ -236,33 +241,15 @@ describe.skipIf(!DATABASE_URL)('DrizzleDecisaoWorkflowRepository (Postgres real)
     }
   });
 
-  it('(issue #650) tenantId ausente no primeiro save é persistido e recarregado quando um upstream posterior o traz', async () => {
+  it('(issue #656 — aperto de tipo) tenantId é obrigatório desde a criação e recarregado igual ao gravado', async () => {
     const id = orcamentoIdDeTeste();
     idsParaLimpar.push(id.toString());
-    const tenantId = TenantId.de('01890a5d-ac96-774b-bcce-b302099a8057');
 
-    const decisao = DecisaoWorkflow.criar(id);
-    decisao.registrarContextoClassificacao(contextoClassificacao); // sem tenantId
+    const decisao = DecisaoWorkflow.criar(id, TENANT_ID);
+    decisao.registrarContextoClassificacao(contextoClassificacao, TENANT_ID);
     await repo.salvar(decisao);
 
     const aguardando = await repo.buscarPorOrcamentoId(id);
-    expect(aguardando?.tenantId).toBeUndefined();
-
-    aguardando!.registrarContextoValidacao(contextoValidacao, tenantId);
-    await repo.salvar(aguardando!);
-
-    const final = await repo.buscarPorOrcamentoId(id);
-    expect(final?.tenantId?.toString()).toBe(tenantId.toString());
-  });
-
-  it('(issue #650) tenantId ausente em todos os 3 upstreams é persistido e recarregado como undefined', async () => {
-    const id = orcamentoIdDeTeste();
-    idsParaLimpar.push(id.toString());
-
-    const decisao = decisaoConsolidada(id);
-    await repo.salvar(decisao);
-
-    const final = await repo.buscarPorOrcamentoId(id);
-    expect(final?.tenantId).toBeUndefined();
+    expect(aguardando?.tenantId.toString()).toBe(TENANT_ID.toString());
   });
 });

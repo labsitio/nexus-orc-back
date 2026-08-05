@@ -1,5 +1,7 @@
+import type { preHandlerHookHandler } from 'fastify';
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { criarTenantContext } from '../../../../src/shared-kernel/tenant/tenant-context.js';
 import { ConsultarStatusValidacao } from '../../../../src/bounded-contexts/validacao/application/use-cases/consultar-status-validacao.js';
 import { RegistrarDecisaoHumanaValidacao } from '../../../../src/bounded-contexts/validacao/application/use-cases/registrar-decisao-humana-validacao.js';
 import type { DomainEventEnvelope } from '../../../../src/bounded-contexts/validacao/domain/events/domain-event.js';
@@ -52,6 +54,15 @@ const dadosExtraidos = (cnpjFornecedor = '11222333000181') =>
     periodoValidade: PeriodoValidade.de(new Date('2026-02-10T00:00:00.000Z')),
   });
 
+const TENANT_ID = TenantId.novo();
+
+/** PreHandler fake que injeta tenantContext nos testes (mesmo padrão de spec 001/007). */
+function criarPreHandlerFakeTenant(tenantId: TenantId): preHandlerHookHandler {
+  return async (request) => {
+    request.tenantContext = criarTenantContext(tenantId);
+  };
+}
+
 describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — controller', () => {
   let app: ReturnType<typeof Fastify>;
   let repositorio: OrcamentoValidacaoRepositoryFake;
@@ -63,8 +74,9 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — control
     app = Fastify();
     registrarRotaDecisaoHumanaValidacao(
       app,
-      new RegistrarDecisaoHumanaValidacao(repositorio, publisher),
-      new ConsultarStatusValidacao(repositorio),
+      new RegistrarDecisaoHumanaValidacao(() => repositorio, publisher),
+      new ConsultarStatusValidacao(() => repositorio),
+      { preHandler: criarPreHandlerFakeTenant(TENANT_ID) },
     );
   });
 
@@ -74,11 +86,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — control
 
   it('200 — CORRECAO_APLICADA corrige o CNPJ e transita para VALIDADO, publicando OrcamentoValidado', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a1');
-    const validacao = OrcamentoValidacao.criar(
-      id,
-      dadosExtraidos('11111111111111'),
-      TenantId.novo(),
-    );
+    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos('11111111111111'), TENANT_ID);
     validacao.avaliarRegrasDeConsistencia([
       InconsistenciaDetectada.de('CNPJ_INVALIDO', 'dígito verificador incorreto'),
     ]);
@@ -106,7 +114,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — control
 
   it('200 — ACEITE_COM_RESSALVA transita para VALIDADO_COM_RESSALVA, publicando OrcamentoValidadoComRessalva', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a2');
-    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos(), TenantId.novo());
+    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos(), TENANT_ID);
     validacao.avaliarRegrasDeConsistencia([
       InconsistenciaDetectada.de('PRAZO_INCOERENTE', 'prazo incoerente'),
     ]);
@@ -133,7 +141,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — control
 
   it('409 Problem Details quando o status atual não é PENDENTE_REVISAO_HUMANA', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a3');
-    await repositorio.salvar(OrcamentoValidacao.criar(id, dadosExtraidos()));
+    await repositorio.salvar(OrcamentoValidacao.criar(id, dadosExtraidos(), TENANT_ID));
 
     const resposta = await app.inject({
       method: 'POST',
@@ -159,7 +167,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — control
 
   it('400 Problem Details quando CORRECAO_APLICADA vem sem dadosCorrigidos', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a5');
-    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos());
+    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos(), TENANT_ID);
     validacao.avaliarRegrasDeConsistencia([
       InconsistenciaDetectada.de('PRAZO_INCOERENTE', 'prazo incoerente'),
     ]);
@@ -177,7 +185,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/validacao/decisao-humana — control
 
   it('400 Problem Details quando dadosCorrigidos.periodoValidade não reconstrói um PeriodoValidade válido', async () => {
     const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a7');
-    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos());
+    const validacao = OrcamentoValidacao.criar(id, dadosExtraidos(), TENANT_ID);
     validacao.avaliarRegrasDeConsistencia([
       InconsistenciaDetectada.de('PRAZO_INCOERENTE', 'prazo incoerente'),
     ]);
