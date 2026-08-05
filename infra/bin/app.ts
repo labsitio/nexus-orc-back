@@ -3,8 +3,14 @@ import { ClassificadorLambdaRoleStack } from '../lib/classificador-lambda-role-s
 import { ClassificadorQueueStack } from '../lib/classificador-queue-stack.ts';
 import { ConfirmarRevisaoHumanaExtracaoLambdaRoleStack } from '../lib/confirmar-revisao-humana-extracao-lambda-role-stack.ts';
 import { ConfirmarRevisaoHumanaLambdaRoleStack } from '../lib/confirmar-revisao-humana-lambda-role-stack.ts';
+import { ContextoClassificacaoFunctionStack } from '../lib/contexto-classificacao-function-stack.ts';
+import { ContextoClassificacaoLambdaRoleStack } from '../lib/contexto-classificacao-lambda-role-stack.ts';
 import { ContextoClassificacaoQueueStack } from '../lib/contexto-classificacao-queue-stack.ts';
+import { ContextoExtracaoFunctionStack } from '../lib/contexto-extracao-function-stack.ts';
+import { ContextoExtracaoLambdaRoleStack } from '../lib/contexto-extracao-lambda-role-stack.ts';
 import { ContextoExtracaoQueueStack } from '../lib/contexto-extracao-queue-stack.ts';
+import { DecisaoWorkflowFunctionStack } from '../lib/decisao-workflow-function-stack.ts';
+import { DecisaoWorkflowLambdaRoleStack } from '../lib/decisao-workflow-lambda-role-stack.ts';
 import { DecisaoWorkflowQueueStack } from '../lib/decisao-workflow-queue-stack.ts';
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
 import { ExtratorLambdaRoleStack } from '../lib/extrator-lambda-role-stack.ts';
@@ -95,21 +101,83 @@ new RegistrarDecisaoHumanaValidacaoLambdaRoleStack(
   },
 );
 
-new ContextoClassificacaoQueueStack(app, 'ContextoClassificacaoQueueStack', {
+const contextoClassificacaoQueueStack = new ContextoClassificacaoQueueStack(
+  app,
+  'ContextoClassificacaoQueueStack',
+  {
+    description:
+      'Fila contexto-classificacao-queue + DLQ + alarme, roteada por regra EventBridge — spec 005, T003/T004.',
+    dominioBus: dominioEventBusStack.dominioBus,
+  },
+);
+
+const contextoClassificacaoLambdaRoleStack = new ContextoClassificacaoLambdaRoleStack(
+  app,
+  'ContextoClassificacaoLambdaRoleStack',
+  {
+    description:
+      'Role IAM least-privilege da Lambda RegistrarContextoClassificacao — spec 005, issue #624.',
+    contextoClassificacaoQueue: contextoClassificacaoQueueStack.contextoClassificacaoQueue,
+  },
+);
+
+new ContextoClassificacaoFunctionStack(app, 'ContextoClassificacaoFunctionStack', {
   description:
-    'Fila contexto-classificacao-queue + DLQ + alarme, roteada por regra EventBridge — spec 005, T003/T004.',
-  dominioBus: dominioEventBusStack.dominioBus,
+    'NodejsFunction de produção do handler consumidor de contexto-classificacao-queue — spec 005, issue #624.',
+  contextoClassificacaoLambdaRole:
+    contextoClassificacaoLambdaRoleStack.contextoClassificacaoLambdaRole,
+  contextoClassificacaoQueue: contextoClassificacaoQueueStack.contextoClassificacaoQueue,
 });
 
-new ContextoExtracaoQueueStack(app, 'ContextoExtracaoQueueStack', {
+const contextoExtracaoQueueStack = new ContextoExtracaoQueueStack(
+  app,
+  'ContextoExtracaoQueueStack',
+  {
+    description:
+      'Fila contexto-extracao-queue + DLQ + alarme, roteada por regra EventBridge — spec 005, T003/T005.',
+    dominioBus: dominioEventBusStack.dominioBus,
+  },
+);
+
+const contextoExtracaoLambdaRoleStack = new ContextoExtracaoLambdaRoleStack(
+  app,
+  'ContextoExtracaoLambdaRoleStack',
+  {
+    description:
+      'Role IAM least-privilege da Lambda RegistrarContextoExtracao — spec 005, issue #624.',
+    contextoExtracaoQueue: contextoExtracaoQueueStack.contextoExtracaoQueue,
+  },
+);
+
+new ContextoExtracaoFunctionStack(app, 'ContextoExtracaoFunctionStack', {
   description:
-    'Fila contexto-extracao-queue + DLQ + alarme, roteada por regra EventBridge — spec 005, T003/T005.',
-  dominioBus: dominioEventBusStack.dominioBus,
+    'NodejsFunction de produção do handler consumidor de contexto-extracao-queue — spec 005, issue #624.',
+  contextoExtracaoLambdaRole: contextoExtracaoLambdaRoleStack.contextoExtracaoLambdaRole,
+  contextoExtracaoQueue: contextoExtracaoQueueStack.contextoExtracaoQueue,
 });
 
-new DecisaoWorkflowQueueStack(app, 'DecisaoWorkflowQueueStack', {
+const decisaoWorkflowQueueStack = new DecisaoWorkflowQueueStack(app, 'DecisaoWorkflowQueueStack', {
   description:
     'Fila decisao-workflow-queue + DLQ + alarme, roteada por regra EventBridge — spec 005, T003/T006.',
+  dominioBus: dominioEventBusStack.dominioBus,
+});
+
+const decisaoWorkflowLambdaRoleStack = new DecisaoWorkflowLambdaRoleStack(
+  app,
+  'DecisaoWorkflowLambdaRoleStack',
+  {
+    description:
+      'Role IAM least-privilege da Lambda ConsolidarEDecidirWorkflow — spec 005, issue #624.',
+    decisaoWorkflowQueue: decisaoWorkflowQueueStack.decisaoWorkflowQueue,
+    dominioBus: dominioEventBusStack.dominioBus,
+  },
+);
+
+new DecisaoWorkflowFunctionStack(app, 'DecisaoWorkflowFunctionStack', {
+  description:
+    'NodejsFunction de produção do handler consumidor de decisao-workflow-queue — spec 005, issue #624.',
+  decisaoWorkflowLambdaRole: decisaoWorkflowLambdaRoleStack.decisaoWorkflowLambdaRole,
+  decisaoWorkflowQueue: decisaoWorkflowQueueStack.decisaoWorkflowQueue,
   dominioBus: dominioEventBusStack.dominioBus,
 });
 
