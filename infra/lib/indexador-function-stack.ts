@@ -1,4 +1,5 @@
 import { CfnParameter, Duration, Stack, type StackProps } from 'aws-cdk-lib';
+import type * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as events from 'aws-cdk-lib/aws-events';
 import type * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -14,6 +15,18 @@ export interface IndexadorFunctionStackProps extends StackProps {
   readonly indexadorQueue: sqs.IQueue;
   /** Bus de domínio único — nome usado por `EventBridgePublisher` em runtime. */
   readonly dominioBus: events.IEventBus;
+  /**
+   * Rede do Aurora Serverless v2 (backend-reviewer, PR #662) — opcional
+   * porque nenhuma stack deste repositório provisiona VPC/Aurora ainda
+   * (fora do escopo desta issue, que só declara a Lambda). Sem `vpc`, o
+   * deploy real só funcionará se o Aurora de destino aceitar conexão fora
+   * da VPC (não é o caso esperado em produção) — quando a stack de rede
+   * existir, passe `vpc`/`vpcSubnets`/`securityGroups` aqui, sem mudar
+   * nenhuma outra parte desta stack.
+   */
+  readonly vpc?: ec2.IVpc;
+  readonly vpcSubnets?: ec2.SubnetSelection;
+  readonly securityGroups?: ec2.ISecurityGroup[];
 }
 
 /**
@@ -33,6 +46,12 @@ export interface IndexadorFunctionStackProps extends StackProps {
  *   `ModeloEmbeddingAprovadoArn` (`IndexadorLambdaRoleStack`).
  *   ponytail: promover para Secrets Manager quando outra Lambda também
  *   precisar de Postgres e a duplicação de parâmetro começar a incomodar.
+ * - `vpc`/`vpcSubnets`/`securityGroups` são opcionais e hoje sempre
+ *   `undefined` no wiring de `infra/bin/app.ts`: nenhuma stack deste
+ *   repositório provisiona VPC/Aurora ainda (fora do escopo de #623).
+ *   Passar `undefined` para `NodejsFunction` é seguro (CDK trata como "sem
+ *   VPC"); a prop existe para a stack de rede/Aurora futura só precisar
+ *   passar os valores aqui, sem alterar esta stack.
  */
 export class IndexadorFunctionStack extends Stack {
   public readonly indexadorFunction: NodejsFunction;
@@ -65,6 +84,9 @@ export class IndexadorFunctionStack extends Stack {
         NEXO_EVENT_BUS: props.dominioBus.eventBusName,
         DATABASE_URL: databaseUrl.valueAsString,
       },
+      vpc: props.vpc,
+      vpcSubnets: props.vpcSubnets,
+      securityGroups: props.securityGroups,
     });
 
     this.indexadorFunction.addEventSource(
