@@ -57,7 +57,7 @@ Arquitetura 100% serverless na AWS, orientada a eventos, com **DDD tático** por
 
 ## Stack técnica
 
-- **Linguagem**: TypeScript 5.x `strict` · Node.js 24 LTS
+- **Linguagem**: TypeScript 5.x `strict` · Node.js 24 LTS (`.nvmrc` na raiz — rode `nvm use` antes de instalar/commitar)
 - **Runtime**: AWS Lambda atrás de API Gateway · AWS Transfer Family (SFTP)
 - **Eventos/mensageria**: EventBridge (bus único) · SQS (uma fila por consumidor)
 - **Dados**: S3 versionado (bruto imutável) · Aurora Serverless v2 Postgres (schema próprio por BC) · pgvector (busca) · DynamoDB (cache)
