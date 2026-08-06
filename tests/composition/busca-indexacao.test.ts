@@ -2,7 +2,13 @@ import type { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import type { EventBridgeClient } from '@aws-sdk/client-eventbridge';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { describe, expect, it } from 'vitest';
-import { criarBuscaIndexacao } from '../../src/composition/busca-indexacao.js';
+import type { AgenteEmbeddingGateway } from '../../src/bounded-contexts/busca-indexacao/domain/gateways/agente-embedding.gateway.js';
+import { BedrockEmbeddingGateway } from '../../src/bounded-contexts/busca-indexacao/infrastructure/bedrock-embedding.gateway.js';
+import { OllamaEmbeddingGateway } from '../../src/bounded-contexts/busca-indexacao/infrastructure/ollama-embedding.gateway.js';
+import {
+  criarBuscaIndexacao,
+  selecionarAgenteEmbedding,
+} from '../../src/composition/busca-indexacao.js';
 import { TenantId } from '../../src/shared-kernel/tenant/tenant-id.vo.js';
 
 /**
@@ -20,8 +26,7 @@ describe('composition root de busca-indexacao', () => {
       db: stub<NodePgDatabase>(),
       eventBridge: stub<EventBridgeClient>(),
       eventBusName: 'nexo-dominio-bus',
-      bedrock: stub<BedrockRuntimeClient>(),
-      modeloEmbeddingId: 'amazon.titan-embed-text-v2:0',
+      embeddingGateway: stub<AgenteEmbeddingGateway>(),
     });
 
     expect(modulo.indexarOrcamento).toBeDefined();
@@ -33,8 +38,7 @@ describe('composition root de busca-indexacao', () => {
       db: stub<NodePgDatabase>(),
       eventBridge: stub<EventBridgeClient>(),
       eventBusName: 'nexo-dominio-bus',
-      bedrock: stub<BedrockRuntimeClient>(),
-      modeloEmbeddingId: 'amazon.titan-embed-text-v2:0',
+      embeddingGateway: stub<AgenteEmbeddingGateway>(),
     });
 
     // `IndiceOrcamentoRepository` (T016/ADR-005, spec 007) exige uma
@@ -52,5 +56,43 @@ describe('composition root de busca-indexacao', () => {
         orcamentoId: 'nao-e-um-payload-valido',
       }),
     ).rejects.toThrow();
+  });
+});
+
+/**
+ * `selecionarAgenteEmbedding` (issue #620, ADR-009) — mesmo contrato de
+ * `selecionarAgenteExtrator` (issue #619). Injeta o valor por parâmetro em
+ * vez de `process.env` para não deixar teste dependente de ordem de execução.
+ */
+describe('selecionarAgenteEmbedding', () => {
+  it('NEXO_AGENTE_IA=bedrock constrói BedrockEmbeddingGateway', () => {
+    const gateway = selecionarAgenteEmbedding(
+      {
+        bedrock: { client: stub<BedrockRuntimeClient>(), modelId: 'amazon.titan-embed-text-v2:0' },
+      },
+      'bedrock',
+    );
+    expect(gateway).toBeInstanceOf(BedrockEmbeddingGateway);
+  });
+
+  it('NEXO_AGENTE_IA=local constrói OllamaEmbeddingGateway', () => {
+    const gateway = selecionarAgenteEmbedding(
+      { ollama: { baseUrl: 'http://localhost:11434', modelo: 'mxbai-embed-large' } },
+      'local',
+    );
+    expect(gateway).toBeInstanceOf(OllamaEmbeddingGateway);
+  });
+
+  it('lança erro se NEXO_AGENTE_IA=bedrock sem config.bedrock', () => {
+    expect(() => selecionarAgenteEmbedding({}, 'bedrock')).toThrow(/config.bedrock/);
+  });
+
+  it('lança erro se NEXO_AGENTE_IA=local sem config.ollama', () => {
+    expect(() => selecionarAgenteEmbedding({}, 'local')).toThrow(/config.ollama/);
+  });
+
+  it('falha rápido se NEXO_AGENTE_IA estiver ausente ou com valor inválido', () => {
+    expect(() => selecionarAgenteEmbedding({}, undefined)).toThrow(/local.*bedrock/);
+    expect(() => selecionarAgenteEmbedding({}, 'outro')).toThrow(/local.*bedrock/);
   });
 });
