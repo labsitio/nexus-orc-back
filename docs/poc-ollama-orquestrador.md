@@ -27,8 +27,10 @@ substitui nenhuma medição contra o Bedrock real.
   aceita decisão sem base auditável).
 - `selecionarAgenteOrquestrador` (`src/composition/orquestracao.ts`) —
   seleção por `NEXO_AGENTE_IA` (`'local' | 'bedrock'`), lida uma única vez na
-  composition root, mesmo contrato de `selecionarAgenteExtrator` (#619).
-  `'local'` monta `OllamaOrquestradorGateway`, `'bedrock'` monta
+  composition root, mesmo estilo de `selecionarAgenteExtrator` (#619) —
+  fail-fast para `NEXO_AGENTE_IA` ausente/inválido. `'local'` monta
+  `OllamaOrquestradorGateway` (com defaults se `config.ollama` for omitido,
+  mesmo comportamento de `criarAgenteClassificador`/#617), `'bedrock'` monta
   `BedrockOrquestradorGateway`. Nenhum `if` no domínio, nenhuma segunda
   variável de ambiente — a duplicação aceita é de implementação de porta,
   nunca de estrutura.
@@ -44,8 +46,10 @@ docker compose up -d ollama
 docker compose exec ollama ollama pull llama3.1
 ```
 
-`OLLAMA_BASE_URL`/`OLLAMA_MODELO_ORQUESTRADOR` (`.env.example`, adicionado
-pela issue #620) configuram o gateway; `selecionarAgenteOrquestrador({}, 'local')`
+Nenhum código lê `process.env` para `baseUrl`/`modelo` do Ollama diretamente
+— quem compuser a Lambda/execução local decide esses valores e os passa via
+`config.ollama` a `selecionarAgenteOrquestrador` (mesma disciplina de
+`criarAgenteClassificador`/#617). `selecionarAgenteOrquestrador({}, 'local')`
 já usa defaults sensatos (`http://localhost:11434`, `llama3.1` — mesmo
 modelo de chat configurado pela issue #617) se omitidos.
 
