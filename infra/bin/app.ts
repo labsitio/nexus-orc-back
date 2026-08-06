@@ -3,6 +3,7 @@ import { ClassificadorLambdaRoleStack } from '../lib/classificador-lambda-role-s
 import { ClassificadorQueueStack } from '../lib/classificador-queue-stack.ts';
 import { ConfirmarRevisaoHumanaExtracaoLambdaRoleStack } from '../lib/confirmar-revisao-humana-extracao-lambda-role-stack.ts';
 import { ConfirmarRevisaoHumanaLambdaRoleStack } from '../lib/confirmar-revisao-humana-lambda-role-stack.ts';
+import { ConsultaStatusLambdaRoleStack } from '../lib/consulta-status-lambda-role-stack.ts';
 import { ContextoClassificacaoFunctionStack } from '../lib/contexto-classificacao-function-stack.ts';
 import { ContextoClassificacaoLambdaRoleStack } from '../lib/contexto-classificacao-lambda-role-stack.ts';
 import { ContextoClassificacaoQueueStack } from '../lib/contexto-classificacao-queue-stack.ts';
@@ -57,6 +58,11 @@ new ClassificadorLambdaRoleStack(app, 'ClassificadorLambdaRoleStack', {
 new ConfirmarRevisaoHumanaLambdaRoleStack(app, 'ConfirmarRevisaoHumanaLambdaRoleStack', {
   description:
     'Role IAM least-privilege da Lambda de confirmação humana (sem Bedrock/S3 raw) — spec 001, T054.',
+});
+
+new ConsultaStatusLambdaRoleStack(app, 'ConsultaStatusLambdaRoleStack', {
+  description:
+    'Role IAM least-privilege da Lambda ConsultarStatusOrcamento (somente leitura, sem Bedrock/S3/EventBridge) — spec 001, T048.',
 });
 
 const extratorQueueStack = new ExtratorQueueStack(app, 'ExtratorQueueStack', {

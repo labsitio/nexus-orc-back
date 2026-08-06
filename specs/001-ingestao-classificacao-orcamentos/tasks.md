@@ -113,7 +113,7 @@
 
 - [x] T046 [US4] Application: caso de uso `ConsultarStatusOrcamento` (query, read-only). PR #404 — depende apenas da interface `OrcamentoRepository` (T009), não de `DrizzleOrcamentoRepository` (T011/#16, ainda em aberto); wiring de produção fica pendente até #16 mergear.
 - [x] T047 [US4] Interface: controller `GET /v1/orcamentos/{orcamentoId}/status`, resposta inclui status atual + histórico com agente de cada tentativa. PR #404.
-- [ ] T048 [US4] IAM: role `ConsultaStatusLambdaRole` (apenas leitura no repositório, nenhuma permissão de escrita/Bedrock/S3/EventBridge — este caso de uso é query, nunca publica evento, então nunca recebe `events:PutEvents`).
+- [x] T048 [US4] IAM: role `ConsultaStatusLambdaRole` (apenas leitura no repositório, nenhuma permissão de escrita/Bedrock/S3/EventBridge — este caso de uso é query, nunca publica evento, então nunca recebe `events:PutEvents`). #53
 - [ ] T049 [US4] Observabilidade: métrica "percentual de orçamentos sem status consultável" (deve ser 0%) exportada para CloudWatch, conforme Métricas de Avaliação Contínua do spec.md.
 
 **Checkpoint**: todo estado do pipeline é observável externamente sem exceção.
