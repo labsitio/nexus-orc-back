@@ -95,6 +95,20 @@ residual, não bloqueante.
 | Falha reportada pelo EventBridge (`FailedEntryCount > 0`) vira erro descritivo, nunca falha silenciosa | Confiabilidade/observabilidade | Unit | `ErrorMessage` presente → mensagem inclui detailType, orcamentoId, bus e motivo | `eventbridge.publisher.test.ts` (1 teste) | PASS |
 | Fallback de mensagem quando EventBridge não informa `ErrorMessage` | Confiabilidade | Unit | `Entries: [{}]` → erro com "motivo desconhecido" | `eventbridge.publisher.test.ts` (1 teste) | PASS |
 
+## Leva T043 (issue #108, PR #604 draft, commit `1434b46`)
+
+| Critério de aceite (tasks.md) | Risco | Nível | Cenário | Teste | Resultado |
+|---|---|---|---|---|---|
+| Payload de `OrcamentoExtraido` (e demais eventos deste BC) próximo do limite de 256KB do EventBridge gera alerta (`logger.warn`) antes de publicar | Confiabilidade/observabilidade (perda silenciosa de evento por rejeição do EventBridge) | Unit (mock `EventBridgeClient` + logger fake) | payload sintético ~230KB (>= 80% de 262144B) | `eventbridge.publisher.test.ts` (1 teste) | PASS |
+| Payload pequeno não gera alerta (sem ruído de log) | Observabilidade (falso positivo) | Unit | evento fake padrão, bem abaixo do limiar | `eventbridge.publisher.test.ts` (1 teste) | PASS |
+| Alerta contém dados corretos para triagem (`orcamentoId`, `tamanhoBytes`, `limiteBytes`, `detailType`) e mensagem legível com o valor do limite | Rastreabilidade do alerta | Unit | asserts sobre os args de `logger.warn` | `eventbridge.publisher.test.ts` (1 teste) | PASS |
+| Publicação (`PutEventsCommand`) e tratamento de falha (`FailedEntryCount`/fallback de mensagem) permanecem intactos — alerta é observação, não bloqueio | Regressão | Unit | 3 testes pré-existentes da leva T015 re-executados sem alteração de asserção | `eventbridge.publisher.test.ts` (3 testes) | PASS |
+
+Gap rastreado, não bloqueante desta task: alarme CloudWatch real (`cloudwatch.Alarm`/`logs.MetricFilter`)
+depende da stack CDK do Lambda consumidor de `extrator-queue`, que ainda não existe no
+repositório — tarefa nova `T043a` registrada em `tasks.md` para quando essa stack existir.
+Ver `specs/002-extracao-dados-orcamento/evidence/qa-final-report-T043.md`.
+
 Limitação: sem LocalStack neste worktree — sem teste de integração real contra
 EventBridge (`PutEventsCommand` de verdade). Risco residual: comportamento real
 do SDK AWS (retries, throttling) não exercitado; mitigado por ser mock fiel ao
