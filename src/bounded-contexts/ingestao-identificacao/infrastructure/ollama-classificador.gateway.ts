@@ -56,6 +56,9 @@ export class OllamaClassificadorGateway implements AgenteClassificadorGateway {
     const resposta = await fetch(`${this.baseUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // Inferência em CPU pode ser lenta no primeiro carregamento do modelo —
+      // 60s evita travar indefinidamente se o Ollama não responder.
+      signal: AbortSignal.timeout(60_000),
       body: JSON.stringify({
         model: this.modelo,
         stream: false,
