@@ -37,11 +37,13 @@ export function clientesProducao(): ClientesProducao {
 /**
  * Decisão 3 do ADR-009: produção sempre fixa `NEXO_AGENTE_IA=bedrock`
  * explicitamente no `environment` da `NodejsFunction` — nunca um default
- * ambíguo. Nenhum gateway `Ollama*` existe ainda (nenhuma spec implementou
- * a variante local de porta de IA até #623), então toda composição de
- * produção só sabe montar `Bedrock*Gateway` — falha rápida no cold start
- * se a variável vier ausente ou com qualquer valor que não seja `bedrock`,
- * em vez de silenciosamente cair para um gateway que não existe.
+ * ambíguo. Desde #617, `OllamaClassificadorGateway` existe como alternativa
+ * local ao `BedrockClassificadorGateway` (mesma porta de domínio,
+ * `AgenteClassificadorGateway`) — mas é exclusivamente um PoC de dev sem
+ * credencial AWS (`docs/plano-infra-ambientes.md` §5): não muda esta função.
+ * Produção continua falhando rápido no cold start se a variável vier ausente
+ * ou com qualquer valor que não seja `bedrock`, em vez de silenciosamente
+ * aceitar um gateway local em ambiente real.
  */
 export function exigirAgenteIaBedrockEmProducao(): void {
   const valor = process.env.NEXO_AGENTE_IA;
