@@ -5,9 +5,11 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ConsolidarEDecidirWorkflow } from '../bounded-contexts/orquestracao/application/use-cases/consolidar-e-decidir-workflow.js';
 import { RegistrarContextoClassificacao } from '../bounded-contexts/orquestracao/application/use-cases/registrar-contexto-classificacao.js';
 import { RegistrarContextoExtracao } from '../bounded-contexts/orquestracao/application/use-cases/registrar-contexto-extracao.js';
+import type { AgenteOrquestradorGateway } from '../bounded-contexts/orquestracao/domain/gateways/agente-orquestrador.gateway.js';
 import type { CriarDecisaoWorkflowRepositorio } from '../bounded-contexts/orquestracao/domain/repositories/decisao-workflow.repository.js';
 import { BedrockOrquestradorGateway } from '../bounded-contexts/orquestracao/infrastructure/bedrock-orquestrador.gateway.js';
 import { EventBridgePublisher } from '../bounded-contexts/orquestracao/infrastructure/eventbridge.publisher.js';
+import { OllamaOrquestradorGateway } from '../bounded-contexts/orquestracao/infrastructure/ollama-orquestrador.gateway.js';
 import { OrcamentoClassificadoEventACL } from '../bounded-contexts/orquestracao/infrastructure/orcamento-classificado-event.acl.js';
 import { OrcamentoExtraidoEventACL } from '../bounded-contexts/orquestracao/infrastructure/orcamento-extraido-event.acl.js';
 import { OrcamentoValidadoEventACL } from '../bounded-contexts/orquestracao/infrastructure/orcamento-validado-event.acl.js';
@@ -106,4 +108,47 @@ export function criarConsolidarEDecidirWorkflow(
     ),
     acl,
   };
+}
+
+/** `llama3.1` roda em CPU — mesmo modelo de chat configurado pela issue #617. */
+const OLLAMA_MODELO_ORQUESTRADOR_PADRAO = 'llama3.1';
+const OLLAMA_BASE_URL_PADRAO = 'http://localhost:11434';
+
+/** Config de cada implementação de `AgenteOrquestradorGateway` — só a lida é obrigatória. */
+export interface ConfiguracaoAgenteOrquestrador {
+  readonly bedrock?: { readonly client: BedrockRuntimeClient; readonly modelId: string };
+  readonly ollama?: { readonly baseUrl?: string; readonly modelo?: string };
+}
+
+/**
+ * Lê `NEXO_AGENTE_IA` (ADR-009, issue #621) e constrói o
+ * `AgenteOrquestradorGateway` correspondente — `local` →
+ * `OllamaOrquestradorGateway`, `bedrock` → `BedrockOrquestradorGateway`.
+ * Mesmo contrato de `selecionarAgenteExtrator` (issue #619): falha rápido se
+ * a variável estiver ausente/inválida ou se a config exigida pelo valor
+ * escolhido não tiver sido fornecida — nunca cai silenciosamente para um
+ * default ambíguo. Em produção, `exigirAgenteIaBedrockEmProducao()`
+ * (`aws-clients.production.ts`, ADR-009 Decisão 3) já garante
+ * `NEXO_AGENTE_IA=bedrock` antes de qualquer wiring — esta função não decide
+ * essa trava, só reflete a mesma variável.
+ */
+export function selecionarAgenteOrquestrador(
+  config: ConfiguracaoAgenteOrquestrador,
+  agenteIa = process.env.NEXO_AGENTE_IA,
+): AgenteOrquestradorGateway {
+  if (agenteIa === 'bedrock') {
+    if (!config.bedrock) {
+      throw new Error('selecionarAgenteOrquestrador: NEXO_AGENTE_IA=bedrock exige config.bedrock');
+    }
+    return new BedrockOrquestradorGateway(config.bedrock.client, config.bedrock.modelId);
+  }
+  if (agenteIa === 'local') {
+    return new OllamaOrquestradorGateway(
+      config.ollama?.baseUrl ?? OLLAMA_BASE_URL_PADRAO,
+      config.ollama?.modelo ?? OLLAMA_MODELO_ORQUESTRADOR_PADRAO,
+    );
+  }
+  throw new Error(
+    `selecionarAgenteOrquestrador: NEXO_AGENTE_IA deve ser "local" ou "bedrock" — recebido "${agenteIa ?? '(ausente)'}".`,
+  );
 }
