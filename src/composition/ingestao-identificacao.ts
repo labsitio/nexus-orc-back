@@ -1,3 +1,4 @@
+import type { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import type { EventBridgeClient } from '@aws-sdk/client-eventbridge';
 import type { S3Client } from '@aws-sdk/client-s3';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -11,7 +12,9 @@ import type { AgenteClassificadorGateway } from '../bounded-contexts/ingestao-id
 import type { ArmazenamentoBrutoGateway } from '../bounded-contexts/ingestao-identificacao/domain/gateways/armazenamento-bruto.gateway.js';
 import type { CacheIdentificacaoGateway } from '../bounded-contexts/ingestao-identificacao/domain/gateways/cache-identificacao.gateway.js';
 import type { MarkItDownConversaoACL } from '../bounded-contexts/ingestao-identificacao/domain/gateways/markitdown-conversao.acl.js';
+import { BedrockClassificadorGateway } from '../bounded-contexts/ingestao-identificacao/infrastructure/bedrock-classificador.gateway.js';
 import { EventBridgePublisher } from '../bounded-contexts/ingestao-identificacao/infrastructure/eventbridge.publisher.js';
+import { OllamaClassificadorGateway } from '../bounded-contexts/ingestao-identificacao/infrastructure/ollama-classificador.gateway.js';
 import { DrizzleIdempotencyKeyRepository } from '../bounded-contexts/ingestao-identificacao/infrastructure/persistence/drizzle-idempotency-key.repository.js';
 import { DrizzleOrcamentoRepository } from '../bounded-contexts/ingestao-identificacao/infrastructure/persistence/drizzle-orcamento.repository.js';
 import { S3ArmazenamentoBrutoGateway } from '../bounded-contexts/ingestao-identificacao/infrastructure/s3-armazenamento-bruto.gateway.js';
@@ -53,6 +56,45 @@ export interface IngestaoIdentificacao {
   readonly classificarOrcamento: ClassificarOrcamento;
   readonly consultarStatusOrcamento: ConsultarStatusOrcamento;
   readonly confirmarRevisaoHumana: ConfirmarRevisaoHumana;
+}
+
+/** `llama3.1` roda em CPU (docs/plano-infra-ambientes.md §5) — sobrescrevível por ambiente. */
+const OLLAMA_MODELO_CLASSIFICADOR_PADRAO = 'llama3.1';
+const OLLAMA_BASE_URL_PADRAO = 'http://localhost:11434';
+
+export interface ConfiguracaoAgenteClassificador {
+  /** `local` usa Ollama, `bedrock` usa o Bedrock real — ADR-009, Decisão 3. */
+  readonly agenteIa: 'local' | 'bedrock';
+  readonly ollamaBaseUrl?: string;
+  readonly ollamaModeloClassificador?: string;
+  readonly bedrock?: BedrockRuntimeClient;
+  readonly bedrockModeloClassificadorId?: string;
+}
+
+/**
+ * Seleção do gateway de IA por configuração (`NEXO_AGENTE_IA=local|bedrock`),
+ * lida uma única vez aqui na composition root — nunca por `if` espalhado no
+ * domínio, nunca por fork de bounded context (issue #617,
+ * `docs/plano-infra-ambientes.md` §5, ADR-009). `OllamaClassificadorGateway`
+ * e `BedrockClassificadorGateway` implementam a mesma porta de domínio
+ * (`AgenteClassificadorGateway`) — só a duplicação de implementação de porta
+ * é aceita, não estrutura nova.
+ */
+export function criarAgenteClassificador(
+  config: ConfiguracaoAgenteClassificador,
+): AgenteClassificadorGateway {
+  if (config.agenteIa === 'bedrock') {
+    if (!config.bedrock || !config.bedrockModeloClassificadorId) {
+      throw new Error(
+        'criarAgenteClassificador: NEXO_AGENTE_IA=bedrock exige cliente Bedrock e modelId configurados.',
+      );
+    }
+    return new BedrockClassificadorGateway(config.bedrock, config.bedrockModeloClassificadorId);
+  }
+  return new OllamaClassificadorGateway(
+    config.ollamaBaseUrl ?? OLLAMA_BASE_URL_PADRAO,
+    config.ollamaModeloClassificador ?? OLLAMA_MODELO_CLASSIFICADOR_PADRAO,
+  );
 }
 
 export function criarIngestaoIdentificacao(deps: IngestaoIdentificacaoDeps): IngestaoIdentificacao {

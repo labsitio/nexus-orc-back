@@ -40,6 +40,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # Ollama: alternativa local ao Bedrock para exercitar o fluxo de
+  # classificação/extração sem credencial AWS (issue #617,
+  # docs/plano-infra-ambientes.md §5). Fidelidade de classificação,
+  # calibração de confiança, prompt injection e p95/custo NÃO são provados
+  # por este serviço — ver README/doc do PoC.
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - '${OLLAMA_PORT:-11434}:11434'
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ['CMD-SHELL', 'ollama list || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   postgres-data:
   localstack-data:
+  ollama-data:
