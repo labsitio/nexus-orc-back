@@ -21,10 +21,14 @@ import {
  * exercido pelo `TenantContextMiddleware` (spec 007, T005, já implementado e
  * testado em `tests/interface/shared/tenant-context.middleware.test.ts`) e
  * pelo controller real de T029, que ainda não existe (T022-T028 pendentes).
- * Os testes de `problemDetailsSchema` abaixo fixam o formato dos dois casos
- * (401/404) que T029 MUST retornar; o teste de integração real (request
- * HTTP sem JWT, request cross-tenant) fica com T029, mesma divisão de
- * responsabilidade T024→T031 da spec 004.
+ * O teste de `problemDetailsSchema` abaixo fixa o formato do 401 que T029
+ * MUST retornar. Isolamento cross-tenant não usa 404: é endpoint de lista
+ * filtrada por RLS (`docs/openapi.yaml:678-681` só declara 400/401 para este
+ * path, nenhum 404 — diferente de `GET .../status`, que é por ID único e
+ * legitimamente usa 404, T011) — cross-tenant aqui é sempre 200 com `itens`
+ * vazio, nunca revelando existência de dado de outro tenant. O teste de
+ * integração real (request HTTP sem JWT, request cross-tenant) fica com
+ * T029, mesma divisão de responsabilidade T024→T031 da spec 004.
  */
 
 describe('GET /v1/auditoria/orcamentos/export — contrato', () => {
@@ -114,13 +118,13 @@ describe('GET /v1/auditoria/orcamentos/export — contrato', () => {
     expect(problemDetailsSchema.parse(problema)).toEqual(problema);
   });
 
-  it('404 Problem Details — nunca revela evento de Tenant B para JWT de Tenant A (nunca 200, nunca 403)', () => {
-    const problemaCrossTenant = {
-      title: 'Recurso não encontrado',
-      status: 404,
-      detail: 'Nenhum evento de auditoria encontrado para os filtros informados',
+  it('isolamento cross-tenant — filtro sem match para o tenant do JWT retorna 200 com itens vazio, nunca 403/404 (lista, não recurso por ID)', () => {
+    const paginaVaziaCrossTenant = {
+      itens: [] as unknown[],
+      proximoCursor: null,
     };
-    expect(problemDetailsSchema.parse(problemaCrossTenant)).toEqual(problemaCrossTenant);
-    expect(problemDetailsSchema.parse(problemaCrossTenant).status).not.toBe(403);
+    expect(exportacaoAuditoriaResponseSchema.parse(paginaVaziaCrossTenant)).toEqual(
+      paginaVaziaCrossTenant,
+    );
   });
 });

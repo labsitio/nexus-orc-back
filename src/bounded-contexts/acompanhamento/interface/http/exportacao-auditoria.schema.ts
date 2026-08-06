@@ -21,9 +21,12 @@ import { z } from 'zod';
  * tenant (RLS + `TenantContextMiddleware` garantem isso antes da query
  * rodar), não um leak. Nunca aceito como query param de entrada: por
  * ADR-004/T005, `tenantId` vem exclusivamente do `TenantContextMiddleware`
- * (claim JWT) — request sem JWT válido é 401 Problem Details, cross-tenant é
- * 404 (o controller real de T029 exerce esse comportamento fim-a-fim; este
- * arquivo fixa apenas o formato de request/response).
+ * (claim JWT) — request sem JWT válido é 401 Problem Details (`docs/openapi.yaml`
+ * declara 400/401 para este path, nenhum 404: é lista filtrada por RLS, não
+ * recurso por ID único como `GET .../status`/T011 — cross-tenant aqui é
+ * sempre 200 com `itens` vazio, nunca 403/404). O controller real de T029
+ * exerce esse comportamento fim-a-fim; este arquivo fixa apenas o formato de
+ * request/response.
  */
 
 export const exportacaoAuditoriaQuerySchema = z
