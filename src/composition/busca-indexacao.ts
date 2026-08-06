@@ -3,10 +3,12 @@ import type { EventBridgeClient } from '@aws-sdk/client-eventbridge';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { IndexarOrcamento } from '../bounded-contexts/busca-indexacao/application/use-cases/indexar-orcamento.js';
+import type { AgenteEmbeddingGateway } from '../bounded-contexts/busca-indexacao/domain/gateways/agente-embedding.gateway.js';
 import type { OrcamentoValidadoEventDetailType } from '../bounded-contexts/busca-indexacao/domain/gateways/orcamento-validado-event.acl.js';
 import type { IndiceOrcamentoRepository } from '../bounded-contexts/busca-indexacao/domain/repositories/indice-orcamento.repository.js';
 import { BedrockEmbeddingGateway } from '../bounded-contexts/busca-indexacao/infrastructure/bedrock-embedding.gateway.js';
 import { EventBridgePublisher } from '../bounded-contexts/busca-indexacao/infrastructure/eventbridge.publisher.js';
+import { OllamaEmbeddingGateway } from '../bounded-contexts/busca-indexacao/infrastructure/ollama-embedding.gateway.js';
 import { OrcamentoValidadoEventACL } from '../bounded-contexts/busca-indexacao/infrastructure/orcamento-validado-event.acl.js';
 import { DrizzlePgvectorIndiceOrcamentoRepository } from '../bounded-contexts/busca-indexacao/infrastructure/persistence/drizzle-pgvector-indice-orcamento.repository.js';
 import { criarTenantContext } from '../shared-kernel/tenant/tenant-context.js';
@@ -21,14 +23,48 @@ export interface BuscaIndexacaoDeps {
   readonly db: NodePgDatabase;
   readonly eventBridge: EventBridgeClient;
   readonly eventBusName: string;
-  readonly bedrock: BedrockRuntimeClient;
-  readonly modeloEmbeddingId: string;
+  readonly embeddingGateway: AgenteEmbeddingGateway;
 }
 
 export interface BuscaIndexacao {
   readonly indexarOrcamento: IndexarOrcamento;
   /** Mesma ACL usada internamente por `indexarOrcamento` — exposta para o handler (T030) extrair `tenantId` cedo/correlação de log, sem duplicar instância. */
   readonly acl: OrcamentoValidadoEventACL;
+}
+
+/** Config de cada implementação de `AgenteEmbeddingGateway` — só a lida é obrigatória. */
+export interface SelecaoAgenteEmbeddingConfig {
+  readonly bedrock?: { readonly client: BedrockRuntimeClient; readonly modelId: string };
+  readonly ollama?: { readonly baseUrl: string; readonly modelo: string };
+}
+
+/**
+ * Lê `NEXO_AGENTE_IA` (ADR-009, issue #620) e constrói o `AgenteEmbeddingGateway`
+ * correspondente — `local` → `OllamaEmbeddingGateway`, `bedrock` →
+ * `BedrockEmbeddingGateway`. Mesmo contrato de `selecionarAgenteExtrator`
+ * (issue #619): única leitura de env desta seleção, falha rápida no boot se
+ * a variável estiver ausente/inválida ou se a config exigida pelo valor
+ * escolhido não tiver sido fornecida.
+ */
+export function selecionarAgenteEmbedding(
+  config: SelecaoAgenteEmbeddingConfig,
+  agenteIa = process.env.NEXO_AGENTE_IA,
+): AgenteEmbeddingGateway {
+  if (agenteIa === 'bedrock') {
+    if (!config.bedrock) {
+      throw new Error('selecionarAgenteEmbedding: NEXO_AGENTE_IA=bedrock exige config.bedrock');
+    }
+    return new BedrockEmbeddingGateway(config.bedrock.client, config.bedrock.modelId);
+  }
+  if (agenteIa === 'local') {
+    if (!config.ollama) {
+      throw new Error('selecionarAgenteEmbedding: NEXO_AGENTE_IA=local exige config.ollama');
+    }
+    return new OllamaEmbeddingGateway(config.ollama.baseUrl, config.ollama.modelo);
+  }
+  throw new Error(
+    `selecionarAgenteEmbedding: NEXO_AGENTE_IA deve ser "local" ou "bedrock" — recebido "${agenteIa ?? '(ausente)'}".`,
+  );
 }
 
 /**
@@ -75,7 +111,7 @@ class IndexarOrcamentoPorMensagem extends IndexarOrcamento {
   constructor(
     private readonly dbCompartilhado: NodePgDatabase,
     private readonly aclCompartilhada: OrcamentoValidadoEventACL,
-    private readonly embeddingGatewayCompartilhado: BedrockEmbeddingGateway,
+    private readonly embeddingGatewayCompartilhado: AgenteEmbeddingGateway,
     private readonly eventPublisherCompartilhado: EventBridgePublisher,
   ) {
     super(
@@ -106,14 +142,13 @@ class IndexarOrcamentoPorMensagem extends IndexarOrcamento {
 
 export function criarBuscaIndexacao(deps: BuscaIndexacaoDeps): BuscaIndexacao {
   const acl = new OrcamentoValidadoEventACL();
-  const embeddingGateway = new BedrockEmbeddingGateway(deps.bedrock, deps.modeloEmbeddingId);
   const eventPublisher = new EventBridgePublisher(deps.eventBridge, deps.eventBusName);
 
   return {
     indexarOrcamento: new IndexarOrcamentoPorMensagem(
       deps.db,
       acl,
-      embeddingGateway,
+      deps.embeddingGateway,
       eventPublisher,
     ),
     acl,

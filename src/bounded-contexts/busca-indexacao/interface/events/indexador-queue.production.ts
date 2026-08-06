@@ -8,7 +8,10 @@
  * `export const handler` é a assinatura exata que o runtime Node da AWS
  * Lambda espera, sem adapter Fastify/container (ADR-009, Decisão 1).
  */
-import { criarBuscaIndexacao } from '../../../../composition/busca-indexacao.js';
+import {
+  criarBuscaIndexacao,
+  selecionarAgenteEmbedding,
+} from '../../../../composition/busca-indexacao.js';
 import {
   clientesProducao,
   exigirAgenteIaBedrockEmProducao,
@@ -36,8 +39,14 @@ const buscaIndexacao = criarBuscaIndexacao({
   db,
   eventBridge,
   eventBusName: nexoEventBusName(),
-  bedrock,
-  modeloEmbeddingId: process.env.NEXO_BEDROCK_EMBEDDING_MODEL_ID ?? MODELO_EMBEDDING_PADRAO,
+  // `exigirAgenteIaBedrockEmProducao()` já garantiu NEXO_AGENTE_IA=bedrock —
+  // `selecionarAgenteEmbedding` sempre resolve para `BedrockEmbeddingGateway` aqui.
+  embeddingGateway: selecionarAgenteEmbedding({
+    bedrock: {
+      client: bedrock,
+      modelId: process.env.NEXO_BEDROCK_EMBEDDING_MODEL_ID ?? MODELO_EMBEDDING_PADRAO,
+    },
+  }),
 });
 
 export const handler = criarIndexadorQueueHandler(
