@@ -14,7 +14,7 @@ import { promisify } from 'node:util';
 
 import { calcular, issuesSchema, mapaSchema } from './dashboard-metricas.js';
 import type { Issue, Mapa } from './dashboard-metricas.js';
-import { renderizar } from './dashboard-html.js';
+import { renderizar, renderizarParaImpressao } from './dashboard-html.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -26,6 +26,7 @@ const LIMITE = 800;
 const RAIZ = new URL('../../', import.meta.url);
 const CAMINHO_MAPA = new URL('docs/dashboard-mapa.json', RAIZ);
 const CAMINHO_SAIDA = new URL('docs/dashboard.html', RAIZ);
+const CAMINHO_SAIDA_IMPRESSAO = new URL('docs/dashboard-impressao.html', RAIZ);
 
 async function coletar(): Promise<Issue[]> {
   let bruto: string;
@@ -72,9 +73,15 @@ async function main(): Promise<void> {
 
   // Só escreve depois que coleta, validação e cálculo passaram: um HTML pela
   // metade é pior que um HTML velho, porque não se anuncia como incompleto.
-  await writeFile(CAMINHO_SAIDA, renderizar(metricas), 'utf8');
+  // Renderiza os dois antes de escrever qualquer um, para não ficar com a
+  // versão de tela nova e a de impressão velha se o segundo render falhar.
+  const tela = renderizar(metricas);
+  const impressao = renderizarParaImpressao(metricas);
+  await writeFile(CAMINHO_SAIDA, tela, 'utf8');
+  await writeFile(CAMINHO_SAIDA_IMPRESSAO, impressao, 'utf8');
 
   console.log(`docs/dashboard.html gerado — ${metricas.global.percentual}% concluído`);
+  console.log('docs/dashboard-impressao.html gerado — tema claro, tudo aberto, Ctrl+P vira PDF');
   console.log(
     `  ${metricas.global.fechadas}/${metricas.global.total} fechadas · ` +
       `${metricas.caminhoCritico.length} P1 abertas · ` +

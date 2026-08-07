@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nexo Back-end — Status do projeto</title>
+<title>Nexo Back-end — Status do projeto (impressão)</title>
 <!--
   ARQUIVO GERADO — não edite à mão.
   Regerar com: pnpm dashboard
@@ -11,8 +11,8 @@
 -->
 <style>
   :root{
-    --bg:#0B0E14; --surface:#171B24; --surface-2:#1E2430; --border:rgba(255,255,255,.08);
-    --text:#F5F6FA; --text-muted:#9AA3B2; --success:#22C55E; --warning:#F5A623; --danger:#EF4444;
+    --bg:#FFFFFF; --surface:#F7F8FA; --surface-2:#EDEFF3; --border:rgba(0,0,0,.14);
+    --text:#11151C; --text-muted:#55606E; --success:#15803D; --warning:#B45309; --danger:#DC2626;
     --magenta:#FF0099; --blue:#02A4F2; --gradient:linear-gradient(135deg,#FF0099,#02A4F2);
     --radius:16px;
   }
@@ -113,6 +113,22 @@
     .grafico{height:180px;}
     table{display:block;overflow-x:auto;}
   }
+
+  @page{margin:12mm;}
+  body{font-size:10.5pt;}
+  main{max-width:none;padding:0;}
+  h1{font-size:22pt;}
+  h2{font-size:13pt;margin:22px 0 10px;break-after:avoid;}
+  /* Sem isto o Chrome descarta todo background na impressão — as barras de
+     progresso e as hastes do gráfico virariam retângulos invisíveis. */
+  .preenchida,.haste,.tier,.pill{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .kpi,.fase,.fila,.grafico,ul.riscos li,tr{break-inside:avoid;}
+  .grafico{height:150px;}
+  .kpis{gap:8px;}
+  .kpi{padding:12px;}
+  .kpi .v{font-size:18pt;}
+  a{color:var(--text);}
+  .fila{margin-bottom:14px;}
 </style>
 </head>
 <body>
@@ -125,36 +141,31 @@
     <div class="kpi"><div class="v">281/432</div><div class="k">issues fechadas</div></div>
     <div class="kpi"><div class="v">151</div><div class="k">abertas</div></div>
     <div class="kpi"><div class="v">145</div><div class="k">prontas p/ pegar</div></div>
-    
-    <details class="kpi abrivel">
-      <summary>
-        <div class="v">2</div>
-        <div class="k">em andamento <span class="caret">▾</span></div>
-      </summary>
-      <ul class="tarefas">
-        <li>
-          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/154">#154</a> <span class="quem">@allanrobert10</span></div>
-          <div class="t">[003] T044: Interface: controllers `POST`/`GET /v1/configuracoes/faixas-preco-categoria` (Zod schema, papel administrativo distinto via Cognito, transaction script sem agregado rico).</div>
-        </li>
-        <li>
-          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/250">#250</a> <span class="quem">@allanrobert10</span></div>
-          <div class="t">[005] T044: Interface: controller `POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana`, Zod schema (`acao`, `justificativa` obrigatória, `motivoDadoAusente` obrigatório quando `acao === &#39;SOLICITAR_REENVIO&#39;`), papel &quot;comprador responsável&quot; via </div>
-        </li></ul>
-    </details>
-    
-    <details class="kpi abrivel">
-      <summary>
-        <div class="v">1</div>
-        <div class="k">bloqueadas <span class="caret">▾</span></div>
-      </summary>
-      <ul class="tarefas">
-        <li>
-          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/690">#690</a> </div>
-          <div class="t">[ADR-010] T6: teste adversarial de papel forjado em body/header/query nas 2 rotas gated</div>
-        </li></ul>
-    </details>
+    <div class="kpi"><div class="v">2</div><div class="k">em andamento</div></div>
+    <div class="kpi"><div class="v">1</div><div class="k">bloqueadas</div></div>
   </div>
 
+  <h2>Em andamento (2)</h2>
+  <table><thead><tr><th>issue</th><th>título</th><th>responsável</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/154">#154</a></td>
+        <td>[003] T044: Interface: controllers `POST`/`GET /v1/configuracoes/faixas-preco-categoria` (Zod schema, papel administrativo distinto via Cognito, transaction script sem agregado rico).</td>
+        <td class="mono">allanrobert10</td>
+      </tr>
+      <tr>
+        <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/250">#250</a></td>
+        <td>[005] T044: Interface: controller `POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana`, Zod schema (`acao`, `justificativa` obrigatória, `motivoDadoAusente` obrigatório quando `acao === &#39;SOLICITAR_REENVIO&#39;`), papel &quot;comprador responsável&quot; via </td>
+        <td class="mono">allanrobert10</td>
+      </tr></tbody></table>
+  <h2>Bloqueadas (1)</h2>
+  <table><thead><tr><th>issue</th><th>título</th><th>responsável</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/690">#690</a></td>
+        <td>[ADR-010] T6: teste adversarial de papel forjado em body/header/query nas 2 rotas gated</td>
+        <td class="mono">—</td>
+      </tr></tbody></table>
 
   <h2>Fases</h2>
   <div class="fases">
@@ -351,9 +362,9 @@
   <p class="sub">Critério de priorização em <code>docs/plano-finalizacao.md</code> §3. Dentro de
      cada faixa não há ordem interna — a ordem de execução são as fases acima.</p>
   
-    <details class="fila">
-      <summary><span class="tier p1">P1</span>
-        16 demandas<span class="caret">▾</span></summary>
+    <section class="fila aberta">
+      <div class="cabeca-fila"><span class="tier p1">P1</span>
+        16 demandas</div>
       <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
         <tbody>
     <tr>
@@ -436,10 +447,10 @@
       <td>[ADR-010] T6: teste adversarial de papel forjado em body/header/query nas 2 rotas gated</td>
       <td class="mono">007</td>
     </tr></tbody></table>
-    </details>
-    <details class="fila">
-      <summary><span class="tier p2">P2</span>
-        55 demandas<span class="caret">▾</span></summary>
+    </section>
+    <section class="fila aberta">
+      <div class="cabeca-fila"><span class="tier p2">P2</span>
+        55 demandas</div>
       <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
         <tbody>
     <tr>
@@ -717,10 +728,10 @@
       <td>[infra] Convenção de métrica de observabilidade — ADR + implementação base (8 issues dependem, nenhuma convenção existe)</td>
       <td class="mono">007</td>
     </tr></tbody></table>
-    </details>
-    <details class="fila">
-      <summary><span class="tier p3">P3</span>
-        80 demandas<span class="caret">▾</span></summary>
+    </section>
+    <section class="fila aberta">
+      <div class="cabeca-fila"><span class="tier p3">P3</span>
+        80 demandas</div>
       <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
         <tbody>
     <tr>
@@ -1123,7 +1134,7 @@
       <td>[009] T036: Revisão de segurança dirigida: confirmar que nenhuma role IAM nova/estendida desta spec concede permissão além do listado nas tasks acima (least privilege, ver seção Segurança do `plan.md`).</td>
       <td class="mono">009</td>
     </tr></tbody></table>
-    </details>
+    </section>
 
   <h2>Ritmo de fechamento — últimos 14 dias</h2>
   <div class="grafico">
