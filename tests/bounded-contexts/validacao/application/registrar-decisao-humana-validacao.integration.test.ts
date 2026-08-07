@@ -80,6 +80,10 @@ class ParametroFaixaPrecoGatewayFake implements ParametroFaixaPrecoGateway {
   async listarTodas(): Promise<readonly FaixaPreco[]> {
     return this.faixas;
   }
+
+  async upsert(): Promise<void> {
+    throw new Error('não usado por RegistrarDecisaoHumanaValidacao — apenas leitura');
+  }
 }
 
 /** Persistência em memória por `orcamentoId` — várias entradas, ao contrário

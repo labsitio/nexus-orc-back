@@ -66,6 +66,10 @@ class ParametroFaixaPrecoGatewayFake implements ParametroFaixaPrecoGateway {
   async listarTodas(): Promise<readonly FaixaPreco[]> {
     return this.faixas;
   }
+
+  async upsert(): Promise<void> {
+    throw new Error('não usado por ValidarOrcamento — apenas leitura');
+  }
 }
 
 class OrcamentoExtraidoEventACLFake implements OrcamentoExtraidoEventACL {
