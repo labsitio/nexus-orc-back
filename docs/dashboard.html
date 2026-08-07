@@ -7,7 +7,7 @@
 <!--
   ARQUIVO GERADO — não edite à mão.
   Regerar com: pnpm dashboard
-  Fonte curada: docs/dashboard-mapa.json (docs/plano-finalizacao.md — 3ª revisão, 06/08/2026)
+  Fonte curada: docs/dashboard-mapa.json (docs/plano-finalizacao.md — 4ª revisão, 07/08/2026)
 -->
 <style>
   :root{
@@ -103,13 +103,13 @@
 <body>
 <main>
   <h1>Status do projeto <span class="g">Nexo Back-end</span></h1>
-  <p class="sub">Gerado em 07/08/2026 09:24:28 (Brasília) · camada curada: docs/plano-finalizacao.md — 3ª revisão, 06/08/2026</p>
+  <p class="sub">Gerado em 07/08/2026 09:48:25 (Brasília) · camada curada: docs/plano-finalizacao.md — 4ª revisão, 07/08/2026</p>
 
   <div class="kpis">
-    <div class="kpi"><div class="v">63.9%</div><div class="k">concluído</div></div>
-    <div class="kpi"><div class="v">276/432</div><div class="k">issues fechadas</div></div>
-    <div class="kpi"><div class="v">156</div><div class="k">abertas</div></div>
-    <div class="kpi"><div class="v">147</div><div class="k">prontas p/ pegar</div></div>
+    <div class="kpi"><div class="v">64.4%</div><div class="k">concluído</div></div>
+    <div class="kpi"><div class="v">278/432</div><div class="k">issues fechadas</div></div>
+    <div class="kpi"><div class="v">154</div><div class="k">abertas</div></div>
+    <div class="kpi"><div class="v">145</div><div class="k">prontas p/ pegar</div></div>
     
     <details class="kpi abrivel">
       <summary>
@@ -122,12 +122,12 @@
           <div class="t">[005] T044: Interface: controller `POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana`, Zod schema (`acao`, `justificativa` obrigatória, `motivoDadoAusente` obrigatório quando `acao === &#39;SOLICITAR_REENVIO&#39;`), papel &quot;comprador responsável&quot; via </div>
         </li>
         <li>
-          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/685">#685</a> <span class="quem">@allanrobert10</span></div>
-          <div class="t">[ADR-010] T1: TenantContextMiddleware popula request.papeis a partir de cognito:groups</div>
+          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/635">#635</a> <span class="quem">@allanrobert10</span></div>
+          <div class="t">[007] Teste adversarial: tenantId forjado no body deve ser ignorado nos endpoints HTTP de 001</div>
         </li>
         <li>
-          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/691">#691</a> <span class="quem">@allanrobert10</span></div>
-          <div class="t">[ADR-010] T7: doc operacional de criacao dos grupos Cognito e AdminAddUserToGroup</div>
+          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/686">#686</a> <span class="quem">@allanrobert10</span></div>
+          <div class="t">[ADR-010] T2: role-guard.middleware.ts com criarExigenciaPapel(papeisPermitidos) e 403 Problem Details</div>
         </li></ul>
     </details>
     <div class="kpi"><div class="v">3</div><div class="k">bloqueadas</div></div>
@@ -151,37 +151,44 @@
     </article>
     <article class="fase em-andamento">
       <header><span class="id">Fase 2</span><span class="pill">em andamento</span></header>
-      <h3>Completar 005 (decisão, reenvio, integração) e 003 (categorização)</h3>
+      <h3>ADR-010 — verificação de papel (autorização) via grupos Cognito</h3>
+      <div class="barra"><div class="preenchida" style="width:28.6%"></div></div>
+      <p class="num">2/7 · 28.6%</p>
+      <p class="nota">⚠ cabeça do caminho crítico — #688/#689/#690 seguem blocked até #686/#687 fecharem</p>
+    </article>
+    <article class="fase em-andamento">
+      <header><span class="id">Fase 3</span><span class="pill">em andamento</span></header>
+      <h3>Completar 005 (reenvio, integração) e 003 (resíduo da categorização)</h3>
       <div class="barra"><div class="preenchida" style="width:21.9%"></div></div>
       <p class="num">7/32 · 21.9%</p>
       
     </article>
     <article class="fase pendente">
-      <header><span class="id">Fase 3</span><span class="pill">pendente</span></header>
+      <header><span class="id">Fase 4</span><span class="pill">pendente</span></header>
       <h3>Encadear o pipeline local completo (001→005)</h3>
       <div class="barra"><div class="preenchida" style="width:0%"></div></div>
       <p class="num">0/2 · 0%</p>
       
     </article>
     <article class="fase pendente">
-      <header><span class="id">Fase 4</span><span class="pill">pendente</span></header>
+      <header><span class="id">Fase 5</span><span class="pill">pendente</span></header>
       <h3>Handlers de produção 001-003, IAM e Acompanhamento</h3>
       <div class="barra"><div class="preenchida" style="width:13.5%"></div></div>
       <p class="num">5/37 · 13.5%</p>
       
     </article>
     <article class="fase pendente">
-      <header><span class="id">Fase 5</span><span class="pill">pendente</span></header>
+      <header><span class="id">Fase 6</span><span class="pill">pendente</span></header>
       <h3>Validação com AWS real</h3>
       <div class="barra"><div class="preenchida" style="width:0%"></div></div>
-      <p class="num">0/16 · 0%</p>
+      <p class="num">0/18 · 0%</p>
       <p class="nota">⚠ exige credencial AWS — o time não tem acesso hoje</p>
     </article>
     <article class="fase pendente">
-      <header><span class="id">Fase 6</span><span class="pill">pendente</span></header>
+      <header><span class="id">Fase 7</span><span class="pill">pendente</span></header>
       <h3>008 LGPD e 009 custo (restante)</h3>
-      <div class="barra"><div class="preenchida" style="width:0%"></div></div>
-      <p class="num">0/62 · 0%</p>
+      <div class="barra"><div class="preenchida" style="width:12.7%"></div></div>
+      <p class="num">9/71 · 12.7%</p>
       
     </article></div>
 
@@ -214,8 +221,8 @@
     </div>
     <div class="linha">
       <span class="rotulo">007</span>
-      <div class="barra"><div class="preenchida" style="width:51.9%"></div></div>
-      <span class="num">28/54 · 51.9%</span>
+      <div class="barra"><div class="preenchida" style="width:55.6%"></div></div>
+      <span class="num">30/54 · 55.6%</span>
     </div>
     <div class="linha">
       <span class="rotulo">008</span>
@@ -233,7 +240,7 @@
       <span class="num">2/2 · 100%</span>
     </div>
 
-  <h2>Caminho crítico — P1 em aberto (14)</h2>
+  <h2>Caminho crítico — P1 em aberto (19)</h2>
   <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
          <tbody>
     <tr>
@@ -305,6 +312,31 @@
       <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/664">#664</a></td>
       <td>[005] Decisão em aberto: modelo Bedrock do Agente Orquestrador + cliente Bedrock (legado vs Mantle) — a decidir</td>
       <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/686">#686</a></td>
+      <td>[ADR-010] T2: role-guard.middleware.ts com criarExigenciaPapel(papeisPermitidos) e 403 Problem Details</td>
+      <td class="mono">007</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/687">#687</a></td>
+      <td>[ADR-010] T3: RotaOpts.preHandler aceita array em orquestracao e validacao</td>
+      <td class="mono">003</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/688">#688</a></td>
+      <td>[ADR-010] T4: guard comprador-responsavel em POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana (destrava #250)</td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/689">#689</a></td>
+      <td>[ADR-010] T5: guard compliance-admin em POST /v1/configuracoes/faixas-preco-categoria (T044 de 003)</td>
+      <td class="mono">003</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/690">#690</a></td>
+      <td>[ADR-010] T6: teste adversarial de papel forjado em body/header/query nas 2 rotas gated</td>
+      <td class="mono">007</td>
     </tr></tbody></table>
 
   <h2>Ritmo de fechamento — últimos 14 dias</h2>
@@ -361,68 +393,22 @@
         <div class="haste" style="height:11.39240506329114%"></div>
         <span>06/08</span>
       </div>
-      <div class="coluna" title="07/08/2026: 5">
-        <div class="haste" style="height:6.329113924050633%"></div>
+      <div class="coluna" title="07/08/2026: 7">
+        <div class="haste" style="height:8.860759493670885%"></div>
         <span>07/08</span>
       </div></div><p class="num">Projeção: <strong>16/08/2026</strong>
            (9 dias no ritmo atual de
-           17.4/dia)
+           17.7/dia)
            <span class="pill aviso">amostra de 9 dias</span></p>
 
   <h2>Riscos</h2>
-  <ul class="riscos"><li>Cutover de tenantId já é produção-visível em 004/005, mas nenhuma dessas Lambdas rodou em AWS real — LocalStack não aplica IAM nem RLS Postgres como o Aurora.</li><li>#635 (teste adversarial de tenantId forjado) segue OPEN: o retrofit de segurança fechou por código, sem prova automatizada sob adversário.</li><li>005 é o BC de maior risco financeiro e menor cobertura de regra de negócio, e agora sem gate formal na frente — fácil de adiar por conveniência.</li><li>#664 (modelo Bedrock do Agente Orquestrador) é decisão em aberto sem ADR; trabalho em 005 que assuma um cliente específico corre risco de retrabalho.</li><li>001-003 seguem sem handler de produção (#613-#616) enquanto 004/005 já têm — o pipeline de produção está desbalanceado.</li><li>Ollama (#617, #619, #620, #621) não reduz a necessidade de validação com Bedrock real na Fase 5.</li></ul>
+  <ul class="riscos"><li>Gate formal blocked voltou ao board e passa pela cabeça do caminho crítico: #688/#689/#690 travados até #686/#687 fecharem. Diferente do gate anterior, este atravessa 003 e 005 ao mesmo tempo por um middleware compartilhado — atraso em #686/#687 atrasa os dois BCs juntos.</li><li>#250 está in-progress mas tecnicamente travado: o controller de decisão humana não fecha sem o guard comprador-responsável (#688). Risco de retrabalho se avançar sem coordenar a ordem.</li><li>request.papeis já está populado em produção local (PR #693) sem role-guard para consumi-lo: a claim é extraída, mas nada decide 403 com ela hoje — janela com dado de papel disponível e sem imposição de autorização.</li><li>Cutover de tenantId é produção-visível em 004/005, mas nenhuma dessas Lambdas rodou em AWS real — LocalStack não aplica IAM nem RLS Postgres como o Aurora.</li><li>#635 (tenantId forjado) e #690 (papel forjado) seguem OPEN: testam a mesma classe de ataque — claim client-controlável tentando se passar por claim verificada — em dimensões diferentes, e nenhuma das duas tem prova automatizada.</li><li>005 segue sendo o BC de maior risco financeiro, agora com uma segunda camada de gate (ADR-010) além da regra de negócio já resolvida por #246/#248. O risco mudou de &quot;falta regra de negócio&quot; para &quot;regra existe, falta autorização e o endpoint que a expõe&quot;.</li><li>#664 (modelo Bedrock do Agente Orquestrador) é decisão em aberto sem ADR; trabalho em 005 que assuma um cliente específico corre risco de retrabalho.</li><li>001-003 seguem sem handler de produção (#613-#616) enquanto 004/005 já têm — desbalanceamento inalterado desde a 3ª revisão.</li><li>#469/#477 (runbooks operacionais AWS) nunca foram citados nas revisões anteriores e são pré-requisito de produção real do retrofit 007: sem eles o TenantContextMiddleware não tem claim custom:tenant_id fora do LocalStack e o canal SFTP não resolve tenantId. Ambos bloqueados por falta de acesso AWS.</li></ul>
 
   <h2>Deriva entre o plano e o board</h2>
-  <p class="sub">32 issues citadas no mapa já fecharam.
-     9 abertas não aparecem em nenhuma lista do mapa —
+  <p class="sub">43 issues citadas no mapa já fecharam.
+     0 abertas não aparecem em nenhuma lista do mapa —
      sinal de que <code>docs/plano-finalizacao.md</code> precisa de revisão.</p>
-  <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
-         <tbody>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/469">#469</a></td>
-      <td>[ops] Executar runbook Cognito custom:tenant_id em dev/staging/prod</td>
-      <td class="mono">007</td>
-    </tr>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/477">#477</a></td>
-      <td>[ops] Confirmar Managed Workflow (tag) do AWS Transfer Family antes de T016</td>
-      <td class="mono">007</td>
-    </tr>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/685">#685</a></td>
-      <td>[ADR-010] T1: TenantContextMiddleware popula request.papeis a partir de cognito:groups</td>
-      <td class="mono">007</td>
-    </tr>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/686">#686</a></td>
-      <td>[ADR-010] T2: role-guard.middleware.ts com criarExigenciaPapel(papeisPermitidos) e 403 Problem Details</td>
-      <td class="mono">007</td>
-    </tr>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/687">#687</a></td>
-      <td>[ADR-010] T3: RotaOpts.preHandler aceita array em orquestracao e validacao</td>
-      <td class="mono">003</td>
-    </tr>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/688">#688</a></td>
-      <td>[ADR-010] T4: guard comprador-responsavel em POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana (destrava #250)</td>
-      <td class="mono">005</td>
-    </tr>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/689">#689</a></td>
-      <td>[ADR-010] T5: guard compliance-admin em POST /v1/configuracoes/faixas-preco-categoria (T044 de 003)</td>
-      <td class="mono">003</td>
-    </tr>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/690">#690</a></td>
-      <td>[ADR-010] T6: teste adversarial de papel forjado em body/header/query nas 2 rotas gated</td>
-      <td class="mono">007</td>
-    </tr>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/691">#691</a></td>
-      <td>[ADR-010] T7: doc operacional de criacao dos grupos Cognito e AdminAddUserToGroup</td>
-      <td class="mono">007</td>
-    </tr></tbody></table>
+  <p class="vazio">Nenhuma issue aberta fora do mapa.</p>
 
   <p class="sub" style="margin-top:48px">Arquivo gerado por <code>pnpm dashboard</code> — não editar à mão.
      Amostra de velocidade: 9 dias.</p>
