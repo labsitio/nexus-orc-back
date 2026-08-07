@@ -191,3 +191,70 @@ PR (#416) está descoberta além do rethrow já justificado.
 ## Threshold
 Ainda não configurado no projeto (mesma observação de todas as rodadas
 anteriores).
+
+---
+
+# Coverage Final — T020–T026 (issues #25–#31) — PR #426
+
+Comando: `corepack pnpm exec vitest run --coverage` (vitest 4.1.10,
+`@vitest/coverage-v8`, escopo `src/**`, Node 24.18.0, sem `DATABASE_URL` —
+6 arquivos/27 casos de integração Drizzle/Postgres pulados, mesma limitação
+de ambiente registrada em `qa/test-plan.md`). Suíte completa: 46 arquivos
+passed, 6 skipped (52), 214 testes passed, 27 skipped (241) — números
+idênticos aos declarados no corpo da PR.
+
+```
+All files: Statements 82.03% | Branches 71.38% | Functions 73.94% | Lines 82.22%
+```
+
+## Arquivos do diff desta task (lidos de `coverage/coverage-final.json`, não
+da tabela resumida do reporter texto — nomes truncados nela colidem
+visualmente, ex. `s3-armazenamento-bruto.gateway.ts` vs.
+`bedrock-classificador.gateway.ts` aparecem ambos como `...or.gateway.ts`)
+- `receber-orcamento.ts`: **100%** statements/branches/functions/lines (14/14, 6/6).
+- `upload-url.controller.ts`: **100%** (10/10, 3/3).
+- `s3-armazenamento-bruto.gateway.ts`: **100%** (35/35, 12/12) — inclui os 2
+  métodos novos desta PR (`gerarUrlUpload`, `confirmarUpload`), com teste
+  dedicado afirmando `ObjectLockMode`/`ObjectLockRetainUntilDate` no PUT
+  presigned e `CopySource`/`Key` do `CopyObjectCommand`.
+- `sftp-upload.handler.ts`: **100%** (11/11, 4/4).
+- `auth-cognito.middleware.ts`: **100%** (12/12, 4/4).
+- `confirmar-upload.controller.ts`: 96% statements (24/25), 88.9% branch
+  (8/9) — única linha não coberta é a defesa `Array.isArray(valor)` em
+  `idempotencyKeyDoHeader` (linha 18), sem caminho real via HTTP (Node
+  normaliza headers repetidos numa única string, RFC 7230 — `string[]` só
+  ocorre para `set-cookie`), já documentado no comentário do próprio código.
+  Classificado como **risco residual trivial** (defesa de tipo sem
+  invariante de negócio), não bloqueante.
+- `idempotency-key.repository.ts` (interface) e
+  `drizzle-idempotency-key.repository.ts` (implementação): 0% via vitest
+  nesta rodada — os 3 testes de integração real contra Postgres
+  (`drizzle-idempotency-key.repository.test.ts`) seguem `skip` sem
+  `DATABASE_URL` (limitação de ambiente, ver `qa/test-plan.md`); a
+  correção lógica do admission gate foi verificada por inspeção de código
+  (instrução SQL única `INSERT ... ON CONFLICT ... WHERE expira_em <= now()
+  RETURNING`) e pela suíte de `receber-orcamento.test.ts`, que exercita o
+  contrato do repositório via fake que simula o resultado real da corrida.
+- `idempotency-key.schema.ts`: sem execução de linha via vitest (schema
+  Drizzle puro, sem lógica) — validado por `tsc --noEmit` e pelo `db:migrate`
+  gerado (`drizzle/0007_daffy_bulldozer.sql`), mesmo padrão de schemas
+  anteriores (T012).
+- `receber-orcamento-lambda-role-stack.ts` / `ingestao-identificacao-storage-
+  stack.ts` (CDK): fora do escopo do vitest coverage — validados via
+  `cdk synth --quiet` (8 stacks, synth limpo), mesmo padrão de todas as
+  rodadas de IAM/storage anteriores.
+
+## Variação vs. baseline
+Queda global frente à rodada anterior (86.14%→82.03% statements,
+72.86%→71.38% branches) explicada por: (1) os arquivos novos de persistência
+desta PR (`drizzle-idempotency-key.repository.ts`, 0% sem `DATABASE_URL`)
+entrando no denominador do projeto; (2) `client.ts` (shared-kernel, 0%,
+pré-existente, fora de escopo). Nenhuma linha nova do diff de aplicação/
+interface/gateway desta PR está descoberta além da defesa trivial já
+justificada — mesmo padrão de queda "aparente" já registrado nas rodadas
+T011 e T050-T055 (arquivo de persistência 0% sem banco disponível zera a
+média do projeto sem indicar regressão real de teste).
+
+## Threshold
+Ainda não configurado no projeto (mesma observação de todas as rodadas
+anteriores) — decisão de piso mínimo para CI segue fora do escopo de QA.

@@ -53,3 +53,19 @@ produção — TDD). Todos os arquivos de produção do diff
 `revisao-humana.schema.ts`, `confirmar-revisao-humana-lambda-role-stack.ts`)
 são novos nesta trilha — baseline de cobertura para eles é 0% por não
 existirem antes. Ver `coverage-final.md` para o resultado desta validação.
+
+---
+
+# Coverage Baseline — T020–T026 (issues #25–#31) — PR #426
+
+Baseline = 0% para todos os arquivos de produção do diff desta PR
+(`receber-orcamento.ts`, `idempotency-key.repository.ts`,
+`drizzle-idempotency-key.repository.ts`, `idempotency-key.schema.ts`,
+`upload-url.controller.ts`/`.schema.ts`, `confirmar-upload.controller.ts`/
+`.schema.ts`, `sftp-upload.handler.ts`, `auth-cognito.middleware.ts`,
+`route-opts.ts`) — todos novos nesta trilha, sem teste antes deste PR.
+`s3-armazenamento-bruto.gateway.ts` já existia (T019, PR #402, 100% então);
+estendido nesta PR com `gerarUrlUpload`/`confirmarUpload`. Cobertura global do
+projeto antes desta PR (commit `main`@`b1a2bf4`, trilha US5 T050-T055, PR
+#416): Statements 86.14% · Branches 72.86% · Functions 80.44% · Lines 85.98%.
+Ver `coverage-final.md` para o resultado desta validação.

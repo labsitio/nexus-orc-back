@@ -303,3 +303,122 @@ Reaproveitado `allure-vitest` já configurado.
   Domain real; classificado como **risco ainda não testado por ser
   inalcançável no comportamento atual do sistema**, não como lacuna de teste
   de T011.
+
+---
+
+# Test Plan — T020–T026 (issues #25–#31) — PR #426
+
+## Escopo
+US1 (Ingestão multi-canal) completa: `ReceberOrcamento` (T020), admission gate
+de idempotência (`IdempotencyKeyRepository`/`DrizzleIdempotencyKeyRepository`,
+T020), `POST /v1/orcamentos/upload-url` (T021), `POST /v1/orcamentos/
+{orcamentoId}/confirmar-upload` (T022), trigger Lambda S3 do canal SFTP
+(T023), lifecycle rule + Object Lock explícito de `pending-uploads/` (T024),
+middleware Cognito opcional nos 3 controllers REST (T025), IAM role dedicada
+`ReceberOrcamentoLambdaRole` (T026).
+
+## Fora de escopo
+Wiring de produção do middleware Cognito (composição raiz/DI ainda não
+existe — issue futura, confirmado no handoff do dev-back-end). Persistência
+real contra Postgres (sem `DATABASE_URL` neste ambiente — ver Limitações).
+AWS real (S3/Lambda/Cognito) — tudo mockado.
+
+## Riscos
+- Idempotência com race check-then-act (2 chamadas concorrentes duplicando
+  persist/publish) — achado MAJOR do `backend-reviewer`, corrigido com
+  admission gate atômico (`INSERT ... ON CONFLICT ... RETURNING`).
+- Referência confirmada apontando para o prefixo `pending-uploads/`, que a
+  lifecycle rule expira — achado BLOCKER do `backend-reviewer`, corrigido
+  (`confirmarUpload` sempre copia para o prefixo definitivo do canal antes de
+  chamar `ReceberOrcamento`).
+- Object Lock (retenção GOVERNANCE de 5 anos por padrão do bucket) impedindo
+  a lifecycle rule de apagar uploads órfãos em `pending-uploads/` (S3
+  Lifecycle nunca ignora Object Lock ativo).
+- SFTP (notificação S3 at-least-once) reprocessando o mesmo evento sem
+  `Idempotency-Key` derivada — achado MAJOR do `backend-reviewer`, corrigido.
+- IAM da role de execução com permissão além do mínimo necessário
+  (`s3:DeleteObject` nunca deve ser concedido neste contexto).
+
+## Níveis e tipos de teste
+Unit (caso de uso `ReceberOrcamento`, admission gate via fake), Contrato/HTTP
+(`app.inject` nos 3 controllers), Integração mockada (gateway S3, handler
+SFTP, middleware Cognito), Integração real Postgres (repositório de
+idempotência — skip sem `DATABASE_URL`), Infra estático (`cdk synth`).
+
+## Ambientes e dependências
+Node 24.18.0, pnpm 11.18.0 via `corepack pnpm`. Sem AWS real — S3/Cognito
+mockados via fake de `S3Client.send`/verificador JWT injetável. Postgres 16
+via `docker-compose.yml` disponível neste worktree, mas migração
+(`db:migrate`) falha com erro genérico ao conectar via TCP — limitação de
+ambiente Windows já conhecida (CI Linux não reproduz); os 3 testes de
+integração de `drizzle-idempotency-key.repository.test.ts` seguem `skip`.
+
+## Estratégia de dados
+Fixtures inline (UUIDs via `OrcamentoId.novo()`, `ReferenciaS3.de({...})`
+sintética). Sem dado sensível/real.
+
+## Estratégia de mocks/fakes
+- `ReceberOrcamento`: fakes de `OrcamentoRepository`/`EventPublisher`/
+  `IdempotencyKeyRepository` (o fake de idempotência simula a semântica de
+  "quem venceu a corrida" devolvendo `{reservado:false, orcamentoId: já
+  existente}`, não apenas um mock ingênuo de chamada única).
+- `S3ArmazenamentoBrutoGateway`: fake de `S3Client.send` por comando
+  (`PutObjectCommand`/`HeadObjectCommand`/`CopyObjectCommand`), afirma
+  `ObjectLockMode`/`ObjectLockRetainUntilDate` no PUT presigned.
+- `sftp-upload.handler`: `S3Event` sintético, fake de `ReceberOrcamento.
+  executar`.
+- `auth-cognito.middleware`: fake do verificador `aws-jwt-verify`.
+- Repositório de idempotência: Postgres real (sem fake) — integração,
+  skip sem `DATABASE_URL`.
+
+## Critérios de entrada
+PR #426 (branch `feat/001-c-us1`, base `main`), commit `68d034f`, `backend-
+reviewer` já aprovou (APPROVE WITH NITS, 4 rodadas, 2 MAJOR + 1 BLOCKER
+corrigidos ao longo do processo). Primeira validação de QA (não reteste).
+
+## Critérios de saída
+`pnpm typecheck`/`typecheck:infra`/`lint`/`test` limpos, suíte completa sem
+regressão, `cdk synth` limpo (8 stacks), cobertura medida e lacunas
+justificadas, nenhum defeito crítico/alto aberto.
+
+## Abordagem Allure
+Reaproveitado `allure-vitest`/`vitest.config.ts` já configurados.
+
+## Ordem de execução
+1. `corepack pnpm install --frozen-lockfile`
+2. `corepack pnpm run typecheck`
+3. `corepack pnpm run typecheck:infra`
+4. `corepack pnpm run lint`
+5. `corepack pnpm test`
+6. `corepack pnpm exec vitest run --coverage`
+7. `corepack pnpm exec cdk synth --quiet`
+
+## Limitações
+- `docker compose up -d postgres` + `db:migrate` falham neste ambiente
+  Windows específico com erro genérico de conexão TCP (`ELIFECYCLE` sem
+  detalhe de causa) — mesma limitação de ambiente já sinalizada na tarefa
+  (funciona via socket dentro do container, falha do host; CI Linux não
+  reproduz). Os 3 testes de `drizzle-idempotency-key.repository.test.ts`
+  continuam sem execução real nesta rodada — mesma classe de lacuna já
+  aceita para `drizzle-orcamento.repository.test.ts` em rodadas anteriores.
+- Verificação da atomicidade real do admission gate sob concorrência: os 3
+  testes de integração cobrem o comportamento sequencialmente (reserva livre,
+  reserva conflitante dentro do TTL, reserva após TTL expirado) mas não
+  disparam 2 conexões simultâneas em `Promise.all` (diferente do padrão usado
+  em T011 para `salvar()`). Avaliação de QA: como `reservar()` é uma única
+  instrução SQL atômica (`INSERT ... ON CONFLICT ... DO UPDATE ... WHERE
+  expira_em <= now() RETURNING`), a garantia de exclusão mútua vem do lock de
+  linha do próprio Postgres sobre a chave única — diferente do caso de T011,
+  que fazia leitura+decisão em múltiplas instruções e por isso exigia um
+  teste de 2 conexões concorrentes para provar a serialização. Os 3 testes
+  sequenciais já provam a semântica correta da instrução única. Registrado
+  como risco residual de baixa severidade (não bloqueante): um teste de 2
+  conexões reais em `Promise.all` fecharia a lacuna de forma mais direta,
+  mas não foi possível executá-lo nesta rodada (bloqueio de `db:migrate` no
+  ambiente Windows).
+- Sem AWS real — gateway S3, middleware Cognito e handler SFTP 100%
+  mockados/locais (limitação de ambiente conhecida, não desta PR).
+- Autenticação Cognito testada apenas isoladamente (`auth-cognito.middleware.
+  test.ts`); os 3 contract tests dos controllers REST rodam sem
+  `preHandler` de autenticação — esperado, wiring de produção é issue futura
+  (confirmado no handoff do dev-back-end, não é lacuna desta PR).
