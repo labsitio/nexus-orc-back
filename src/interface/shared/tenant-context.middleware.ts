@@ -1,5 +1,8 @@
 import type { preHandlerHookHandler } from 'fastify';
-import { criarTenantContext, type TenantContext } from '../../shared-kernel/tenant/tenant-context.js';
+import {
+  criarTenantContext,
+  type TenantContext,
+} from '../../shared-kernel/tenant/tenant-context.js';
 import { TenantId } from '../../shared-kernel/tenant/tenant-id.vo.js';
 import { criarVerificadorJwtCognito, extrairBearerToken } from './cognito-jwt-verifier.js';
 import type { ProblemDetails } from './problem-details.schema.js';
@@ -7,6 +10,7 @@ import type { ProblemDetails } from './problem-details.schema.js';
 declare module 'fastify' {
   interface FastifyRequest {
     tenantContext?: TenantContext;
+    papeis?: readonly string[];
   }
 }
 
@@ -25,6 +29,15 @@ export interface TenantContextMiddlewareConfig {
  * `tenantId` MUST NUNCA vir de query/path/body — única fonte legítima é esta
  * claim verificada do JWT (canal SFTP resolve `tenantId` por outro caminho,
  * fora deste middleware, ver plan.md).
+ *
+ * ADR-010 (`docs/architecture-diagrams/adr-010-verificacao-papel-autorizacao.html`)
+ * estende este middleware para também popular `request.papeis` a partir da
+ * claim `cognito:groups` do MESMO payload já verificado — zero segunda
+ * chamada de `verify()` (ADR-007 já aceita a dupla verificação entre
+ * middlewares distintos como trade-off; esta task não pode piorar isso).
+ * Papel MUST NUNCA vir de body/query/header — só da claim. Token sem
+ * `cognito:groups` resulta em lista vazia, nunca em erro: decidir 403 é
+ * responsabilidade do guard de papel (ADR-010 T2), não deste middleware.
  */
 export function criarTenantContextMiddleware(
   config: TenantContextMiddlewareConfig,
@@ -43,14 +56,20 @@ export function criarTenantContextMiddleware(
     try {
       payload = await verifier.verify(token);
     } catch {
-      request.log.warn({ motivo: 'token_invalido' }, 'TenantContextMiddleware: requisição rejeitada');
+      request.log.warn(
+        { motivo: 'token_invalido' },
+        'TenantContextMiddleware: requisição rejeitada',
+      );
       await responderNaoAutenticado(reply, 'Token JWT inválido ou expirado');
       return;
     }
 
     const claimTenantId = payload['custom:tenant_id'];
     if (typeof claimTenantId !== 'string' || claimTenantId.length === 0) {
-      request.log.warn({ motivo: 'claim_ausente' }, 'TenantContextMiddleware: requisição rejeitada');
+      request.log.warn(
+        { motivo: 'claim_ausente' },
+        'TenantContextMiddleware: requisição rejeitada',
+      );
       await responderNaoAutenticado(reply, 'Claim custom:tenant_id ausente no token');
       return;
     }
@@ -59,13 +78,25 @@ export function criarTenantContextMiddleware(
     try {
       tenantId = TenantId.de(claimTenantId);
     } catch {
-      request.log.warn({ motivo: 'claim_invalida' }, 'TenantContextMiddleware: requisição rejeitada');
+      request.log.warn(
+        { motivo: 'claim_invalida' },
+        'TenantContextMiddleware: requisição rejeitada',
+      );
       await responderNaoAutenticado(reply, 'Claim custom:tenant_id inválida');
       return;
     }
 
     request.tenantContext = criarTenantContext(tenantId);
+    request.papeis = extrairPapeis(payload);
   };
+}
+
+function extrairPapeis(payload: Record<string, unknown>): readonly string[] {
+  const grupos = payload['cognito:groups'];
+  if (!Array.isArray(grupos)) {
+    return [];
+  }
+  return grupos.filter((grupo): grupo is string => typeof grupo === 'string');
 }
 
 async function responderNaoAutenticado(
