@@ -6,7 +6,13 @@
  * destoar do resto de `docs/`. Barras são CSS puro: nenhuma biblioteca de
  * gráfico entra aqui.
  */
-import type { FaseMetrica, ItemIssue, Metricas, SpecMetrica } from './dashboard-metricas.js';
+import type {
+  FaseMetrica,
+  FilaPrioridade,
+  ItemIssue,
+  Metricas,
+  SpecMetrica,
+} from './dashboard-metricas.js';
 
 const ESCAPES: Readonly<Record<string, string>> = {
   '&': '&amp;',
@@ -132,6 +138,24 @@ function kpiAbrivel(
     </details>`;
 }
 
+/** Uma faixa de prioridade, colapsada — 135 linhas abertas de uma vez afogam a página. */
+function blocoPrioridade(fila: FilaPrioridade): string {
+  if (fila.itens.length === 0) {
+    return '';
+  }
+
+  return `
+    <details class="fila">
+      <summary>
+        <span class="tier ${fila.tier.toLowerCase()}">${fila.tier}</span>
+        ${fila.itens.length} ${fila.itens.length === 1 ? 'demanda' : 'demandas'}
+        <span class="caret">▾</span>
+      </summary>
+      <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
+        <tbody>${fila.itens.map(linhaIssue).join('')}</tbody></table>
+    </details>`;
+}
+
 function graficoVelocidade(metricas: Metricas): string {
   const pico = Math.max(1, ...metricas.velocidade.serie.map((p) => p.fechadas));
   const colunas = metricas.velocidade.serie
@@ -237,10 +261,24 @@ export function renderizar(metricas: Metricas): string {
   th{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);}
   tr:last-child td{border-bottom:none;}
 
-  .grafico{display:flex;align-items:flex-end;gap:5px;height:140px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+  .grafico{display:flex;align-items:flex-end;gap:5px;height:260px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
   .coluna{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:6px;}
   .coluna .haste{width:100%;background:var(--gradient);border-radius:4px 4px 0 0;min-height:2px;}
   .coluna span{font-size:9.5px;color:var(--text-muted);white-space:nowrap;}
+
+  .fila{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;}
+  .fila summary{list-style:none;cursor:pointer;padding:12px 16px;display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--text-muted);border-radius:12px;}
+  .fila summary::-webkit-details-marker{display:none;}
+  .fila summary:hover{background:var(--surface-2);}
+  .fila summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .fila[open] summary{border-bottom:1px solid var(--border);border-radius:12px 12px 0 0;}
+  .fila[open] .caret{transform:rotate(180deg);}
+  .fila .caret{display:inline-block;transition:transform .15s ease;margin-left:auto;}
+  .fila .tier{font-weight:800;font-size:11px;letter-spacing:1px;padding:3px 9px;border-radius:6px;background:var(--surface-2);}
+  .fila .tier.p0,.fila .tier.p1{color:var(--danger);}
+  .fila .tier.p2{color:var(--warning);}
+  .fila .tier.p3{color:var(--text-muted);}
+  .fila table{border:none;border-radius:0 0 12px 12px;}
 
   ul.riscos{list-style:none;display:grid;gap:10px;}
   /* Trava de medida: a 1600px de container, uma linha corrida de texto vira
@@ -255,7 +293,7 @@ export function renderizar(metricas: Metricas): string {
     .linha .num{grid-column:2;text-align:left;}
     /* 14 rótulos de data não cabem lado a lado; o title de cada coluna mantém o dado. */
     .coluna span{display:none;}
-    .grafico{height:110px;}
+    .grafico{height:180px;}
     table{display:block;overflow-x:auto;}
   }
 </style>
@@ -287,6 +325,11 @@ export function renderizar(metricas: Metricas): string {
       : `<table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
          <tbody>${metricas.caminhoCritico.map(linhaIssue).join('')}</tbody></table>`
   }
+
+  <h2>Demandas em aberto por prioridade (${metricas.filaPorPrioridade.reduce((s, f) => s + f.itens.length, 0)})</h2>
+  <p class="sub">Critério de priorização em <code>docs/plano-finalizacao.md</code> §3. Dentro de
+     cada faixa não há ordem interna — a ordem de execução são as fases acima.</p>
+  ${metricas.filaPorPrioridade.map(blocoPrioridade).join('')}
 
   <h2>Ritmo de fechamento — últimos 14 dias</h2>
   ${graficoVelocidade(metricas)}
