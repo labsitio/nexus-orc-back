@@ -55,6 +55,7 @@ function metricas(parcial: Partial<Metricas> = {}): Metricas {
     fases: [fase({ id: '1' })],
     caminhoCritico: [item({ number: 10 })],
     tarefasEmAndamento: [],
+    tarefasBloqueadas: [],
     deriva: { mapaJaFechadas: 3, naoMapeadas: [item({ number: 20 })] },
     velocidade: {
       serie: [
@@ -170,6 +171,58 @@ describe('renderizar — KPI em andamento clicável', () => {
     // `abrivel` sozinho não serve de asserção: a classe existe no CSS sempre.
     expect(html).not.toContain('<details');
     expect(html).toContain('<div class="k">em andamento</div>');
+  });
+
+  it('abre os dois cards de forma independente', () => {
+    const html = renderizar(
+      metricas({
+        tarefasEmAndamento: [item({ number: 250 })],
+        tarefasBloqueadas: [item({ number: 688 })],
+      }),
+    );
+
+    expect(html.match(/<details class="kpi abrivel">/g)).toHaveLength(2);
+    expect(html).toContain('em andamento <span class="caret">');
+    expect(html).toContain('bloqueadas <span class="caret">');
+  });
+});
+
+describe('renderizar — KPI bloqueadas clicável', () => {
+  it('lista as issues bloqueadas quando existem', () => {
+    const html = renderizar(
+      metricas({
+        global: {
+          total: 10,
+          fechadas: 4,
+          abertas: 6,
+          percentual: 40,
+          ready: 2,
+          emAndamento: 0,
+          bloqueadas: 2,
+        },
+        tarefasBloqueadas: [
+          item({ number: 688, title: '[ADR-010] T4: guard comprador-responsavel' }),
+          item({ number: 689, title: '[ADR-010] T5: guard compliance-admin' }),
+        ],
+      }),
+    );
+
+    expect(html).toContain('bloqueadas <span class="caret">');
+    expect(html).toContain('[ADR-010] T4: guard comprador-responsavel');
+    expect(html).toContain('/issues/689');
+  });
+
+  it('não avisa sobre responsável ausente em bloqueada — é o estado normal', () => {
+    const html = renderizar(metricas({ tarefasBloqueadas: [item({ number: 688 })] }));
+
+    expect(html).toContain('/issues/688');
+    expect(html).not.toContain('sem responsável atribuído');
+  });
+
+  it('continua um card estático quando nada está bloqueado', () => {
+    const html = renderizar(metricas({ tarefasBloqueadas: [] }));
+
+    expect(html).toContain('<div class="k">bloqueadas</div>');
   });
 
   it('escapa login de responsável', () => {

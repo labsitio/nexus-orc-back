@@ -332,6 +332,32 @@ describe('calcular — tarefas em andamento', () => {
     expect(tarefasEmAndamento[0]?.responsaveis).toEqual([]);
   });
 
+  it('separa bloqueadas de em andamento pelo label, sem misturar as duas listas', () => {
+    const issues = [
+      issue({ number: 688, title: '[ADR-010] T4', labels: [{ name: 'blocked' }] }),
+      issue({ number: 689, title: '[ADR-010] T5', labels: [{ name: 'blocked' }] }),
+      issue({ number: 250, labels: [{ name: 'in-progress' }] }),
+    ];
+
+    const { tarefasBloqueadas, tarefasEmAndamento } = calcular(issues, mapaVazio, AGORA);
+
+    expect(tarefasBloqueadas.map((t) => t.number)).toEqual([688, 689]);
+    expect(tarefasEmAndamento.map((t) => t.number)).toEqual([250]);
+  });
+
+  it('ignora issue fechada que ainda carrega o label blocked', () => {
+    const issues = [
+      issue({
+        number: 688,
+        state: 'CLOSED',
+        closedAt: '2026-08-01T00:00:00Z',
+        labels: [{ name: 'blocked' }],
+      }),
+    ];
+
+    expect(calcular(issues, mapaVazio, AGORA).tarefasBloqueadas).toEqual([]);
+  });
+
   it('ignora issue fechada que ainda carrega o label in-progress', () => {
     const issues = [
       issue({

@@ -86,23 +86,31 @@ function linhaIssue(item: ItemIssue): string {
 }
 
 /**
- * O KPI "em andamento" vira um `<details>` clicável quando há tarefa reservada.
- * `<details>` é nativo: nenhum JavaScript, e por isso continua funcionando com a
- * página aberta por `file://`, sem servidor.
+ * KPI que abre ao clique e lista as issues por trás do número. `<details>` é
+ * nativo: nenhum JavaScript, e por isso continua funcionando com a página aberta
+ * por `file://`, sem servidor. Sem issue para listar, vira um card estático — um
+ * card que abre para nada é pior que um card que não abre.
+ *
+ * `avisarSemDono` distingue os dois usos: em "em andamento", issue reservada sem
+ * ninguém atribuído é anomalia digna de aviso; em "bloqueadas", é o normal.
  */
-function kpiEmAndamento(metricas: Metricas): string {
-  const tarefas = metricas.tarefasEmAndamento;
-  const quantidade = metricas.global.emAndamento;
-
+function kpiAbrivel(
+  quantidade: number,
+  rotulo: string,
+  tarefas: readonly ItemIssue[],
+  avisarSemDono: boolean,
+): string {
   if (tarefas.length === 0) {
-    return `<div class="kpi"><div class="v">${quantidade}</div><div class="k">em andamento</div></div>`;
+    return `<div class="kpi"><div class="v">${quantidade}</div><div class="k">${rotulo}</div></div>`;
   }
 
   const linhas = tarefas
     .map((tarefa) => {
       const quem =
         tarefa.responsaveis.length === 0
-          ? '<span class="sem-dono">sem responsável atribuído</span>'
+          ? avisarSemDono
+            ? '<span class="sem-dono">sem responsável atribuído</span>'
+            : ''
           : tarefa.responsaveis
               .map((login) => `<span class="quem">@${escapar(login)}</span>`)
               .join(' ');
@@ -118,7 +126,7 @@ function kpiEmAndamento(metricas: Metricas): string {
     <details class="kpi abrivel">
       <summary>
         <div class="v">${quantidade}</div>
-        <div class="k">em andamento <span class="caret">▾</span></div>
+        <div class="k">${rotulo} <span class="caret">▾</span></div>
       </summary>
       <ul class="tarefas">${linhas}</ul>
     </details>`;
@@ -262,8 +270,8 @@ export function renderizar(metricas: Metricas): string {
     <div class="kpi"><div class="v">${global.fechadas}/${global.total}</div><div class="k">issues fechadas</div></div>
     <div class="kpi"><div class="v">${global.abertas}</div><div class="k">abertas</div></div>
     <div class="kpi"><div class="v">${global.ready}</div><div class="k">prontas p/ pegar</div></div>
-    ${kpiEmAndamento(metricas)}
-    <div class="kpi"><div class="v">${global.bloqueadas}</div><div class="k">bloqueadas</div></div>
+    ${kpiAbrivel(global.emAndamento, 'em andamento', metricas.tarefasEmAndamento, true)}
+    ${kpiAbrivel(global.bloqueadas, 'bloqueadas', metricas.tarefasBloqueadas, false)}
   </div>
 
   <h2>Fases</h2>

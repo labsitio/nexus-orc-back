@@ -113,6 +113,8 @@ export interface Metricas {
   readonly caminhoCritico: readonly ItemIssue[];
   /** Issues abertas com label `in-progress` — quem do time está com o quê. */
   readonly tarefasEmAndamento: readonly ItemIssue[];
+  /** Issues abertas com label `blocked` — o gate técnico em vigor hoje. */
+  readonly tarefasBloqueadas: readonly ItemIssue[];
   readonly deriva: Deriva;
   readonly velocidade: Velocidade;
   readonly riscos: readonly string[];
@@ -220,14 +222,15 @@ function paraItem(issue: Issue): ItemIssue {
 }
 
 /**
- * Quem do time está com o quê. `in-progress` é o label que a skill `claim-issue`
- * aplica ao reservar, então ele — não o assignee — é o que define "em andamento";
- * uma issue reservada sem atribuir aparece aqui com `responsaveis` vazio, e isso
- * é informação, não erro.
+ * Issues abertas com um label de estado, para o KPI correspondente poder abrir e
+ * listar quais são. O label — não o assignee — é o que define o estado:
+ * `in-progress` é o que a skill `claim-issue` aplica ao reservar, e `blocked` é
+ * aplicado à mão quando existe gate técnico. Uma issue com o label e sem ninguém
+ * atribuído aparece aqui com `responsaveis` vazio, e isso é informação, não erro.
  */
-function tarefasEmAndamento(issues: readonly Issue[]): ItemIssue[] {
+function tarefasComLabel(issues: readonly Issue[], label: string): ItemIssue[] {
   return issues
-    .filter((i) => i.state === 'OPEN' && temLabel(i, 'in-progress'))
+    .filter((i) => i.state === 'OPEN' && temLabel(i, label))
     .sort((a, b) => a.number - b.number)
     .map(paraItem);
 }
@@ -343,7 +346,8 @@ export function calcular(issues: readonly Issue[], mapa: Mapa, agora: Date): Met
     specs: metricasPorSpec(issues),
     fases: metricasPorFase(issues, mapa),
     caminhoCritico: caminhoCritico(issues, mapa),
-    tarefasEmAndamento: tarefasEmAndamento(issues),
+    tarefasEmAndamento: tarefasComLabel(issues, 'in-progress'),
+    tarefasBloqueadas: tarefasComLabel(issues, 'blocked'),
     deriva: deriva(issues, mapa),
     velocidade: velocidade(issues, agora, global.abertas),
     riscos: mapa.riscos,
