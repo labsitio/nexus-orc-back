@@ -5,15 +5,6 @@
  * O tema reaproveita as variáveis CSS de `docs/index.html` para a página não
  * destoar do resto de `docs/`. Barras são CSS puro: nenhuma biblioteca de
  * gráfico entra aqui.
- *
- * Dois modos, mesma estrutura de página e mesmos helpers:
- *
- * - `tela`: tema escuro, seções longas em `<details>` colapsado.
- * - `impressao`: tema claro e **tudo aberto**, para o Ctrl+P do navegador virar
- *   PDF legível. Não é um `@media print` do modo tela porque forçar um
- *   `<details>` fechado a abrir na impressão não é confiável — o Chrome esconde
- *   o conteúdo por mecanismo interno que o `display` da regra de print não
- *   vence. Markup diferente resolve; CSS sozinho, não.
  */
 import type {
   FaseMetrica,
@@ -22,16 +13,6 @@ import type {
   Metricas,
   SpecMetrica,
 } from './dashboard-metricas.js';
-
-export type Modo = 'tela' | 'impressao';
-
-/** Só os tokens de cor mudam entre os modos; gradiente e cores de acento são iguais. */
-const TOKENS: Readonly<Record<Modo, string>> = {
-  tela: `--bg:#0B0E14; --surface:#171B24; --surface-2:#1E2430; --border:rgba(255,255,255,.08);
-    --text:#F5F6FA; --text-muted:#9AA3B2; --success:#22C55E; --warning:#F5A623; --danger:#EF4444;`,
-  impressao: `--bg:#FFFFFF; --surface:#F7F8FA; --surface-2:#EDEFF3; --border:rgba(0,0,0,.14);
-    --text:#11151C; --text-muted:#55606E; --success:#15803D; --warning:#B45309; --danger:#DC2626;`,
-};
 
 const ESCAPES: Readonly<Record<string, string>> = {
   '&': '&amp;',
@@ -124,11 +105,8 @@ function kpiAbrivel(
   rotulo: string,
   tarefas: readonly ItemIssue[],
   avisarSemDono: boolean,
-  modo: Modo,
 ): string {
-  // Na impressão o card fica estático: o painel é absoluto e não imprime bem, e
-  // as mesmas tarefas saem em seção própria logo abaixo dos KPIs.
-  if (tarefas.length === 0 || modo === 'impressao') {
+  if (tarefas.length === 0) {
     return `<div class="kpi"><div class="v">${quantidade}</div><div class="k">${rotulo}</div></div>`;
   }
 
@@ -160,59 +138,22 @@ function kpiAbrivel(
     </details>`;
 }
 
-function tabelaIssues(itens: readonly ItemIssue[]): string {
-  return `<table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
-        <tbody>${itens.map(linhaIssue).join('')}</tbody></table>`;
-}
-
-/**
- * Uma faixa de prioridade. Em `tela`, colapsada — 135 linhas abertas de uma vez
- * afogam a leitura. Em `impressao`, aberta, senão o PDF sai sem o backlog.
- */
-function blocoPrioridade(fila: FilaPrioridade, modo: Modo): string {
+/** Uma faixa de prioridade, colapsada — 135 linhas abertas de uma vez afogam a página. */
+function blocoPrioridade(fila: FilaPrioridade): string {
   if (fila.itens.length === 0) {
     return '';
   }
 
-  const cabeca = `<span class="tier ${fila.tier.toLowerCase()}">${fila.tier}</span>
-        ${fila.itens.length} ${fila.itens.length === 1 ? 'demanda' : 'demandas'}`;
-
-  if (modo === 'impressao') {
-    return `
-    <section class="fila aberta">
-      <div class="cabeca-fila">${cabeca}</div>
-      ${tabelaIssues(fila.itens)}
-    </section>`;
-  }
-
   return `
     <details class="fila">
-      <summary>${cabeca}<span class="caret">▾</span></summary>
-      ${tabelaIssues(fila.itens)}
+      <summary>
+        <span class="tier ${fila.tier.toLowerCase()}">${fila.tier}</span>
+        ${fila.itens.length} ${fila.itens.length === 1 ? 'demanda' : 'demandas'}
+        <span class="caret">▾</span>
+      </summary>
+      <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
+        <tbody>${fila.itens.map(linhaIssue).join('')}</tbody></table>
     </details>`;
-}
-
-/** Lista de tarefas como seção plana — o formato de impressão dos cards que abrem. */
-function secaoTarefas(titulo: string, itens: readonly ItemIssue[]): string {
-  if (itens.length === 0) {
-    return '';
-  }
-
-  const linhas = itens
-    .map(
-      (t) => `
-      <tr>
-        <td class="mono"><a href="${escapar(t.url)}">#${t.number}</a></td>
-        <td>${escapar(t.title)}</td>
-        <td class="mono">${t.responsaveis.length === 0 ? '—' : escapar(t.responsaveis.join(', '))}</td>
-      </tr>`,
-    )
-    .join('');
-
-  return `
-  <h2>${escapar(titulo)} (${itens.length})</h2>
-  <table><thead><tr><th>issue</th><th>título</th><th>responsável</th></tr></thead>
-    <tbody>${linhas}</tbody></table>`;
 }
 
 function graficoVelocidade(metricas: Metricas): string {
@@ -238,29 +179,15 @@ function graficoVelocidade(metricas: Metricas): string {
   return `<div class="grafico">${colunas}</div>${projecao}`;
 }
 
-/** Versão de tela: tema escuro, seções longas colapsadas. */
 export function renderizar(metricas: Metricas): string {
-  return pagina(metricas, 'tela');
-}
-
-/**
- * Versão para o Ctrl+P virar PDF: tema claro, tudo aberto, quebras de página
- * controladas. Mesmos dados e mesmos helpers da versão de tela.
- */
-export function renderizarParaImpressao(metricas: Metricas): string {
-  return pagina(metricas, 'impressao');
-}
-
-function pagina(metricas: Metricas, modo: Modo): string {
   const { global, velocidade: v } = metricas;
-  const impresso = modo === 'impressao';
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nexo Back-end — Status do projeto${impresso ? ' (impressão)' : ''}</title>
+<title>Nexo Back-end — Status do projeto</title>
 <!--
   ARQUIVO GERADO — não edite à mão.
   Regerar com: pnpm dashboard
@@ -268,8 +195,9 @@ function pagina(metricas: Metricas, modo: Modo): string {
 -->
 <style>
   :root{
-    ${TOKENS[modo]}
+    --bg:#0B0E14; --surface:#171B24; --surface-2:#1E2430; --border:rgba(255,255,255,.08);
     --magenta:#FF0099; --blue:#02A4F2; --gradient:linear-gradient(135deg,#FF0099,#02A4F2);
+    --text:#F5F6FA; --text-muted:#9AA3B2; --success:#22C55E; --warning:#F5A623; --danger:#EF4444;
     --radius:16px;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -351,7 +279,6 @@ function pagina(metricas: Metricas, modo: Modo): string {
   .fila .tier.p2{color:var(--warning);}
   .fila .tier.p3{color:var(--text-muted);}
   .fila table{border:none;border-radius:0 0 12px 12px;}
-  .fila .cabeca-fila{display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13.5px;color:var(--text-muted);border-bottom:1px solid var(--border);}
 
   ul.riscos{list-style:none;display:grid;gap:10px;}
   /* Trava de medida: a 1600px de container, uma linha corrida de texto vira
@@ -369,27 +296,7 @@ function pagina(metricas: Metricas, modo: Modo): string {
     .grafico{height:180px;}
     table{display:block;overflow-x:auto;}
   }
-${
-  impresso
-    ? `
-  @page{margin:12mm;}
-  body{font-size:10.5pt;}
-  main{max-width:none;padding:0;}
-  h1{font-size:22pt;}
-  h2{font-size:13pt;margin:22px 0 10px;break-after:avoid;}
-  /* Sem isto o Chrome descarta todo background na impressão — as barras de
-     progresso e as hastes do gráfico virariam retângulos invisíveis. */
-  .preenchida,.haste,.tier,.pill{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .kpi,.fase,.fila,.grafico,ul.riscos li,tr{break-inside:avoid;}
-  .grafico{height:150px;}
-  .kpis{gap:8px;}
-  .kpi{padding:12px;}
-  .kpi .v{font-size:18pt;}
-  a{color:var(--text);}
-  .fila{margin-bottom:14px;}
-`
-    : ''
-}</style>
+</style>
 </head>
 <body>
 <main>
@@ -401,15 +308,9 @@ ${
     <div class="kpi"><div class="v">${global.fechadas}/${global.total}</div><div class="k">issues fechadas</div></div>
     <div class="kpi"><div class="v">${global.abertas}</div><div class="k">abertas</div></div>
     <div class="kpi"><div class="v">${global.ready}</div><div class="k">prontas p/ pegar</div></div>
-    ${kpiAbrivel(global.emAndamento, 'em andamento', metricas.tarefasEmAndamento, true, modo)}
-    ${kpiAbrivel(global.bloqueadas, 'bloqueadas', metricas.tarefasBloqueadas, false, modo)}
+    ${kpiAbrivel(global.emAndamento, 'em andamento', metricas.tarefasEmAndamento, true)}
+    ${kpiAbrivel(global.bloqueadas, 'bloqueadas', metricas.tarefasBloqueadas, false)}
   </div>
-${
-  impresso
-    ? secaoTarefas('Em andamento', metricas.tarefasEmAndamento) +
-      secaoTarefas('Bloqueadas', metricas.tarefasBloqueadas)
-    : ''
-}
 
   <h2>Fases</h2>
   <div class="fases">${metricas.fases.map(cardFase).join('')}</div>
@@ -428,7 +329,7 @@ ${
   <h2>Demandas em aberto por prioridade (${metricas.filaPorPrioridade.reduce((s, f) => s + f.itens.length, 0)})</h2>
   <p class="sub">Critério de priorização em <code>docs/plano-finalizacao.md</code> §3. Dentro de
      cada faixa não há ordem interna — a ordem de execução são as fases acima.</p>
-  ${metricas.filaPorPrioridade.map((fila) => blocoPrioridade(fila, modo)).join('')}
+  ${metricas.filaPorPrioridade.map(blocoPrioridade).join('')}
 
   <h2>Ritmo de fechamento — últimos 14 dias</h2>
   ${graficoVelocidade(metricas)}

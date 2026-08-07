@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderizar, renderizarParaImpressao } from '../../src/dev/dashboard-html.js';
+import { renderizar } from '../../src/dev/dashboard-html.js';
 import type {
   FaseMetrica,
   ItemIssue,
@@ -301,7 +301,7 @@ describe('renderizar — fila por prioridade', () => {
     );
 
     // Espaços normalizados: o template quebra linha entre a contagem e o caret.
-    expect(uma.replace(/\s+/g, ' ')).toContain('P1</span> 1 demanda<span class="caret">');
+    expect(uma.replace(/\s+/g, ' ')).toContain('P1</span> 1 demanda <span class="caret">');
   });
 });
 
@@ -338,80 +338,6 @@ describe('renderizar — data e hora', () => {
 
     expect(html).toContain('<span>05/08</span>');
     expect(html).toContain('title="06/08/2026: 2"');
-  });
-});
-
-describe('renderizarParaImpressao', () => {
-  /** `Metricas` com conteúdo em toda seção que muda de forma na impressão. */
-  const completa = () =>
-    metricas({
-      tarefasEmAndamento: [item({ number: 250, responsaveis: ['allanrobert10'] })],
-      tarefasBloqueadas: [item({ number: 690 })],
-      filaPorPrioridade: [
-        { tier: 'P0', itens: [] },
-        { tier: 'P1', itens: [item({ number: 1 })] },
-        { tier: 'P2', itens: [item({ number: 2 })] },
-        { tier: 'P3', itens: [item({ number: 3 })] },
-      ],
-    });
-
-  it('não usa details em nenhum lugar — conteúdo colapsado não imprime', () => {
-    const html = renderizarParaImpressao(completa());
-
-    expect(html).not.toContain('<details');
-    expect(html).not.toContain('<summary');
-  });
-
-  it('mostra todas as faixas de prioridade abertas', () => {
-    const html = renderizarParaImpressao(completa());
-
-    expect(html.match(/<section class="fila aberta">/g)).toHaveLength(3);
-    expect(html).toContain('/issues/1');
-    expect(html).toContain('/issues/2');
-    expect(html).toContain('/issues/3');
-  });
-
-  it('vira as tarefas em seção própria, com responsável em coluna', () => {
-    const html = renderizarParaImpressao(completa());
-
-    expect(html).toContain('Em andamento (1)');
-    expect(html).toContain('Bloqueadas (1)');
-    expect(html).toContain('allanrobert10');
-    expect(html).toContain('<th>responsável</th>');
-  });
-
-  it('usa tema claro e força impressão de cor nas barras', () => {
-    const html = renderizarParaImpressao(completa());
-
-    expect(html).toContain('--bg:#FFFFFF');
-    expect(html).not.toContain('--bg:#0B0E14');
-    expect(html).toContain('print-color-adjust:exact');
-    expect(html).toContain('@page{margin:12mm;}');
-  });
-
-  it('omite seção de tarefas quando a lista está vazia', () => {
-    const html = renderizarParaImpressao(
-      metricas({ tarefasEmAndamento: [], tarefasBloqueadas: [] }),
-    );
-
-    expect(html).not.toContain('Em andamento (');
-    expect(html).not.toContain('Bloqueadas (');
-  });
-
-  it('mantém tema escuro e details na versão de tela', () => {
-    const html = renderizar(completa());
-
-    expect(html).toContain('--bg:#0B0E14');
-    expect(html).not.toContain('@page');
-    expect(html).toContain('<details');
-  });
-
-  it('não deixa undefined, NaN ou [object Object] na versão de impressão', () => {
-    const html = renderizarParaImpressao(completa());
-
-    expect(html).not.toContain('undefined');
-    expect(html).not.toContain('NaN');
-    expect(html).not.toContain('[object Object]');
   });
 });
 
