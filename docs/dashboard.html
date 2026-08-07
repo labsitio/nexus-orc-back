@@ -31,10 +31,31 @@
   .nota{color:var(--warning);font-size:12.5px;margin-top:10px;}
   .num{color:var(--text-muted);font-size:12.5px;}
 
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:28px;}
+  /* align-items:start impede que um card aberto estique a altura dos irmãos. */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:28px;align-items:start;}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
   .kpi .v{font-size:26px;font-weight:800;letter-spacing:-.5px;}
   .kpi .k{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-top:4px;}
+
+  /* KPI clicável: o painel é absoluto para o título da issue ter largura de
+     leitura, em vez de espremer na coluna estreita do grid. */
+  .kpi.abrivel{position:relative;padding:0;cursor:pointer;}
+  .kpi.abrivel summary{list-style:none;padding:18px;border-radius:var(--radius);}
+  .kpi.abrivel summary::-webkit-details-marker{display:none;}
+  .kpi.abrivel summary:hover{background:var(--surface-2);}
+  .kpi.abrivel summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .kpi.abrivel .caret{display:inline-block;transition:transform .15s ease;}
+  .kpi.abrivel[open] .caret{transform:rotate(180deg);}
+  .kpi.abrivel[open]{border-color:var(--blue);}
+  .tarefas{list-style:none;position:absolute;top:calc(100% + 6px);right:0;z-index:10;
+    width:max-content;min-width:100%;max-width:min(520px,88vw);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:12px;
+    padding:8px;display:grid;gap:6px;box-shadow:0 12px 32px rgba(0,0,0,.5);cursor:auto;}
+  .tarefas li{padding:8px 10px;border-radius:8px;background:var(--surface);}
+  .tarefas .cabeca{display:flex;align-items:center;gap:8px;font-size:12.5px;}
+  .tarefas .quem{font-weight:700;color:var(--success);}
+  .tarefas .sem-dono{color:var(--warning);font-size:11.5px;}
+  .tarefas .t{font-size:12.5px;color:var(--text-muted);margin-top:3px;line-height:1.45;}
 
   .barra{background:var(--surface-2);border-radius:999px;height:9px;overflow:hidden;}
   .preenchida{height:100%;background:var(--gradient);border-radius:999px;}
@@ -82,15 +103,34 @@
 <body>
 <main>
   <h1>Status do projeto <span class="g">Nexo Back-end</span></h1>
-  <p class="sub">Gerado em 07/08/2026 09:16:16 (Brasília) · camada curada: docs/plano-finalizacao.md — 3ª revisão, 06/08/2026</p>
+  <p class="sub">Gerado em 07/08/2026 09:24:28 (Brasília) · camada curada: docs/plano-finalizacao.md — 3ª revisão, 06/08/2026</p>
 
   <div class="kpis">
-    <div class="kpi"><div class="v">64.9%</div><div class="k">concluído</div></div>
-    <div class="kpi"><div class="v">276/425</div><div class="k">issues fechadas</div></div>
-    <div class="kpi"><div class="v">149</div><div class="k">abertas</div></div>
-    <div class="kpi"><div class="v">145</div><div class="k">prontas p/ pegar</div></div>
-    <div class="kpi"><div class="v">1</div><div class="k">em andamento</div></div>
-    <div class="kpi"><div class="v">0</div><div class="k">bloqueadas</div></div>
+    <div class="kpi"><div class="v">63.9%</div><div class="k">concluído</div></div>
+    <div class="kpi"><div class="v">276/432</div><div class="k">issues fechadas</div></div>
+    <div class="kpi"><div class="v">156</div><div class="k">abertas</div></div>
+    <div class="kpi"><div class="v">147</div><div class="k">prontas p/ pegar</div></div>
+    
+    <details class="kpi abrivel">
+      <summary>
+        <div class="v">3</div>
+        <div class="k">em andamento <span class="caret">▾</span></div>
+      </summary>
+      <ul class="tarefas">
+        <li>
+          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/250">#250</a> <span class="quem">@allanrobert10</span></div>
+          <div class="t">[005] T044: Interface: controller `POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana`, Zod schema (`acao`, `justificativa` obrigatória, `motivoDadoAusente` obrigatório quando `acao === &#39;SOLICITAR_REENVIO&#39;`), papel &quot;comprador responsável&quot; via </div>
+        </li>
+        <li>
+          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/685">#685</a> <span class="quem">@allanrobert10</span></div>
+          <div class="t">[ADR-010] T1: TenantContextMiddleware popula request.papeis a partir de cognito:groups</div>
+        </li>
+        <li>
+          <div class="cabeca"><a href="https://github.com/labsitio/nexus-orc-back/issues/691">#691</a> <span class="quem">@allanrobert10</span></div>
+          <div class="t">[ADR-010] T7: doc operacional de criacao dos grupos Cognito e AdminAddUserToGroup</div>
+        </li></ul>
+    </details>
+    <div class="kpi"><div class="v">3</div><div class="k">bloqueadas</div></div>
   </div>
 
   <h2>Fases</h2>
@@ -159,8 +199,8 @@
     </div>
     <div class="linha">
       <span class="rotulo">003</span>
-      <div class="barra"><div class="preenchida" style="width:81.5%"></div></div>
-      <span class="num">44/54 · 81.5%</span>
+      <div class="barra"><div class="preenchida" style="width:78.6%"></div></div>
+      <span class="num">44/56 · 78.6%</span>
     </div>
     <div class="linha">
       <span class="rotulo">004</span>
@@ -169,13 +209,13 @@
     </div>
     <div class="linha">
       <span class="rotulo">005</span>
-      <div class="barra"><div class="preenchida" style="width:62.3%"></div></div>
-      <span class="num">38/61 · 62.3%</span>
+      <div class="barra"><div class="preenchida" style="width:61.3%"></div></div>
+      <span class="num">38/62 · 61.3%</span>
     </div>
     <div class="linha">
       <span class="rotulo">007</span>
-      <div class="barra"><div class="preenchida" style="width:56%"></div></div>
-      <span class="num">28/50 · 56%</span>
+      <div class="barra"><div class="preenchida" style="width:51.9%"></div></div>
+      <span class="num">28/54 · 51.9%</span>
     </div>
     <div class="linha">
       <span class="rotulo">008</span>
@@ -334,7 +374,7 @@
 
   <h2>Deriva entre o plano e o board</h2>
   <p class="sub">32 issues citadas no mapa já fecharam.
-     2 abertas não aparecem em nenhuma lista do mapa —
+     9 abertas não aparecem em nenhuma lista do mapa —
      sinal de que <code>docs/plano-finalizacao.md</code> precisa de revisão.</p>
   <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
          <tbody>
@@ -346,6 +386,41 @@
     <tr>
       <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/477">#477</a></td>
       <td>[ops] Confirmar Managed Workflow (tag) do AWS Transfer Family antes de T016</td>
+      <td class="mono">007</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/685">#685</a></td>
+      <td>[ADR-010] T1: TenantContextMiddleware popula request.papeis a partir de cognito:groups</td>
+      <td class="mono">007</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/686">#686</a></td>
+      <td>[ADR-010] T2: role-guard.middleware.ts com criarExigenciaPapel(papeisPermitidos) e 403 Problem Details</td>
+      <td class="mono">007</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/687">#687</a></td>
+      <td>[ADR-010] T3: RotaOpts.preHandler aceita array em orquestracao e validacao</td>
+      <td class="mono">003</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/688">#688</a></td>
+      <td>[ADR-010] T4: guard comprador-responsavel em POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana (destrava #250)</td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/689">#689</a></td>
+      <td>[ADR-010] T5: guard compliance-admin em POST /v1/configuracoes/faixas-preco-categoria (T044 de 003)</td>
+      <td class="mono">003</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/690">#690</a></td>
+      <td>[ADR-010] T6: teste adversarial de papel forjado em body/header/query nas 2 rotas gated</td>
+      <td class="mono">007</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/691">#691</a></td>
+      <td>[ADR-010] T7: doc operacional de criacao dos grupos Cognito e AdminAddUserToGroup</td>
       <td class="mono">007</td>
     </tr></tbody></table>
 

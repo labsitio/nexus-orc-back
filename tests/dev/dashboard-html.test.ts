@@ -12,6 +12,7 @@ function item(parcial: Partial<ItemIssue> & Pick<ItemIssue, 'number'>): ItemIssu
     title: `titulo ${parcial.number}`,
     url: `https://github.com/labsitio/nexus-orc-back/issues/${parcial.number}`,
     spec: '001',
+    responsaveis: [],
     ...parcial,
   };
 }
@@ -53,6 +54,7 @@ function metricas(parcial: Partial<Metricas> = {}): Metricas {
     specs: [SPEC_PADRAO],
     fases: [fase({ id: '1' })],
     caminhoCritico: [item({ number: 10 })],
+    tarefasEmAndamento: [],
     deriva: { mapaJaFechadas: 3, naoMapeadas: [item({ number: 20 })] },
     velocidade: {
       serie: [
@@ -136,6 +138,47 @@ describe('renderizar — escaping', () => {
 
     expect(html).toContain('&quot;aspas&quot; &amp; &#39;apóstrofos&#39;');
     expect(html).not.toContain('"aspas"');
+  });
+});
+
+describe('renderizar — KPI em andamento clicável', () => {
+  it('vira um details com o responsável quando há tarefa reservada', () => {
+    const html = renderizar(
+      metricas({
+        tarefasEmAndamento: [
+          item({ number: 250, title: '[005] decisao humana', responsaveis: ['allanrobert10'] }),
+        ],
+      }),
+    );
+
+    expect(html).toContain('<details class="kpi abrivel">');
+    expect(html).toContain('@allanrobert10');
+    expect(html).toContain('[005] decisao humana');
+    expect(html).toContain('/issues/250');
+  });
+
+  it('avisa quando a tarefa foi reservada sem ninguém atribuído', () => {
+    const html = renderizar(metricas({ tarefasEmAndamento: [item({ number: 250 })] }));
+
+    expect(html).toContain('sem responsável atribuído');
+    expect(html).not.toContain('<span class="quem">');
+  });
+
+  it('continua um card estático, sem details, quando nada está em andamento', () => {
+    const html = renderizar(metricas({ tarefasEmAndamento: [] }));
+
+    // `abrivel` sozinho não serve de asserção: a classe existe no CSS sempre.
+    expect(html).not.toContain('<details');
+    expect(html).toContain('<div class="k">em andamento</div>');
+  });
+
+  it('escapa login de responsável', () => {
+    const html = renderizar(
+      metricas({ tarefasEmAndamento: [item({ number: 1, responsaveis: ['<b>x</b>'] })] }),
+    );
+
+    expect(html).toContain('@&lt;b&gt;x&lt;/b&gt;');
+    expect(html).not.toContain('@<b>x</b>');
   });
 });
 

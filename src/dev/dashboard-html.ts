@@ -85,6 +85,45 @@ function linhaIssue(item: ItemIssue): string {
     </tr>`;
 }
 
+/**
+ * O KPI "em andamento" vira um `<details>` clicável quando há tarefa reservada.
+ * `<details>` é nativo: nenhum JavaScript, e por isso continua funcionando com a
+ * página aberta por `file://`, sem servidor.
+ */
+function kpiEmAndamento(metricas: Metricas): string {
+  const tarefas = metricas.tarefasEmAndamento;
+  const quantidade = metricas.global.emAndamento;
+
+  if (tarefas.length === 0) {
+    return `<div class="kpi"><div class="v">${quantidade}</div><div class="k">em andamento</div></div>`;
+  }
+
+  const linhas = tarefas
+    .map((tarefa) => {
+      const quem =
+        tarefa.responsaveis.length === 0
+          ? '<span class="sem-dono">sem responsável atribuído</span>'
+          : tarefa.responsaveis
+              .map((login) => `<span class="quem">@${escapar(login)}</span>`)
+              .join(' ');
+      return `
+        <li>
+          <div class="cabeca"><a href="${escapar(tarefa.url)}">#${tarefa.number}</a> ${quem}</div>
+          <div class="t">${escapar(tarefa.title)}</div>
+        </li>`;
+    })
+    .join('');
+
+  return `
+    <details class="kpi abrivel">
+      <summary>
+        <div class="v">${quantidade}</div>
+        <div class="k">em andamento <span class="caret">▾</span></div>
+      </summary>
+      <ul class="tarefas">${linhas}</ul>
+    </details>`;
+}
+
 function graficoVelocidade(metricas: Metricas): string {
   const pico = Math.max(1, ...metricas.velocidade.serie.map((p) => p.fechadas));
   const colunas = metricas.velocidade.serie
@@ -144,10 +183,31 @@ export function renderizar(metricas: Metricas): string {
   .nota{color:var(--warning);font-size:12.5px;margin-top:10px;}
   .num{color:var(--text-muted);font-size:12.5px;}
 
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:28px;}
+  /* align-items:start impede que um card aberto estique a altura dos irmãos. */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:28px;align-items:start;}
   .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
   .kpi .v{font-size:26px;font-weight:800;letter-spacing:-.5px;}
   .kpi .k{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-top:4px;}
+
+  /* KPI clicável: o painel é absoluto para o título da issue ter largura de
+     leitura, em vez de espremer na coluna estreita do grid. */
+  .kpi.abrivel{position:relative;padding:0;cursor:pointer;}
+  .kpi.abrivel summary{list-style:none;padding:18px;border-radius:var(--radius);}
+  .kpi.abrivel summary::-webkit-details-marker{display:none;}
+  .kpi.abrivel summary:hover{background:var(--surface-2);}
+  .kpi.abrivel summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  .kpi.abrivel .caret{display:inline-block;transition:transform .15s ease;}
+  .kpi.abrivel[open] .caret{transform:rotate(180deg);}
+  .kpi.abrivel[open]{border-color:var(--blue);}
+  .tarefas{list-style:none;position:absolute;top:calc(100% + 6px);right:0;z-index:10;
+    width:max-content;min-width:100%;max-width:min(520px,88vw);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:12px;
+    padding:8px;display:grid;gap:6px;box-shadow:0 12px 32px rgba(0,0,0,.5);cursor:auto;}
+  .tarefas li{padding:8px 10px;border-radius:8px;background:var(--surface);}
+  .tarefas .cabeca{display:flex;align-items:center;gap:8px;font-size:12.5px;}
+  .tarefas .quem{font-weight:700;color:var(--success);}
+  .tarefas .sem-dono{color:var(--warning);font-size:11.5px;}
+  .tarefas .t{font-size:12.5px;color:var(--text-muted);margin-top:3px;line-height:1.45;}
 
   .barra{background:var(--surface-2);border-radius:999px;height:9px;overflow:hidden;}
   .preenchida{height:100%;background:var(--gradient);border-radius:999px;}
@@ -202,7 +262,7 @@ export function renderizar(metricas: Metricas): string {
     <div class="kpi"><div class="v">${global.fechadas}/${global.total}</div><div class="k">issues fechadas</div></div>
     <div class="kpi"><div class="v">${global.abertas}</div><div class="k">abertas</div></div>
     <div class="kpi"><div class="v">${global.ready}</div><div class="k">prontas p/ pegar</div></div>
-    <div class="kpi"><div class="v">${global.emAndamento}</div><div class="k">em andamento</div></div>
+    ${kpiEmAndamento(metricas)}
     <div class="kpi"><div class="v">${global.bloqueadas}</div><div class="k">bloqueadas</div></div>
   </div>
 

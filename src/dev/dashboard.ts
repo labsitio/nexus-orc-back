@@ -18,7 +18,7 @@ import { renderizar } from './dashboard-html.js';
 
 const execFileAsync = promisify(execFile);
 
-const CAMPOS = 'number,title,state,closedAt,createdAt,milestone,labels,url';
+const CAMPOS = 'number,title,state,closedAt,createdAt,milestone,labels,assignees,url';
 
 /** Acima das 425 issues de hoje, com folga — `gh` não pagina sozinho. */
 const LIMITE = 800;

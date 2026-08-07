@@ -18,6 +18,7 @@ function issue(parcial: Partial<Issue> & Pick<Issue, 'number'>): Issue {
     createdAt: '2026-07-01T00:00:00Z',
     milestone: null,
     labels: [],
+    assignees: [],
     url: `https://github.com/labsitio/nexus-orc-back/issues/${parcial.number}`,
     ...parcial,
   };
@@ -224,12 +225,14 @@ describe('calcular — caminho crítico e deriva', () => {
         title: '[003] categorizar item',
         url: 'https://github.com/labsitio/nexus-orc-back/issues/10',
         spec: '003',
+        responsaveis: [],
       },
       {
         number: 20,
         title: '[005] decisao humana',
         url: 'https://github.com/labsitio/nexus-orc-back/issues/20',
         spec: '005',
+        responsaveis: [],
       },
     ]);
   });
@@ -271,6 +274,7 @@ describe('calcular — caminho crítico e deriva', () => {
         title: '[008] issue nova',
         url: 'https://github.com/labsitio/nexus-orc-back/issues/40',
         spec: '008',
+        responsaveis: [],
       },
     ]);
   });
@@ -291,6 +295,55 @@ describe('calcular — caminho crítico e deriva', () => {
     const mapa: Mapa = { ...mapaVazio, riscos: ['risco A', 'risco B'] };
 
     expect(calcular([], mapa, AGORA).riscos).toEqual(['risco A', 'risco B']);
+  });
+});
+
+describe('calcular — tarefas em andamento', () => {
+  it('lista as abertas com label in-progress e seus responsáveis, ordenadas por número', () => {
+    const issues = [
+      issue({
+        number: 30,
+        title: '[005] decisao humana',
+        labels: [{ name: 'in-progress' }],
+        assignees: [{ login: 'allanrobert10' }],
+      }),
+      issue({
+        number: 10,
+        title: '[003] categorizar item',
+        labels: [{ name: 'in-progress' }],
+        assignees: [{ login: 'fulano' }, { login: 'ciclana' }],
+      }),
+      issue({ number: 20, labels: [{ name: 'ready' }] }),
+    ];
+
+    const { tarefasEmAndamento } = calcular(issues, mapaVazio, AGORA);
+
+    expect(tarefasEmAndamento.map((t) => t.number)).toEqual([10, 30]);
+    expect(tarefasEmAndamento[0]?.responsaveis).toEqual(['fulano', 'ciclana']);
+    expect(tarefasEmAndamento[1]?.responsaveis).toEqual(['allanrobert10']);
+  });
+
+  it('inclui a issue reservada sem ninguém atribuído, com responsáveis vazio', () => {
+    const issues = [issue({ number: 10, labels: [{ name: 'in-progress' }] })];
+
+    const { tarefasEmAndamento } = calcular(issues, mapaVazio, AGORA);
+
+    expect(tarefasEmAndamento).toHaveLength(1);
+    expect(tarefasEmAndamento[0]?.responsaveis).toEqual([]);
+  });
+
+  it('ignora issue fechada que ainda carrega o label in-progress', () => {
+    const issues = [
+      issue({
+        number: 10,
+        state: 'CLOSED',
+        closedAt: '2026-08-01T00:00:00Z',
+        labels: [{ name: 'in-progress' }],
+        assignees: [{ login: 'fulano' }],
+      }),
+    ];
+
+    expect(calcular(issues, mapaVazio, AGORA).tarefasEmAndamento).toEqual([]);
   });
 });
 

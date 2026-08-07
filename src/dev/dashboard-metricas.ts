@@ -15,6 +15,7 @@ export const issueSchema = z.object({
   createdAt: z.string(),
   milestone: z.object({ title: z.string() }).nullable(),
   labels: z.array(z.object({ name: z.string() })),
+  assignees: z.array(z.object({ login: z.string() })),
   url: z.string(),
 });
 
@@ -77,6 +78,8 @@ export interface ItemIssue {
   readonly title: string;
   readonly url: string;
   readonly spec: string;
+  /** Logins do GitHub atribuídos à issue. Vazio quando ninguém pegou. */
+  readonly responsaveis: readonly string[];
 }
 
 export interface Deriva {
@@ -108,6 +111,8 @@ export interface Metricas {
   readonly specs: readonly SpecMetrica[];
   readonly fases: readonly FaseMetrica[];
   readonly caminhoCritico: readonly ItemIssue[];
+  /** Issues abertas com label `in-progress` — quem do time está com o quê. */
+  readonly tarefasEmAndamento: readonly ItemIssue[];
   readonly deriva: Deriva;
   readonly velocidade: Velocidade;
   readonly riscos: readonly string[];
@@ -205,7 +210,26 @@ function metricasPorSpec(issues: readonly Issue[]): SpecMetrica[] {
 }
 
 function paraItem(issue: Issue): ItemIssue {
-  return { number: issue.number, title: issue.title, url: issue.url, spec: specDaIssue(issue) };
+  return {
+    number: issue.number,
+    title: issue.title,
+    url: issue.url,
+    spec: specDaIssue(issue),
+    responsaveis: issue.assignees.map((a) => a.login),
+  };
+}
+
+/**
+ * Quem do time está com o quê. `in-progress` é o label que a skill `claim-issue`
+ * aplica ao reservar, então ele — não o assignee — é o que define "em andamento";
+ * uma issue reservada sem atribuir aparece aqui com `responsaveis` vazio, e isso
+ * é informação, não erro.
+ */
+function tarefasEmAndamento(issues: readonly Issue[]): ItemIssue[] {
+  return issues
+    .filter((i) => i.state === 'OPEN' && temLabel(i, 'in-progress'))
+    .sort((a, b) => a.number - b.number)
+    .map(paraItem);
 }
 
 function metricasPorFase(issues: readonly Issue[], mapa: Mapa): FaseMetrica[] {
@@ -319,6 +343,7 @@ export function calcular(issues: readonly Issue[], mapa: Mapa, agora: Date): Met
     specs: metricasPorSpec(issues),
     fases: metricasPorFase(issues, mapa),
     caminhoCritico: caminhoCritico(issues, mapa),
+    tarefasEmAndamento: tarefasEmAndamento(issues),
     deriva: deriva(issues, mapa),
     velocidade: velocidade(issues, agora, global.abertas),
     riscos: mapa.riscos,
