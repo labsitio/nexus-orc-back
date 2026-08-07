@@ -13,8 +13,8 @@ export type { ProblemDetails } from './status.schema.js';
  *
  * CRUD simples de parâmetro operacional (nota de complexidade YAGNI do
  * `plan.md`, seção Interface) — sem agregado rico, transaction script direto
- * sobre `faixas_preco_categoria`. Consumido pelo controller (T044) quando
- * este existir — aqui define-se apenas o contrato.
+ * sobre `faixas_preco_categoria`. Consumido por
+ * `faixa-preco-categoria.controller.ts` (T044).
  */
 
 export const dinheiroSchema = z.object({

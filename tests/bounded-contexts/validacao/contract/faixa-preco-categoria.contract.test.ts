@@ -19,19 +19,15 @@ import {
  * operacional (transaction script, ver nota de complexidade YAGNI do
  * `plan.md`, seção Interface).
  *
- * Fronteira desta task vs T041/T043/T044 (ver tasks.md, Phase 5): este
- * arquivo é o teste de contrato escrito ANTES da implementação de borda —
- * `DrizzleFaixaPrecoRepository.upsert` (T043) e o controller HTTP (T044)
- * ainda não existem, então não há rota Fastify real para exercitar via
- * `app.inject`. Mesma convenção já usada em `decisao-humana.contract.test.ts`
- * (T032, antes de T035/T036): valida o contrato de borda (Zod, espelhando
- * `docs/openapi.yaml` -> `FaixaPrecoCategoria`/`ProblemDetails`) e, para o
- * critério de aceite "válido/consistente antes de persistir", exercita
- * diretamente o único ponto de produção que já implementa a regra de
- * validação de faixa hoje — o VO `FaixaPreco.de` (T007) — cuja
- * `FaixaPrecoInvalidaError` é exatamente o que o controller (T044) mapeará
- * para 400 Problem Details. Quando T043/T044 existirem, este teste deve ser
- * reescrito para `app.inject` real, reusando estes mesmos schemas.
+ * Escrito ANTES da implementação de borda (T038, antes de T043/T044) —
+ * valida o contrato de forma (Zod, espelhando `docs/openapi.yaml` ->
+ * `FaixaPrecoCategoria`/`ProblemDetails`) e a regra de domínio subjacente
+ * (`FaixaPreco.de`, T007) isoladamente. O controller HTTP real (T044,
+ * `faixa-preco-categoria.controller.ts`) e o repositório (T043) já existem
+ * hoje — cobertura via `app.inject` real vive em
+ * `faixa-preco-categoria.controller.test.ts`; este arquivo continua válido
+ * como teste de contrato/domínio, sem `app.inject`, para não duplicar setup
+ * de Fastify.
  * `problemDetailsSchema` é reexportado de `status.schema.ts` (mesmo padrão
  * de reuso já usado em `decisao-humana.schema.ts`), não redefinido aqui.
  */
