@@ -110,7 +110,7 @@
 ### Implementation (US3)
 
 - [x] T041 [US3] Infrastructure: `BedrockCategorizadorItemGateway` + `BedrockCategorizacaoACL` (structured output/tool-use restrito ao catálogo configurado, nunca parsing de texto livre por regex; mitigação de prompt injection via bloco delimitado de conteúdo, mesmo padrão das specs 001/002). Implementado em `bedrock-categorizador-item.gateway.ts` (issue #151) — `BedrockCategorizacaoACL` já mergeada em T039/#149. Wiring no caso de uso `ValidarOrcamento` é escopo de T042/#152.
-- [ ] T042 [US3] Application: estender `ValidarOrcamento` para, antes de aplicar a regra de preço, invocar `AgenteCategorizadorItemGateway` para cada item sem `categoria` conhecida.
+- [x] T042 [US3] Application: estender `ValidarOrcamento` para, antes de aplicar a regra de preço, invocar `AgenteCategorizadorItemGateway` para cada item sem `categoria` conhecida. Implementado em `validar-orcamento.ts` (PR #680, issue #152) — item já categorizado nunca vai ao agente; catálogo vazio (sem faixa configurada) também nunca invoca; falha do agente propaga (mensagem SQS retenta).
 - [ ] T043 [US3] Infrastructure: `DrizzleFaixaPrecoRepository` (T023) completo com escrita (`upsert`) além da leitura já usada em US1.
 - [ ] T044 [US3] Interface: controllers `POST`/`GET /v1/configuracoes/faixas-preco-categoria` (Zod schema, papel administrativo distinto via Cognito, transaction script sem agregado rico).
 - [ ] T045 [US3] IAM: role dedicada `ValidarOrcamentoLambdaRole` (T028) estendida com `bedrock:InvokeModel` restrito ao ARN do modelo de categorização aprovado.
