@@ -20,7 +20,10 @@ function appComRotaProtegida() {
     clientId: 'client-teste',
   });
   app.get('/protegida', { preHandler }, async (request, reply) =>
-    reply.status(200).send({ tenantId: request.tenantContext?.tenantId.toString() }),
+    reply.status(200).send({
+      tenantId: request.tenantContext?.tenantId.toString(),
+      papeis: request.papeis,
+    }),
   );
   return app;
 }
@@ -95,7 +98,7 @@ describe('criarTenantContextMiddleware', () => {
     });
 
     expect(resposta.statusCode).toBe(200);
-    expect(resposta.json()).toEqual({ tenantId: TENANT_ID_VALIDO });
+    expect(resposta.json()).toEqual({ tenantId: TENANT_ID_VALIDO, papeis: [] });
     await app.close();
   });
 
@@ -111,7 +114,65 @@ describe('criarTenantContextMiddleware', () => {
     });
 
     expect(resposta.statusCode).toBe(200);
-    expect(resposta.json()).toEqual({ tenantId: TENANT_ID_VALIDO });
+    expect(resposta.json()).toEqual({ tenantId: TENANT_ID_VALIDO, papeis: [] });
+    await app.close();
+  });
+
+  it('popula request.papeis a partir da claim cognito:groups do payload já verificado', async () => {
+    mockVerify.mockResolvedValue({
+      sub: 'usuario-1',
+      'custom:tenant_id': TENANT_ID_VALIDO,
+      'cognito:groups': ['comprador-responsavel', 'admin'],
+    });
+    const app = appComRotaProtegida();
+
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/protegida',
+      headers: { authorization: 'Bearer token-valido' },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json()).toEqual({
+      tenantId: TENANT_ID_VALIDO,
+      papeis: ['comprador-responsavel', 'admin'],
+    });
+    expect(mockVerify).toHaveBeenCalledTimes(1);
+    await app.close();
+  });
+
+  it('lista vazia quando o token não tem cognito:groups — não lança erro', async () => {
+    mockVerify.mockResolvedValue({ sub: 'usuario-1', 'custom:tenant_id': TENANT_ID_VALIDO });
+    const app = appComRotaProtegida();
+
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/protegida',
+      headers: { authorization: 'Bearer token-valido' },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().papeis).toEqual([]);
+    await app.close();
+  });
+
+  it('ignora papel forjado no body — só usa a claim cognito:groups do JWT', async () => {
+    mockVerify.mockResolvedValue({
+      sub: 'usuario-1',
+      'custom:tenant_id': TENANT_ID_VALIDO,
+      'cognito:groups': ['leitor'],
+    });
+    const app = appComRotaProtegida();
+
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/protegida',
+      headers: { authorization: 'Bearer token-valido' },
+      payload: { papeis: ['admin'] },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().papeis).toEqual(['leitor']);
     await app.close();
   });
 });
