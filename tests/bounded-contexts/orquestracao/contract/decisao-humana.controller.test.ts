@@ -285,4 +285,57 @@ describe('POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana — controll
       expect(resposta.statusCode).toBe(200);
     });
   });
+
+  it('401 Problem Details — papel presente mas tenantContext ausente (fallback defensivo)', async () => {
+    montarApp(async (request) => {
+      request.papeis = ['comprador-responsavel']; // sem popular request.tenantContext
+    });
+    const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726bc');
+
+    const resposta = await app.inject({
+      method: 'POST',
+      url: `/v1/orcamentos/${id.toString()}/workflow/decisao-humana`,
+      payload: { acao: 'APROVAR', justificativa: 'x' },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
+  });
+
+  it('sem opts.preHandler (default {}) — guard ainda protege a rota', async () => {
+    app = Fastify();
+    registrarRotaDecisaoHumanaWorkflow(
+      app,
+      new RegistrarDecisaoHumanaWorkflow(() => repositorio, publisher),
+      new ConsultarStatusDecisaoWorkflow(() => repositorio),
+    );
+    const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726be');
+
+    const resposta = await app.inject({
+      method: 'POST',
+      url: `/v1/orcamentos/${id.toString()}/workflow/decisao-humana`,
+      payload: { acao: 'APROVAR', justificativa: 'x' },
+    });
+
+    expect(resposta.statusCode).toBe(403);
+  });
+
+  it('erro de domínio não mapeado propaga (500) em vez de virar Problem Details silencioso', async () => {
+    class RepositorioQuebrado extends DecisaoWorkflowRepositoryFake {
+      async buscarPorOrcamentoId(): Promise<never> {
+        throw new Error('falha inesperada de infraestrutura');
+      }
+    }
+    repositorio = new RepositorioQuebrado();
+    montarApp(criarPreHandlerFakeAutenticado(TENANT_ID));
+    const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726bf');
+
+    const resposta = await app.inject({
+      method: 'POST',
+      url: `/v1/orcamentos/${id.toString()}/workflow/decisao-humana`,
+      payload: { acao: 'APROVAR', justificativa: 'x' },
+    });
+
+    expect(resposta.statusCode).toBe(500);
+  });
 });
