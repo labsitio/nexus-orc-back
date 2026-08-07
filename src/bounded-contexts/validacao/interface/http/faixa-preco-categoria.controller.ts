@@ -1,10 +1,12 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { criarExigenciaPapel } from '../../../../interface/shared/role-guard.middleware.js';
 import type { ParametroFaixaPrecoGateway } from '../../domain/gateways/parametro-faixa-preco.gateway.js';
-import { CategoriaItem } from '../../domain/value-objects/categoria-item.vo.js';
-import { Dinheiro } from '../../domain/value-objects/dinheiro.vo.js';
-import { FaixaPreco } from '../../domain/value-objects/faixa-preco.vo.js';
-import { ErroDominio } from '../../domain/errors/erro-dominio.js';
+import {
+  CategoriaItem,
+  CategoriaItemInvalidaError,
+} from '../../domain/value-objects/categoria-item.vo.js';
+import { Dinheiro, DinheiroInvalidoError } from '../../domain/value-objects/dinheiro.vo.js';
+import { FaixaPreco, FaixaPrecoInvalidaError } from '../../domain/value-objects/faixa-preco.vo.js';
 import {
   faixaPrecoCategoriaRequestSchema,
   faixaPrecoCategoriaResponseSchema,
@@ -102,7 +104,15 @@ export function registrarRotaFaixaPrecoCategoria(
 
         await reply.status(201).send(paraResposta(faixaPreco));
       } catch (erro) {
-        if (erro instanceof ErroDominio) {
+        // Só os 3 subtipos que este caminho pode de fato lançar — nunca a
+        // classe-base `ErroDominio` (achado do backend-reviewer, PR #700):
+        // um futuro erro de domínio deste BC não cai aqui por engano sob um
+        // título genérico "Faixa de preço inválida" que pode não se aplicar.
+        if (
+          erro instanceof CategoriaItemInvalidaError ||
+          erro instanceof DinheiroInvalidoError ||
+          erro instanceof FaixaPrecoInvalidaError
+        ) {
           const problema: ProblemDetails = {
             type: 'https://nexo.internal/problems/faixa-preco-invalida',
             title: 'Faixa de preço inválida',
