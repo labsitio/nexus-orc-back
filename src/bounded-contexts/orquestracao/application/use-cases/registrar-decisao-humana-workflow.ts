@@ -53,20 +53,17 @@ export class RegistrarDecisaoHumanaWorkflow {
     decisaoWorkflow.registrarDecisaoHumana(decisao);
     await repositorio.salvar(decisaoWorkflow);
 
+    const idParaEventos = orcamentoId.toString();
     const tenantIdParaEventos = decisaoWorkflow.tenantId.toString();
     const decisaoRegistrada = decisaoWorkflow.decisaoAtual!;
 
     await this.publisher.publicar(
-      criarEventoDesfecho(orcamentoIdBruto, decisaoRegistrada, tenantIdParaEventos),
+      criarEventoDesfecho(idParaEventos, decisaoRegistrada, tenantIdParaEventos),
     );
 
     if (decisaoRegistrada.requerIntegracaoExterna) {
       await this.publisher.publicar(
-        new IntegracaoExternaSolicitada(
-          orcamentoIdBruto,
-          decisaoRegistrada.acao,
-          tenantIdParaEventos,
-        ),
+        new IntegracaoExternaSolicitada(idParaEventos, decisaoRegistrada.acao, tenantIdParaEventos),
       );
     }
   }
