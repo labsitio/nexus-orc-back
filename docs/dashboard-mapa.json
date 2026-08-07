@@ -1,0 +1,90 @@
+{
+  "gerado_de": "docs/plano-finalizacao.md — 3ª revisão, 2026-08-06",
+  "fases": [
+    {
+      "id": "0",
+      "titulo": "Desbloqueio imediato",
+      "status": "concluida",
+      "issues": [592, 618]
+    },
+    {
+      "id": "1",
+      "titulo": "Retrofit multi-tenant 007 (001-005)",
+      "status": "concluida",
+      "issues": [
+        277, 278, 279, 280, 281, 297, 582, 583, 584, 585, 586, 587, 631, 632, 648, 649, 650, 656
+      ]
+    },
+    {
+      "id": "2",
+      "titulo": "Completar 005 (decisão, reenvio, integração) e 003 (categorização)",
+      "status": "em-andamento",
+      "issues": [
+        149, 150, 151, 152, 153, 154, 155, 156, 229, 230, 237, 238, 239, 241, 242, 243, 244, 246,
+        248, 250, 251, 252, 253, 254, 255, 256, 257, 260, 261, 262, 263, 664
+      ]
+    },
+    {
+      "id": "3",
+      "titulo": "Encadear o pipeline local completo (001→005)",
+      "status": "pendente",
+      "issues": [192, 200]
+    },
+    {
+      "id": "4",
+      "titulo": "Handlers de produção 001-003, IAM e Acompanhamento",
+      "status": "pendente",
+      "issues": [
+        53, 65, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 298, 299,
+        300, 301, 576, 577, 578, 579, 580, 588, 589, 590, 613, 614, 615, 616, 617, 619, 620, 621,
+        641
+      ]
+    },
+    {
+      "id": "5",
+      "titulo": "Validação com AWS real",
+      "status": "pendente",
+      "nota": "exige credencial AWS — o time não tem acesso hoje",
+      "issues": [63, 64, 107, 109, 157, 158, 202, 203, 258, 259, 314, 315, 316, 317, 318]
+    },
+    {
+      "id": "6",
+      "titulo": "008 LGPD e 009 custo (restante)",
+      "status": "pendente",
+      "issues": [
+        314, 315, 316, 317, 318, 321, 322, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334,
+        335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 351, 356, 357,
+        358, 359, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376,
+        377, 378, 379, 380, 381, 382, 383, 384
+      ]
+    }
+  ],
+  "prioridades": {
+    "P0": [],
+    "P1": [
+      149, 150, 151, 152, 153, 154, 155, 229, 237, 238, 246, 248, 250, 251, 252, 253, 254, 255,
+      256, 635, 664
+    ],
+    "P2": [
+      53, 54, 61, 62, 63, 64, 65, 107, 109, 110, 156, 157, 158, 159, 160, 186, 187, 192, 195, 196,
+      197, 200, 201, 202, 203, 204, 205, 206, 230, 239, 241, 242, 243, 244, 257, 258, 259, 260,
+      261, 262, 263, 576, 577, 578, 579, 580, 588, 589, 590, 613, 614, 615, 616, 617, 619, 620,
+      621, 641
+    ],
+    "P3": [
+      314, 315, 316, 317, 318, 321, 322, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334,
+      335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 351, 356, 357,
+      358, 359, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376,
+      377, 378, 379, 380, 381, 382, 383, 384, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292,
+      293, 294, 295, 296, 298, 299, 300, 301
+    ]
+  },
+  "riscos": [
+    "Cutover de tenantId já é produção-visível em 004/005, mas nenhuma dessas Lambdas rodou em AWS real — LocalStack não aplica IAM nem RLS Postgres como o Aurora.",
+    "#635 (teste adversarial de tenantId forjado) segue OPEN: o retrofit de segurança fechou por código, sem prova automatizada sob adversário.",
+    "005 é o BC de maior risco financeiro e menor cobertura de regra de negócio, e agora sem gate formal na frente — fácil de adiar por conveniência.",
+    "#664 (modelo Bedrock do Agente Orquestrador) é decisão em aberto sem ADR; trabalho em 005 que assuma um cliente específico corre risco de retrabalho.",
+    "001-003 seguem sem handler de produção (#613-#616) enquanto 004/005 já têm — o pipeline de produção está desbalanceado.",
+    "Ollama (#617, #619, #620, #621) não reduz a necessidade de validação com Bedrock real na Fase 5."
+  ]
+}

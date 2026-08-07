@@ -62,11 +62,39 @@ export interface SpecMetrica {
   readonly percentual: number;
 }
 
+export interface FaseMetrica {
+  readonly id: string;
+  readonly titulo: string;
+  readonly status: 'concluida' | 'em-andamento' | 'pendente';
+  readonly nota: string | undefined;
+  readonly total: number;
+  readonly fechadas: number;
+  readonly percentual: number;
+}
+
+export interface ItemIssue {
+  readonly number: number;
+  readonly title: string;
+  readonly url: string;
+  readonly spec: string;
+}
+
+export interface Deriva {
+  /** Issues citadas nas prioridades do mapa que já fecharam — sinal de plano defasado. */
+  readonly mapaJaFechadas: number;
+  /** Issues abertas que nenhuma prioridade do mapa cita — sinal de triagem pendente. */
+  readonly naoMapeadas: readonly ItemIssue[];
+}
+
 export interface Metricas {
   readonly geradoEm: string;
   readonly geradoDe: string;
   readonly global: ResumoGlobal;
   readonly specs: readonly SpecMetrica[];
+  readonly fases: readonly FaseMetrica[];
+  readonly caminhoCritico: readonly ItemIssue[];
+  readonly deriva: Deriva;
+  readonly riscos: readonly string[];
 }
 
 /** Bucket das issues sem prefixo, sem milestone e sem label `spec-*`. */
@@ -160,11 +188,68 @@ function metricasPorSpec(issues: readonly Issue[]): SpecMetrica[] {
     });
 }
 
+function paraItem(issue: Issue): ItemIssue {
+  return { number: issue.number, title: issue.title, url: issue.url, spec: specDaIssue(issue) };
+}
+
+function metricasPorFase(issues: readonly Issue[], mapa: Mapa): FaseMetrica[] {
+  const porNumero = new Map(issues.map((i) => [i.number, i]));
+
+  return mapa.fases.map((fase) => {
+    // Número do mapa sem issue correspondente no board (removida, ou digitada errado)
+    // simplesmente não conta — o mapa é curado à mão e não deve derrubar a geração.
+    const daFase = fase.issues.flatMap((numero) => {
+      const issue = porNumero.get(numero);
+      return issue === undefined ? [] : [issue];
+    });
+    const fechadas = daFase.filter((i) => i.state === 'CLOSED').length;
+
+    return {
+      id: fase.id,
+      titulo: fase.titulo,
+      status: fase.status,
+      nota: fase.nota,
+      total: daFase.length,
+      fechadas,
+      percentual: percentual(fechadas, daFase.length),
+    };
+  });
+}
+
+function todosOsNumerosPriorizados(mapa: Mapa): Set<number> {
+  const { P0, P1, P2, P3 } = mapa.prioridades;
+  return new Set([...P0, ...P1, ...P2, ...P3]);
+}
+
+function caminhoCritico(issues: readonly Issue[], mapa: Mapa): ItemIssue[] {
+  const p1 = new Set(mapa.prioridades.P1);
+  return issues
+    .filter((i) => i.state === 'OPEN' && p1.has(i.number))
+    .sort((a, b) => a.number - b.number)
+    .map(paraItem);
+}
+
+function deriva(issues: readonly Issue[], mapa: Mapa): Deriva {
+  const priorizadas = todosOsNumerosPriorizados(mapa);
+
+  return {
+    mapaJaFechadas: issues.filter((i) => i.state === 'CLOSED' && priorizadas.has(i.number)).length,
+    naoMapeadas: issues
+      .filter((i) => i.state === 'OPEN' && !priorizadas.has(i.number))
+      .sort((a, b) => a.number - b.number)
+      .map(paraItem),
+  };
+}
+
 export function calcular(issues: readonly Issue[], mapa: Mapa, agora: Date): Metricas {
   return {
     geradoEm: agora.toISOString(),
     geradoDe: mapa.gerado_de,
     global: resumoGlobal(issues),
     specs: metricasPorSpec(issues),
+    fases: metricasPorFase(issues, mapa),
+    caminhoCritico: caminhoCritico(issues, mapa),
+    deriva: deriva(issues, mapa),
+    riscos: mapa.riscos,
   };
 }

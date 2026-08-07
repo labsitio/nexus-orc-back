@@ -141,3 +141,131 @@ describe('calcular — agrupamento por spec', () => {
     expect(specs.map((s) => s.spec)).toEqual(['001', '009', SEM_SPEC]);
   });
 });
+
+describe('calcular — fases', () => {
+  it('calcula o percentual de cada fase a partir das issues listadas no mapa', () => {
+    const mapa: Mapa = {
+      ...mapaVazio,
+      fases: [
+        { id: '2', titulo: 'Completar 005 e 003', status: 'em-andamento', issues: [10, 11, 12] },
+        {
+          id: '5',
+          titulo: 'Validação com AWS real',
+          status: 'pendente',
+          nota: 'exige credencial AWS',
+          issues: [20],
+        },
+      ],
+    };
+    const issues = [
+      issue({ number: 10, state: 'CLOSED', closedAt: '2026-08-01T00:00:00Z' }),
+      issue({ number: 11 }),
+      issue({ number: 12 }),
+      issue({ number: 20 }),
+    ];
+
+    const { fases } = calcular(issues, mapa, AGORA);
+
+    expect(fases).toEqual([
+      {
+        id: '2',
+        titulo: 'Completar 005 e 003',
+        status: 'em-andamento',
+        nota: undefined,
+        total: 3,
+        fechadas: 1,
+        percentual: 33.3,
+      },
+      {
+        id: '5',
+        titulo: 'Validação com AWS real',
+        status: 'pendente',
+        nota: 'exige credencial AWS',
+        total: 1,
+        fechadas: 0,
+        percentual: 0,
+      },
+    ]);
+  });
+
+  it('ignora número de issue do mapa que não existe mais no board', () => {
+    const mapa: Mapa = {
+      ...mapaVazio,
+      fases: [{ id: '0', titulo: 'Fase 0', status: 'concluida', issues: [10, 999] }],
+    };
+    const issues = [issue({ number: 10, state: 'CLOSED', closedAt: '2026-08-01T00:00:00Z' })];
+
+    const { fases } = calcular(issues, mapa, AGORA);
+
+    expect(fases[0]?.total).toBe(1);
+    expect(fases[0]?.percentual).toBe(100);
+  });
+});
+
+describe('calcular — caminho crítico e deriva', () => {
+  it('lista apenas as P1 ainda abertas, ordenadas por número', () => {
+    const mapa: Mapa = { ...mapaVazio, prioridades: { P0: [], P1: [30, 20, 10], P2: [], P3: [] } };
+    const issues = [
+      issue({ number: 10, title: '[003] categorizar item' }),
+      issue({ number: 20, title: '[005] decisao humana' }),
+      issue({
+        number: 30,
+        title: '[005] ja fechada',
+        state: 'CLOSED',
+        closedAt: '2026-08-01T00:00:00Z',
+      }),
+    ];
+
+    const { caminhoCritico } = calcular(issues, mapa, AGORA);
+
+    expect(caminhoCritico).toEqual([
+      {
+        number: 10,
+        title: '[003] categorizar item',
+        url: 'https://github.com/labsitio/nexus-orc-back/issues/10',
+        spec: '003',
+      },
+      {
+        number: 20,
+        title: '[005] decisao humana',
+        url: 'https://github.com/labsitio/nexus-orc-back/issues/20',
+        spec: '005',
+      },
+    ]);
+  });
+
+  it('conta as issues do mapa que já fecharam', () => {
+    const mapa: Mapa = { ...mapaVazio, prioridades: { P0: [], P1: [10], P2: [20], P3: [] } };
+    const issues = [
+      issue({ number: 10, state: 'CLOSED', closedAt: '2026-08-01T00:00:00Z' }),
+      issue({ number: 20, state: 'CLOSED', closedAt: '2026-08-02T00:00:00Z' }),
+      issue({ number: 30 }),
+    ];
+
+    const { deriva } = calcular(issues, mapa, AGORA);
+
+    expect(deriva.mapaJaFechadas).toBe(2);
+  });
+
+  it('reporta issue aberta que não está em nenhuma prioridade do mapa', () => {
+    const mapa: Mapa = { ...mapaVazio, prioridades: { P0: [], P1: [10], P2: [], P3: [] } };
+    const issues = [issue({ number: 10 }), issue({ number: 40, title: '[008] issue nova' })];
+
+    const { deriva } = calcular(issues, mapa, AGORA);
+
+    expect(deriva.naoMapeadas).toEqual([
+      {
+        number: 40,
+        title: '[008] issue nova',
+        url: 'https://github.com/labsitio/nexus-orc-back/issues/40',
+        spec: '008',
+      },
+    ]);
+  });
+
+  it('repassa os riscos do mapa sem transformação', () => {
+    const mapa: Mapa = { ...mapaVazio, riscos: ['risco A', 'risco B'] };
+
+    expect(calcular([], mapa, AGORA).riscos).toEqual(['risco A', 'risco B']);
+  });
+});
