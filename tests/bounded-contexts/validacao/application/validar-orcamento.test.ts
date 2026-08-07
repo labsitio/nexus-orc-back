@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { ValidarOrcamento } from '../../../../src/bounded-contexts/validacao/application/use-cases/validar-orcamento.js';
 import { OrcamentoValidacao } from '../../../../src/bounded-contexts/validacao/domain/orcamento-validacao.aggregate.js';
+import { CategoriaItem } from '../../../../src/bounded-contexts/validacao/domain/value-objects/categoria-item.vo.js';
 import { CNPJ } from '../../../../src/bounded-contexts/validacao/domain/value-objects/cnpj.vo.js';
 import { DadosExtraidosParaValidacao } from '../../../../src/bounded-contexts/validacao/domain/value-objects/dados-extraidos-para-validacao.vo.js';
 import { Dinheiro } from '../../../../src/bounded-contexts/validacao/domain/value-objects/dinheiro.vo.js';
+import { FaixaPreco } from '../../../../src/bounded-contexts/validacao/domain/value-objects/faixa-preco.vo.js';
 import { ItemParaValidacao } from '../../../../src/bounded-contexts/validacao/domain/value-objects/item-para-validacao.vo.js';
 import { OrcamentoId } from '../../../../src/bounded-contexts/validacao/domain/value-objects/orcamento-id.vo.js';
 import { PeriodoValidade } from '../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
-import type { FaixaPreco } from '../../../../src/bounded-contexts/validacao/domain/value-objects/faixa-preco.vo.js';
+import type {
+  AgenteCategorizadorItemGateway,
+  AgenteCategorizadorItemInput,
+} from '../../../../src/bounded-contexts/validacao/domain/gateways/agente-categorizador-item.gateway.js';
 import type { FornecedorCadastradoGateway } from '../../../../src/bounded-contexts/validacao/domain/gateways/fornecedor-cadastrado.gateway.js';
 import type { ParametroFaixaPrecoGateway } from '../../../../src/bounded-contexts/validacao/domain/gateways/parametro-faixa-preco.gateway.js';
 import type {
@@ -77,6 +82,30 @@ class EventPublisherFake implements EventPublisher {
   }
 }
 
+/**
+ * Fake de `AgenteCategorizadorItemGateway` (T042) — por padrão rejeita
+ * qualquer chamada (`AgenteCategorizadorNuncaChamadoError`), forçando os
+ * testes que não esperam categorização a falhar explicitamente se o agente
+ * for invocado por engano. Testes que exercitam a categorização passam uma
+ * `categoria` fixa.
+ */
+class AgenteCategorizadorNuncaChamadoError extends Error {}
+
+class AgenteCategorizadorItemGatewayFake implements AgenteCategorizadorItemGateway {
+  chamadas: AgenteCategorizadorItemInput[] = [];
+  constructor(private readonly categoria?: CategoriaItem) {}
+
+  async categorizar(input: AgenteCategorizadorItemInput): Promise<CategoriaItem> {
+    this.chamadas.push(input);
+    if (!this.categoria) {
+      throw new AgenteCategorizadorNuncaChamadoError(
+        'AgenteCategorizadorItemGatewayFake: chamada inesperada neste teste',
+      );
+    }
+    return this.categoria;
+  }
+}
+
 const CNPJ_VALIDO = '11222333000181';
 const ORCAMENTO_ID = OrcamentoId.de('01890a5d-ac96-774b-bcce-b302099a8057');
 const TENANT_ID = TenantId.novo();
@@ -120,6 +149,7 @@ describe('ValidarOrcamento', () => {
       fornecedorCadastrado,
       new ParametroFaixaPrecoGatewayFake(),
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
 
     await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
@@ -146,6 +176,7 @@ describe('ValidarOrcamento', () => {
       new FornecedorCadastradoGatewayFake(false),
       new ParametroFaixaPrecoGatewayFake(),
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
 
     await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
@@ -170,6 +201,7 @@ describe('ValidarOrcamento', () => {
       fornecedorCadastrado,
       new ParametroFaixaPrecoGatewayFake(),
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
 
     await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
@@ -197,6 +229,7 @@ describe('ValidarOrcamento', () => {
       fornecedorCadastrado,
       new ParametroFaixaPrecoGatewayFake(),
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
 
     await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
@@ -216,6 +249,7 @@ describe('ValidarOrcamento', () => {
       new FornecedorCadastradoGatewayFake(true),
       new ParametroFaixaPrecoGatewayFake(),
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
 
     await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
@@ -241,6 +275,7 @@ describe('ValidarOrcamento', () => {
       new FornecedorCadastradoGatewayFake(true),
       new ParametroFaixaPrecoGatewayFake(),
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
 
     await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
@@ -254,4 +289,103 @@ describe('ValidarOrcamento', () => {
   // (`OrcamentoValidacaoSemTenantIdError`) foi removido: `OrcamentoValidacao.criar`
   // exige `tenantId` desde o tipo, então o cenário de agregado legado sem
   // tenantId não é mais representável — a garantia agora vem do compilador.
+
+  // T042 (#152) — categorização de item sem categoria via
+  // `AgenteCategorizadorItemGateway` antes da regra de preço.
+  describe('categorização de item sem categoria (T042)', () => {
+    const faixaCaixas = FaixaPreco.de(
+      CategoriaItem.de('embalagens'),
+      Dinheiro.de(100, 'BRL'),
+      Dinheiro.de(500, 'BRL'),
+    );
+
+    it('invoca o agente categorizador quando o item não tem categoria conhecida', async () => {
+      const repositorio = new OrcamentoValidacaoRepositoryFake();
+      const publisher = new EventPublisherFake();
+      const agenteCategorizador = new AgenteCategorizadorItemGatewayFake(
+        CategoriaItem.de('embalagens'),
+      );
+      const useCase = new ValidarOrcamento(
+        new ACLFake({
+          orcamentoId: ORCAMENTO_ID,
+          dadosExtraidos: dadosConsistentes(),
+          tenantId: TENANT_ID,
+        }),
+        () => repositorio,
+        new FornecedorCadastradoGatewayFake(true),
+        new ParametroFaixaPrecoGatewayFake([faixaCaixas]),
+        publisher,
+        agenteCategorizador,
+      );
+
+      await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+      expect(agenteCategorizador.chamadas).toHaveLength(1);
+      expect(agenteCategorizador.chamadas[0]!.descricaoItem).toBe(
+        'Caixa de papelão ondulado 40x30x20',
+      );
+      expect(agenteCategorizador.chamadas[0]!.catalogoCategorias).toEqual(['embalagens']);
+      expect(repositorio.salvos[0]!.status).toBe('VALIDADO');
+    });
+
+    it('nunca invoca o agente categorizador quando o item já tem categoria conhecida', async () => {
+      const repositorio = new OrcamentoValidacaoRepositoryFake();
+      const publisher = new EventPublisherFake();
+      const agenteCategorizador = new AgenteCategorizadorItemGatewayFake();
+      const dadosComCategoria = DadosExtraidosParaValidacao.de({
+        ...dadosConsistentes(),
+        itens: [
+          ItemParaValidacao.de({
+            descricao: 'Caixa de papelão ondulado 40x30x20',
+            quantidade: 500,
+            precoUnitario: Dinheiro.de(320, 'BRL'),
+            extraido: true,
+            categoria: CategoriaItem.de('embalagens'),
+          }),
+        ],
+      });
+      const useCase = new ValidarOrcamento(
+        new ACLFake({
+          orcamentoId: ORCAMENTO_ID,
+          dadosExtraidos: dadosComCategoria,
+          tenantId: TENANT_ID,
+        }),
+        () => repositorio,
+        new FornecedorCadastradoGatewayFake(true),
+        new ParametroFaixaPrecoGatewayFake([faixaCaixas]),
+        publisher,
+        agenteCategorizador,
+      );
+
+      await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+      expect(agenteCategorizador.chamadas).toHaveLength(0);
+      expect(repositorio.salvos[0]!.status).toBe('VALIDADO');
+    });
+
+    it('propaga a falha do agente categorizador sem persistir nem publicar (mensagem SQS retenta)', async () => {
+      const repositorio = new OrcamentoValidacaoRepositoryFake();
+      const publisher = new EventPublisherFake();
+      const agenteCategorizador = new AgenteCategorizadorItemGatewayFake(); // sem categoria → rejeita
+      const useCase = new ValidarOrcamento(
+        new ACLFake({
+          orcamentoId: ORCAMENTO_ID,
+          dadosExtraidos: dadosConsistentes(),
+          tenantId: TENANT_ID,
+        }),
+        () => repositorio,
+        new FornecedorCadastradoGatewayFake(true),
+        new ParametroFaixaPrecoGatewayFake([faixaCaixas]),
+        publisher,
+        agenteCategorizador,
+      );
+
+      await expect(useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() })).rejects.toThrow(
+        AgenteCategorizadorNuncaChamadoError,
+      );
+
+      expect(repositorio.salvos).toHaveLength(0);
+      expect(publisher.eventosPublicados).toHaveLength(0);
+    });
+  });
 });

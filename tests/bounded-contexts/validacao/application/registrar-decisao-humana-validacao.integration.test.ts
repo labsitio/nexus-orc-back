@@ -12,8 +12,13 @@ import { ItemParaValidacao } from '../../../../src/bounded-contexts/validacao/do
 import { OrcamentoId } from '../../../../src/bounded-contexts/validacao/domain/value-objects/orcamento-id.vo.js';
 import { PeriodoValidade } from '../../../../src/bounded-contexts/validacao/domain/value-objects/periodo-validade.vo.js';
 import type { FaixaPreco } from '../../../../src/bounded-contexts/validacao/domain/value-objects/faixa-preco.vo.js';
+import type { CategoriaItem } from '../../../../src/bounded-contexts/validacao/domain/value-objects/categoria-item.vo.js';
 import type { FornecedorCadastradoGateway } from '../../../../src/bounded-contexts/validacao/domain/gateways/fornecedor-cadastrado.gateway.js';
 import type { ParametroFaixaPrecoGateway } from '../../../../src/bounded-contexts/validacao/domain/gateways/parametro-faixa-preco.gateway.js';
+import type {
+  AgenteCategorizadorItemGateway,
+  AgenteCategorizadorItemInput,
+} from '../../../../src/bounded-contexts/validacao/domain/gateways/agente-categorizador-item.gateway.js';
 import type {
   OrcamentoExtraidoEventACL,
   OrcamentoExtraidoEventACLResultado,
@@ -89,6 +94,17 @@ class OrcamentoValidacaoRepositoryEmMemoria implements OrcamentoValidacaoReposit
 
   async buscarPorOrcamentoId(orcamentoId: OrcamentoId): Promise<OrcamentoValidacao | undefined> {
     return this.porId.get(orcamentoId.toString());
+  }
+}
+
+/**
+ * Nesta suíte nenhum cenário configura faixa de preço (catálogo vazio) —
+ * `ValidarOrcamento` nunca invoca o agente categorizador nesse caso (T042:
+ * sem catálogo não há o que categorizar). Rejeita se for chamado por engano.
+ */
+class AgenteCategorizadorItemGatewayFake implements AgenteCategorizadorItemGateway {
+  async categorizar(_input: AgenteCategorizadorItemInput): Promise<CategoriaItem> {
+    throw new Error('AgenteCategorizadorItemGatewayFake: chamada inesperada neste teste');
   }
 }
 
@@ -206,6 +222,7 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
     await validarOrcamento.executar({ orcamentoId: orcamentoId.toString() });
 
@@ -256,6 +273,7 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
     await validarOrcamento.executar({ orcamentoId: orcamentoId.toString() });
 
@@ -294,6 +312,7 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
     await validarOrcamento.executar({ orcamentoId: orcamentoId.toString() });
     expect(publisher.eventosPublicados).toHaveLength(1);
@@ -351,6 +370,7 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
     await validarPendente.executar({ orcamentoId: orcamentoPendente.toString() });
 
@@ -364,6 +384,7 @@ describe('Fluxo completo de resolução humana de inconsistência (T033)', () =>
       new FornecedorCadastradoGatewayFake(true),
       parametroFaixaPreco,
       publisher,
+      new AgenteCategorizadorItemGatewayFake(),
     );
     await validarConsistente.executar({ orcamentoId: orcamentoConsistente.toString() });
 
