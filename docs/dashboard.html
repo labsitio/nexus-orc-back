@@ -7,7 +7,7 @@
 <!--
   ARQUIVO GERADO — não edite à mão.
   Regerar com: pnpm dashboard
-  Fonte curada: docs/dashboard-mapa.json (docs/plano-finalizacao.md — 3ª revisão, 2026-08-06)
+  Fonte curada: docs/dashboard-mapa.json (docs/plano-finalizacao.md — 3ª revisão, 06/08/2026)
 -->
 <style>
   :root{
@@ -19,7 +19,7 @@
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px;}
   a{color:var(--blue);text-decoration:none;} a:hover{text-decoration:underline;}
-  main{max-width:1100px;margin:0 auto;padding:48px 5vw 80px;}
+  main{max-width:1600px;margin:0 auto;padding:48px clamp(20px,3.5vw,56px) 80px;}
   h1{font-size:clamp(26px,4vw,40px);font-weight:800;letter-spacing:-.5px;}
   h1 .g{background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;}
   h2{font-size:19px;font-weight:800;margin:48px 0 18px;letter-spacing:-.2px;}
@@ -62,14 +62,27 @@
   .coluna span{font-size:9.5px;color:var(--text-muted);white-space:nowrap;}
 
   ul.riscos{list-style:none;display:grid;gap:10px;}
-  ul.riscos li{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--danger);border-radius:10px;padding:12px 16px;font-size:13.5px;}
+  /* Trava de medida: a 1600px de container, uma linha corrida de texto vira
+     parede e ninguém lê até o fim. Os cards e tabelas podem esticar; prosa não. */
+  ul.riscos li{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--danger);border-radius:10px;padding:12px 16px;font-size:13.5px;max-width:110ch;}
+  p.sub{max-width:110ch;}
   .vazio{color:var(--text-muted);font-size:13.5px;}
+
+  @media(max-width:640px){
+    /* Rótulo e barra em cima, contagem embaixo — 3 colunas não cabem no celular. */
+    .linha{grid-template-columns:44px 1fr;row-gap:2px;}
+    .linha .num{grid-column:2;text-align:left;}
+    /* 14 rótulos de data não cabem lado a lado; o title de cada coluna mantém o dado. */
+    .coluna span{display:none;}
+    .grafico{height:110px;}
+    table{display:block;overflow-x:auto;}
+  }
 </style>
 </head>
 <body>
 <main>
   <h1>Status do projeto <span class="g">Nexo</span></h1>
-  <p class="sub">Gerado em 2026-08-07T11:06:30.401Z · camada curada: docs/plano-finalizacao.md — 3ª revisão, 2026-08-06</p>
+  <p class="sub">Gerado em 07/08/2026 09:11:05 (Brasília) · camada curada: docs/plano-finalizacao.md — 3ª revisão, 06/08/2026</p>
 
   <div class="kpis">
     <div class="kpi"><div class="v">64.9%</div><div class="k">concluído</div></div>
@@ -256,62 +269,62 @@
 
   <h2>Ritmo de fechamento — últimos 14 dias</h2>
   <div class="grafico">
-      <div class="coluna" title="2026-07-25: 0">
+      <div class="coluna" title="25/07/2026: 0">
         <div class="haste" style="height:0%"></div>
-        <span>07-25</span>
+        <span>25/07</span>
       </div>
-      <div class="coluna" title="2026-07-26: 0">
+      <div class="coluna" title="26/07/2026: 0">
         <div class="haste" style="height:0%"></div>
-        <span>07-26</span>
+        <span>26/07</span>
       </div>
-      <div class="coluna" title="2026-07-27: 0">
+      <div class="coluna" title="27/07/2026: 0">
         <div class="haste" style="height:0%"></div>
-        <span>07-27</span>
+        <span>27/07</span>
       </div>
-      <div class="coluna" title="2026-07-28: 0">
+      <div class="coluna" title="28/07/2026: 0">
         <div class="haste" style="height:0%"></div>
-        <span>07-28</span>
+        <span>28/07</span>
       </div>
-      <div class="coluna" title="2026-07-29: 19">
+      <div class="coluna" title="29/07/2026: 19">
         <div class="haste" style="height:24.050632911392405%"></div>
-        <span>07-29</span>
+        <span>29/07</span>
       </div>
-      <div class="coluna" title="2026-07-30: 56">
+      <div class="coluna" title="30/07/2026: 56">
         <div class="haste" style="height:70.88607594936708%"></div>
-        <span>07-30</span>
+        <span>30/07</span>
       </div>
-      <div class="coluna" title="2026-07-31: 79">
+      <div class="coluna" title="31/07/2026: 79">
         <div class="haste" style="height:100%"></div>
-        <span>07-31</span>
+        <span>31/07</span>
       </div>
-      <div class="coluna" title="2026-08-01: 18">
+      <div class="coluna" title="01/08/2026: 18">
         <div class="haste" style="height:22.78481012658228%"></div>
-        <span>08-01</span>
+        <span>01/08</span>
       </div>
-      <div class="coluna" title="2026-08-02: 24">
+      <div class="coluna" title="02/08/2026: 24">
         <div class="haste" style="height:30.37974683544304%"></div>
-        <span>08-02</span>
+        <span>02/08</span>
       </div>
-      <div class="coluna" title="2026-08-03: 40">
+      <div class="coluna" title="03/08/2026: 40">
         <div class="haste" style="height:50.63291139240506%"></div>
-        <span>08-03</span>
+        <span>03/08</span>
       </div>
-      <div class="coluna" title="2026-08-04: 18">
+      <div class="coluna" title="04/08/2026: 18">
         <div class="haste" style="height:22.78481012658228%"></div>
-        <span>08-04</span>
+        <span>04/08</span>
       </div>
-      <div class="coluna" title="2026-08-05: 8">
+      <div class="coluna" title="05/08/2026: 8">
         <div class="haste" style="height:10.126582278481013%"></div>
-        <span>08-05</span>
+        <span>05/08</span>
       </div>
-      <div class="coluna" title="2026-08-06: 9">
+      <div class="coluna" title="06/08/2026: 9">
         <div class="haste" style="height:11.39240506329114%"></div>
-        <span>08-06</span>
+        <span>06/08</span>
       </div>
-      <div class="coluna" title="2026-08-07: 5">
+      <div class="coluna" title="07/08/2026: 5">
         <div class="haste" style="height:6.329113924050633%"></div>
-        <span>08-07</span>
-      </div></div><p class="num">Projeção: <strong>2026-08-16</strong>
+        <span>07/08</span>
+      </div></div><p class="num">Projeção: <strong>16/08/2026</strong>
            (9 dias no ritmo atual de
            17.4/dia)
            <span class="pill aviso">amostra de 9 dias</span></p>

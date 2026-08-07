@@ -139,6 +139,42 @@ describe('renderizar — escaping', () => {
   });
 });
 
+describe('renderizar — data e hora', () => {
+  it('mostra o instante de geração como DD/MM/AAAA HH:MM:SS no fuso de Brasília', () => {
+    // 12:00Z é 09:00 em Brasília (UTC-3) — o teste falha se o fuso local vazar.
+    const html = renderizar(metricas({ geradoEm: '2026-08-06T12:00:00.000Z' }));
+
+    expect(html).toContain('Gerado em 06/08/2026 09:00:00 (Brasília)');
+    expect(html).not.toContain('2026-08-06T12:00:00.000Z');
+  });
+
+  it('vira o dia quando o horário UTC cai antes das 03:00', () => {
+    const html = renderizar(metricas({ geradoEm: '2026-08-07T01:30:15.000Z' }));
+
+    expect(html).toContain('Gerado em 06/08/2026 22:30:15 (Brasília)');
+  });
+
+  it('usa relógio de 24 horas à meia-noite, não 24:00', () => {
+    const html = renderizar(metricas({ geradoEm: '2026-08-07T03:00:00.000Z' }));
+
+    expect(html).toContain('Gerado em 07/08/2026 00:00:00 (Brasília)');
+  });
+
+  it('mostra a data projetada como DD/MM/AAAA', () => {
+    const html = renderizar(metricas());
+
+    expect(html).toContain('<strong>11/08/2026</strong>');
+    expect(html).not.toContain('2026-08-11');
+  });
+
+  it('rotula as colunas do gráfico como DD/MM', () => {
+    const html = renderizar(metricas());
+
+    expect(html).toContain('<span>05/08</span>');
+    expect(html).toContain('title="06/08/2026: 2"');
+  });
+});
+
 describe('renderizar — ausência de valores estranhos', () => {
   it('não deixa undefined, NaN ou [object Object] em uma Metricas totalmente populada', () => {
     const html = renderizar(

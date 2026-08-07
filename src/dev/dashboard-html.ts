@@ -21,6 +21,34 @@ function escapar(texto: string): string {
   return texto.replace(/[&<>"']/g, (caractere) => ESCAPES[caractere] ?? caractere);
 }
 
+/**
+ * Fuso fixo de Brasília, não o fuso da máquina: quem lê o dashboard está no
+ * Brasil, e um horário que muda conforme quem gerou o arquivo não é auditável.
+ */
+const HORA_BRASILIA = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** Instante ISO em UTC para `DD/MM/AAAA HH:MM:SS` no fuso de Brasília. */
+function dataHoraBrasilia(iso: string): string {
+  return HORA_BRASILIA.format(new Date(iso)).replace(', ', ' ');
+}
+
+/**
+ * `AAAA-MM-DD` para `DD/MM/AAAA`. É uma data civil, não um instante — converter
+ * fuso aqui deslocaria o dia em um.
+ */
+function dataBrasileira(ymd: string): string {
+  return `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}/${ymd.slice(0, 4)}`;
+}
+
 const ROTULO_STATUS: Readonly<Record<FaseMetrica['status'], string>> = {
   concluida: 'concluída',
   'em-andamento': 'em andamento',
@@ -62,9 +90,9 @@ function graficoVelocidade(metricas: Metricas): string {
   const colunas = metricas.velocidade.serie
     .map(
       (ponto) => `
-      <div class="coluna" title="${ponto.dia}: ${ponto.fechadas}">
+      <div class="coluna" title="${dataBrasileira(ponto.dia)}: ${ponto.fechadas}">
         <div class="haste" style="height:${(ponto.fechadas / pico) * 100}%"></div>
-        <span>${ponto.dia.slice(5)}</span>
+        <span>${dataBrasileira(ponto.dia).slice(0, 5)}</span>
       </div>`,
     )
     .join('');
@@ -72,7 +100,7 @@ function graficoVelocidade(metricas: Metricas): string {
   const projecao =
     metricas.velocidade.dataProjetada === null
       ? '<p class="nota">Sem fechamento nos últimos 7 dias — nenhuma projeção é honesta aqui.</p>'
-      : `<p class="num">Projeção: <strong>${metricas.velocidade.dataProjetada}</strong>
+      : `<p class="num">Projeção: <strong>${dataBrasileira(metricas.velocidade.dataProjetada)}</strong>
            (${metricas.velocidade.diasRestantes} dias no ritmo atual de
            ${metricas.velocidade.mediaMovel7.toFixed(1)}/dia)
            <span class="pill aviso">amostra de ${metricas.velocidade.amostraDias} dias</span></p>`;
@@ -104,7 +132,7 @@ export function renderizar(metricas: Metricas): string {
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px;}
   a{color:var(--blue);text-decoration:none;} a:hover{text-decoration:underline;}
-  main{max-width:1100px;margin:0 auto;padding:48px 5vw 80px;}
+  main{max-width:1600px;margin:0 auto;padding:48px clamp(20px,3.5vw,56px) 80px;}
   h1{font-size:clamp(26px,4vw,40px);font-weight:800;letter-spacing:-.5px;}
   h1 .g{background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;}
   h2{font-size:19px;font-weight:800;margin:48px 0 18px;letter-spacing:-.2px;}
@@ -147,14 +175,27 @@ export function renderizar(metricas: Metricas): string {
   .coluna span{font-size:9.5px;color:var(--text-muted);white-space:nowrap;}
 
   ul.riscos{list-style:none;display:grid;gap:10px;}
-  ul.riscos li{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--danger);border-radius:10px;padding:12px 16px;font-size:13.5px;}
+  /* Trava de medida: a 1600px de container, uma linha corrida de texto vira
+     parede e ninguém lê até o fim. Os cards e tabelas podem esticar; prosa não. */
+  ul.riscos li{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--danger);border-radius:10px;padding:12px 16px;font-size:13.5px;max-width:110ch;}
+  p.sub{max-width:110ch;}
   .vazio{color:var(--text-muted);font-size:13.5px;}
+
+  @media(max-width:640px){
+    /* Rótulo e barra em cima, contagem embaixo — 3 colunas não cabem no celular. */
+    .linha{grid-template-columns:44px 1fr;row-gap:2px;}
+    .linha .num{grid-column:2;text-align:left;}
+    /* 14 rótulos de data não cabem lado a lado; o title de cada coluna mantém o dado. */
+    .coluna span{display:none;}
+    .grafico{height:110px;}
+    table{display:block;overflow-x:auto;}
+  }
 </style>
 </head>
 <body>
 <main>
   <h1>Status do projeto <span class="g">Nexo</span></h1>
-  <p class="sub">Gerado em ${escapar(metricas.geradoEm)} · camada curada: ${escapar(metricas.geradoDe)}</p>
+  <p class="sub">Gerado em ${dataHoraBrasilia(metricas.geradoEm)} (Brasília) · camada curada: ${escapar(metricas.geradoDe)}</p>
 
   <div class="kpis">
     <div class="kpi"><div class="v">${global.percentual}%</div><div class="k">concluído</div></div>
