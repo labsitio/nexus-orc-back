@@ -560,3 +560,145 @@ deploy real.
 
 ## Parecer final
 APROVADO PELO QA
+
+---
+
+# QA Final Report — T020–T026 (issues #25–#31) — PR #426
+
+## SPEC_ID e versão testada
+`001-ingestao-classificacao-orcamentos`. PR #426, branch `feat/001-c-us1`,
+commit `68d034f`, base `main`. Fecha as 7 tasks restantes de US1 (Ingestão
+multi-canal): T020-T026. Primeira validação de QA (não é reteste).
+
+## Resumo executivo
+US1 completa ponta a ponta: `ReceberOrcamento` (T020) com admission gate
+atômico de idempotência; `POST /upload-url` (T021) + `POST /{orcamentoId}/
+confirmar-upload` (T022), que copia o objeto de `pending-uploads/` para o
+prefixo definitivo do canal antes de disparar `ReceberOrcamento`; trigger
+Lambda do canal SFTP (T023) com `Idempotency-Key` derivada do próprio
+evento S3; lifecycle rule + Object Lock explícito curto em `pending-uploads/`
+(T024); middleware Cognito opcional (T025); IAM role dedicada least
+privilege (T026). `backend-reviewer` já aprovou (APPROVE WITH NITS, 4
+rodadas, 2 MAJOR + 1 BLOCKER corrigidos ao longo do processo). QA confirma
+por execução própria e leitura direta do código, não apenas por declaração
+do reviewer anterior — com atenção especial aos 3 riscos mais altos da
+entrega (idempotência atômica sob concorrência, Object Lock × lifecycle,
+referência confirmada nunca apontar para o prefixo pendente que expira).
+
+## Requisitos cobertos e não cobertos
+Cobertos (detalhe em `qa/traceability-matrix.md`):
+- `ReceberOrcamento` persiste e publica a partir de referência S3 já
+  gravada; usa o `orcamentoId` provisório repassado por `confirmar-upload`.
+- Admission gate de idempotência: chave nova reserva antes de qualquer
+  persist/publish; chave repetida dentro do TTL devolve o `OrcamentoId`
+  vencedor sem duplicar efeito colateral (achado MAJOR corrigido).
+- `POST /upload-url`: 201 com `orcamentoId` + `uploadUrl`, nada persistido;
+  PUT presigned assinado com Object Lock explícito curto (2h) — achado
+  BLOCKER corrigido, protegido por guarda em runtime no stack CDK.
+- `POST /confirmar-upload`: localiza o objeto pendente via `HeadObject`,
+  copia para o prefixo definitivo do canal, só então dispara
+  `ReceberOrcamento`; 409 quando o upload nunca foi concluído.
+- Trigger SFTP: chama `ReceberOrcamento` direto com a referência do próprio
+  evento; `Idempotency-Key` derivada de `bucket/key#versionId` — redelivery
+  at-least-once da AWS não duplica (achado MAJOR corrigido); erro explícito
+  se o evento não trouxer `versionId`.
+- Middleware Cognito: 401 sem header, 401 com JWT inválido/expirado, 200
+  com JWT válido — testado isoladamente (preHandler injetável).
+- IAM `ReceberOrcamentoLambdaRole`: `GetObject`/`PutObject`/
+  `PutObjectRetention` restrito ao bucket, nunca `DeleteObject` — confirmado
+  por `cdk synth` + inspeção de código.
+
+Não cobertos / aceitos como fora de escopo desta validação:
+- Wiring de produção do middleware Cognito nos 3 controllers REST (issue
+  futura, confirmado no handoff do dev-back-end) — não é lacuna desta PR.
+- Execução real dos 3 testes de integração de
+  `drizzle-idempotency-key.repository.test.ts` contra Postgres (ambiente
+  Windows deste worktree não conecta via TCP — ver Limitações). Verificado
+  por inspeção de código: `reservar()` é uma única instrução SQL atômica
+  (`INSERT ... ON CONFLICT ... WHERE expira_em <= now() RETURNING`), cuja
+  exclusão mútua sob concorrência real vem do lock de linha do próprio
+  Postgres, não de lógica de aplicação — diferente do padrão check-then-act
+  que o achado MAJOR original eliminou.
+
+## Suítes executadas e comandos
+```
+corepack pnpm install --frozen-lockfile
+corepack pnpm run typecheck
+corepack pnpm run typecheck:infra
+corepack pnpm run lint
+corepack pnpm test
+corepack pnpm exec vitest run --coverage
+corepack pnpm exec cdk synth --quiet
+```
+Detalhe completo (incluindo a tentativa de subir Postgres via
+`docker compose` e o erro de conexão) em `qa/test-execution-report.md`.
+
+## Quantidade de testes por tipo
+214 testes passando (suíte inteira, 46 arquivos) + 27 skipped (6 arquivos,
+integração Drizzle/Postgres sem `DATABASE_URL`) — no escopo direto desta PR:
+5 unit (`ReceberOrcamento`), 3 integração Postgres skipped (idempotência),
+3 contrato/HTTP (`upload-url`), 5 contrato/HTTP (`confirmar-upload`), 5 unit
+(`sftp-upload.handler`), 5 unit (`auth-cognito.middleware`), 10 unit
+(`s3-armazenamento-bruto.gateway`, inclui os 2 métodos novos). Demais 181
+testes de trilhas/rodadas anteriores, sem regressão.
+
+## Resultado
+214 aprovados, 0 falhos, 0 ignorados, 0 instáveis (27 skipped por ausência
+de `DATABASE_URL`, mesma limitação de ambiente documentada desde T011).
+Números idênticos aos declarados no corpo da PR.
+
+## Cobertura inicial e final
+Inicial (baseline, `main` antes desta PR, T050-T055/PR #416): Statements
+86.14% · Branches 72.86% · Functions 80.44% · Lines 85.98%.
+Final (commit `68d034f`, suíte inteira sem `DATABASE_URL`): Statements
+82.03% · Branches 71.38% · Functions 73.94% · Lines 82.22% — queda aparente
+explicada por arquivos novos de persistência entrando no denominador com 0%
+sem banco disponível (mesmo padrão de rodadas anteriores, não indica
+regressão real). Arquivos do diff (lidos de `coverage/coverage-final.json`):
+`receber-orcamento.ts`, `upload-url.controller.ts`,
+`s3-armazenamento-bruto.gateway.ts`, `sftp-upload.handler.ts` e
+`auth-cognito.middleware.ts` em **100%** statements/branches/functions/
+lines; `confirmar-upload.controller.ts` em 96% statements/88.9% branch
+(única linha não coberta é uma defesa de tipo sem caminho real via HTTP,
+já documentada no próprio código). Detalhe em `qa/coverage-final.md`.
+
+## Local do allure-results e do relatório Allure
+`allure-results/` (raiz do worktree, git-ignorado), 3243 arquivos JSON
+gerados (suíte inteira), todos `"status":"passed"` para os testes
+executados. Relatório HTML não gerado (mesma limitação de todas as rodadas
+anteriores — requer CLI Java Allure). Ver `qa/allure-report.md`.
+
+## Bugs por severidade e status
+Nenhum bug de produção encontrado.
+
+## Riscos residuais
+- Atomicidade do admission gate de idempotência verificada por inspeção de
+  código + 3 testes de integração sequenciais (não executados nesta rodada
+  por limitação de ambiente); não há teste de 2 conexões Postgres
+  simultâneas em `Promise.all` (padrão usado em T011 para `salvar()`).
+  Avaliação de QA: dispensável neste caso porque `reservar()` é uma única
+  instrução SQL atômica, cuja exclusão mútua sob concorrência real vem do
+  lock de linha do Postgres — diferente do caso de T011 (leitura + decisão
+  em múltiplas instruções). Registrado como risco residual de baixa
+  severidade, não bloqueante; um teste de 2 conexões reais fecharia a
+  lacuna de forma mais direta caso o ambiente permita no futuro.
+- Wiring de produção do middleware Cognito nos 3 controllers REST ainda não
+  existe (issue futura, confirmado no handoff do dev-back-end) — não é
+  lacuna desta PR, mas é pré-requisito para os endpoints ficarem
+  efetivamente protegidos em produção.
+- Save-then-publish sem outbox em `ReceberOrcamento` (mesmo padrão já
+  presente em `ClassificarOrcamento`/`ConfirmarRevisaoHumana`, US2/US5) —
+  risco arquitetural já rastreado em trilhas anteriores, não específico
+  desta PR.
+
+## Limitações do ambiente
+`docker compose up -d postgres` sobe o container normalmente, mas
+`pnpm run db:migrate` falha com erro genérico de conexão TCP neste
+ambiente Windows específico (mesma limitação já sinalizada na invocação —
+funciona via socket dentro do container, falha do host; CI Linux não
+reproduz). Os 3 testes de `drizzle-idempotency-key.repository.test.ts`
+seguem sem execução real nesta rodada. Sem AWS/Cognito real — gateway S3,
+middleware Cognito e handler SFTP 100% mockados/locais.
+
+## Parecer final
+APROVADO PELO QA

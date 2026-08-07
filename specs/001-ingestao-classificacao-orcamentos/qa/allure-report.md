@@ -103,3 +103,21 @@ registrada em todas as rodadas anteriores).
 Nenhum dado sensível anexado — fixtures sintéticas (UUIDs gerados por
 `OrcamentoId.novo()`, `'Distribuidora ABC Ltda'`/`'Fornecedor Incerto'`,
 bucket `nexo-orcamentos-raw` fictício).
+
+---
+
+# Allure — T020–T026 (issues #25–#31) — PR #426
+
+Reaproveitado `allure-vitest` + `vitest.config.ts` já configurados.
+`corepack pnpm exec vitest run --coverage` gerou `allure-results/` (raiz do
+worktree, git-ignorado) com resultado por teste da suíte inteira (46 arquivos
+executados, 214 casos + 6 arquivos/27 casos de integração Drizzle/Postgres
+pulados sem `DATABASE_URL`), todos `"status":"passed"`.
+
+Relatório HTML não gerado (requer CLI Java `allure`, mesma limitação
+registrada em todas as rodadas anteriores).
+
+Nenhum dado sensível anexado — fixtures sintéticas (UUIDs gerados por
+`OrcamentoId.novo()`, bucket `nexo-orcamentos-raw` fictício, nomes de
+arquivo fictícios `orcamento.pdf`/`a.pdf`/`b.pdf`, JWT sintético inválido no
+teste de `auth-cognito.middleware.test.ts` — nunca um token/segredo real).

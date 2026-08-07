@@ -371,3 +371,110 @@ seguido de `eventPublisher.publicar()` sem transação/outbox). Já encaminhado
 ao `arquiteto-back` pelo backend-reviewer; QA concorda que não bloqueia esta
 entrega (mesmo risco arquitetural já aceito e rastreado em US2, decisão de
 padrão é do arquiteto, não de código específico desta task).
+
+---
+
+# Relatório de execução — T020–T026 (issues #25–#31) — PR #426
+
+Commit testado: `68d034f` (PR #426, branch `feat/001-c-us1`, base `main`).
+US1 (Ingestão multi-canal) completa. Primeira validação de QA (não reteste).
+Ambiente: worktree `.claude/worktrees/agent-a2007af5ce25cedb3`, Node 24.18.0,
+pnpm 11.18.0 via `corepack pnpm`.
+
+## Comandos e resultados
+
+```
+$ corepack pnpm install --frozen-lockfile
+Already up to date
+EXIT=0
+
+$ corepack pnpm run typecheck        # tsc --noEmit
+EXIT=0 (sem output)
+
+$ corepack pnpm run typecheck:infra  # tsc --noEmit -p infra/tsconfig.json
+EXIT=0 (sem output)
+
+$ corepack pnpm run lint             # eslint .
+EXIT=0 (sem output)
+
+$ corepack pnpm test                 # vitest run --passWithNoTests
+Test Files  46 passed | 6 skipped (52)
+Tests       214 passed | 27 skipped (241)
+EXIT=0
+
+$ corepack pnpm exec vitest run --coverage
+Test Files  46 passed | 6 skipped (52)
+Tests       214 passed | 27 skipped (241)
+All files: Statements 82.03% | Branches 71.38% | Functions 73.94% | Lines 82.22%
+EXIT=0
+allure-results/ gerado (46 arquivos executados, todos passed)
+
+$ corepack pnpm exec cdk synth --quiet
+Successfully synthesized to .../cdk.out
+8 stacks (IngestaoIdentificacaoStorageStack, ReceberOrcamentoLambdaRoleStack,
+DominioEventBusStack, ClassificadorQueueStack, ClassificadorLambdaRoleStack,
+ConfirmarRevisaoHumanaLambdaRoleStack, ExtratorQueueStack, ValidadorQueueStack)
+EXIT=0 (1 warning informativo de cross-stack-reference, não bloqueante)
+```
+
+## Tentativa de integração Postgres real (não bloqueante ao gate)
+```
+$ docker compose up -d postgres
+Container ...-postgres-1 Started
+
+$ DATABASE_URL=postgresql://nexo:nexo@localhost:5432/nexo corepack pnpm run db:migrate
+$ drizzle-kit migrate
+...
+[ELIFECYCLE] Command failed with exit code 1.
+EXIT=1 (erro genérico de conexão, sem detalhe de causa — mesma limitação de
+ambiente Windows já conhecida e sinalizada na invocação: `pg`/Postgres via
+TCP falha do host, funciona via socket dentro do container; CI Linux não
+reproduz)
+```
+Container derrubado (`docker compose down`) após a tentativa. Os 6
+arquivos/27 casos de integração Drizzle/Postgres (incluindo
+`drizzle-idempotency-key.repository.test.ts`, T020) seguem `skip`, mesma
+limitação já registrada em rodadas anteriores (T011, T050-T055).
+
+## Achados de segurança/resiliência verificados por leitura de código
+- **Idempotência atômica** (`DrizzleIdempotencyKeyRepository.reservar`):
+  única instrução `INSERT ... ON CONFLICT (chave) DO UPDATE ... WHERE
+  expira_em <= now() RETURNING` — o lock de linha do Postgres sobre a chave
+  única garante que só uma entre N chamadas concorrentes recebe a linha de
+  `RETURNING`; as demais leem o `orcamentoId` já commitado pela vencedora via
+  `SELECT` de fallback. Não é um check-then-act (leitura separada da
+  escrita) — a exclusão mútua vem da própria instrução SQL, não de lógica de
+  aplicação. Os 3 testes de integração cobrem a semântica sequencialmente
+  (chave livre, chave conflitante dentro do TTL, chave expirada); não há um
+  teste de 2 conexões simultâneas em `Promise.all` (diferente do padrão de
+  T011 para `salvar()`), mas a garantia de atomicidade de uma única
+  instrução SQL não depende desse tipo de teste para ser válida — registrado
+  como risco residual de baixa severidade em `qa/test-plan.md`.
+- **Object Lock × Lifecycle**: `RETENCAO_UPLOAD_PENDENTE_HORAS = 2` (PUT
+  presigned de `gerarUrlUpload`) é menor que `EXPIRACAO_UPLOAD_PENDENTE_DIAS
+  * 24 = 24` (lifecycle rule) — guarda em runtime no construtor do stack
+  (`IngestaoIdentificacaoStorageStack`) lança erro se a invariante for
+  violada; `cdk synth` confirma que os valores atuais não violam a guarda.
+  Teste unitário do gateway confirma `ObjectLockMode: 'GOVERNANCE'` e
+  `ObjectLockRetainUntilDate` ≈ `now + 2h` no comando assinado.
+- **Referência confirmada nunca aponta para `pending-uploads/`**:
+  `confirmarUpload` sempre executa `CopyObjectCommand` para o prefixo
+  definitivo do canal antes de devolver a `ReferenciaS3` usada por
+  `ReceberOrcamento` — confirmado por leitura de código e pelo teste de
+  `confirmar-upload.controller.test.ts` (200 com o mesmo `orcamentoId`).
+- **IAM least privilege**: `ReceberOrcamentoLambdaRole` concede apenas
+  `s3:GetObject`/`s3:PutObject`/`s3:PutObjectRetention` sobre
+  `arnForObjects('*')` do bucket — nenhum `s3:DeleteObject` em nenhuma
+  policy statement, confirmado por inspeção do código-fonte da stack.
+
+## Conclusão
+214/214 testes reais passando (0 falhas, 0 regressões — mesmos números
+declarados no corpo da PR), 27 skipped (integração Postgres sem
+`DATABASE_URL`, limitação de ambiente pré-existente). `tsc --noEmit`
+(app + infra) e `eslint .` limpos. `cdk synth` limpo (8 stacks). Nenhum
+defeito de produção encontrado. Os 3 achados do `backend-reviewer` (2 MAJOR
++ 1 BLOCKER) verificados como corrigidos por leitura de código e cobertos
+por teste automatizado onde o ambiente permitiu (mockado); a atomicidade do
+admission gate de idempotência foi verificada por inspeção de código e
+prova parcial (testes sequenciais), sem execução real contra Postgres nesta
+rodada por limitação de ambiente.

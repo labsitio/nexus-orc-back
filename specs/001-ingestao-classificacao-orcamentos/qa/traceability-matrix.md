@@ -126,3 +126,49 @@ Cobertura da fatia desta task: `confirmar-revisao-humana.ts` 100% em todas as
 métricas; `revisao-humana.controller.ts` 96%/90% branch (gap justificado —
 rethrow de erro inesperado, ver `qa/coverage-final.md`); `revisao-humana.schema.ts`
 100%.
+
+---
+
+# Matriz de rastreabilidade — T020–T026 (issues #25–#31) — PR #426
+
+| Requisito / Critério de aceite | Risco | Nível | Cenário | Arquivo / caso | Resultado |
+|---|---|---|---|---|---|
+| `ReceberOrcamento` persiste `Orcamento.receber` + publica `OrcamentoRecebido` a partir de referência S3 já gravada | Persistência/evento divergente da referência recebida | Unit | referência sintética → `salvar` 1x, `OrcamentoRecebido` 1x com `bucket`/`key`/`versionId` corretos | `receber-orcamento.test.ts` | PASS |
+| `confirmar-upload` repassa o `orcamentoId` provisório de `upload-url` para `ReceberOrcamento` | Identidade devolvida ao cliente na 1ª chamada diverge da persistida na 2ª | Unit | `orcamentoId` provisório informado é o mesmo devolvido | `receber-orcamento.test.ts` | PASS |
+| Admission gate: `Idempotency-Key` repetida (perdeu a corrida) devolve `OrcamentoId` vencedor sem novo persist/publish | Evento `OrcamentoRecebido` duplicado (achado MAJOR do backend-reviewer) | Unit | fake de `reservar` devolve `{reservado:false, orcamentoId: existente}` → 0 `salvar`, 0 `publicar` | `receber-orcamento.test.ts` | PASS |
+| Admission gate: `Idempotency-Key` nova reserva ANTES de persistir/publicar | Persist/publish antes da reserva permitiria janela de corrida | Unit | `reservar` chamado 1x com TTL futuro, seguido de `salvar`/`publicar` 1x cada | `receber-orcamento.test.ts` | PASS |
+| Canal fora dos 4 fixos rejeitado sem efeito colateral | Canal inválido criando registro/evento | Unit | `canal: 'FAX'` → `rejects.toThrow(/Canal inválido/)`, 0 `reservar`/`salvar` | `receber-orcamento.test.ts` | PASS |
+| `IdempotencyKeyRepository.reservar` — chave livre reserva, chave repetida dentro do TTL não reserva e devolve o vencedor, chave expirada reserva de novo | Check-then-act não atômico duplicando persist/publish | Integração (Postgres real) | 3 cenários sequenciais via `INSERT ... ON CONFLICT ... RETURNING` | `drizzle-idempotency-key.repository.test.ts` | SKIP (sem `DATABASE_URL` — ver Limitações) |
+| `POST /upload-url` devolve 201 com `orcamentoId` (UUID v7) + `uploadUrl`, sem persistir nada | Efeito colateral prematuro antes do upload real | Contrato/HTTP | `app.inject` → 201, nenhuma chamada a `OrcamentoRepository`/`EventPublisher` | `upload-url.controller.test.ts` | PASS |
+| `gerarUrlUpload` assina o PUT com `ObjectLockMode: GOVERNANCE` e `ObjectLockRetainUntilDate` curto (2h) | Upload pendente herda a retenção longa (5 anos) do bucket e nunca expira (Object Lock bloqueia a lifecycle rule) — achado corrigido | Unit | fake de `getSignedUrl`/`PutObjectCommand` afirma `ObjectLockMode`/`ObjectLockRetainUntilDate` ≈ `now + 2h` | `s3-armazenamento-bruto.gateway.test.ts` | PASS |
+| `EXPIRACAO_UPLOAD_PENDENTE_DIAS * 24 > RETENCAO_UPLOAD_PENDENTE_HORAS` (lifecycle só expira depois que a retenção já passou) | Lifecycle rule tentando apagar objeto ainda sob Object Lock (S3 ignora silenciosamente) | Infra estático (guarda em runtime) | `IngestaoIdentificacaoStorageStack` lança erro no construtor se a invariante for violada; `cdk synth` sintetiza limpo com os valores atuais (1 dia vs. 2h) | inspeção de código + `cdk synth --quiet` | PASS |
+| `POST /{orcamentoId}/confirmar-upload` localiza o objeto pendente, copia para o prefixo definitivo do canal e só então dispara `ReceberOrcamento` | Referência confirmada apontando para `pending-uploads/`, que a lifecycle rule expira (achado BLOCKER do backend-reviewer) | Contrato/HTTP + Unit (gateway) | `app.inject` com objeto pendente simulado → 200, `ReceberOrcamento` chamado com a referência do prefixo definitivo (não `pending-uploads/`); `confirmarUpload` testado isoladamente com `CopyObjectCommand` afirmando `Key`/`CopySource` do prefixo do canal | `confirmar-upload.controller.test.ts`, `s3-armazenamento-bruto.gateway.test.ts` | PASS |
+| `confirmar-upload` — 409 quando o upload nunca foi concluído (objeto pendente não existe) | Cliente sem feedback claro de upload incompleto | Contrato/HTTP | `HeadObjectCommand` simulado com erro `NotFound` → 409 Problem Details | `confirmar-upload.controller.test.ts` | PASS |
+| Trigger SFTP chama `ReceberOrcamento(canal=SFTP)` direto com a referência do próprio evento S3, sem re-ler o objeto | Latência/custo de releitura desnecessária; referência divergente do evento | Unit | `S3Event` sintético → `ReceberOrcamento.executar` chamado 1x com `bucket`/`key`/`versionId` do evento | `sftp-upload.handler.test.ts` | PASS |
+| Redelivery do mesmo evento S3 (at-least-once da AWS) não duplica salvar/publicar — `Idempotency-Key` derivada de `bucket/key#versionId` | Notificação S3 duplicada reprocessando o mesmo orçamento (achado MAJOR do backend-reviewer) | Unit | mesmo evento entregue 2x → `Idempotency-Key` idêntica nas 2 chamadas a `ReceberOrcamento.executar` | `sftp-upload.handler.test.ts` | PASS |
+| Evento S3 sem `versionId` (bucket sem versionamento) lança erro explícito | Silêncio em vez de erro ao processar bucket mal configurado | Unit | evento sem `versionId` → `rejects.toThrow(/versionId/)` | `sftp-upload.handler.test.ts` | PASS |
+| Middleware Cognito opcional — 401 Problem Details sem header `Authorization`; 200 com JWT válido; 401 com JWT inválido/expirado | Rota exposta sem autenticação quando o `preHandler` é injetado | Unit (fake do verificador JWT) | `criarAutenticacaoCognito` como `preHandler` isolado, 5 casos (ausente/inválido/expirado/válido/formato incorreto) | `auth-cognito.middleware.test.ts` | PASS |
+| IAM `ReceberOrcamentoLambdaRole` least privilege — `GetObject`/`PutObject`/`PutObjectRetention` restrito ao bucket, nunca `DeleteObject` | Role Lambda com permissão excessiva sobre dado bruto imutável (Princípio III) | Infra estático | `cdk synth` sintetiza `ReceberOrcamentoLambdaRoleStack`; inspeção do código confirma ausência de `s3:DeleteObject` em qualquer statement | `cdk synth --quiet` + inspeção manual (`receber-orcamento-lambda-role-stack.ts`) | PASS |
+| Regressão: suíte completa (US1–US5, VOs, agregados, eventos, gateways, controllers) | Quebra de comportamento já validado em rodadas anteriores | Regressão | `corepack pnpm test` | 46 arquivos passed, 214 casos passed (6 arquivos/27 casos skip — integração Postgres sem `DATABASE_URL`) | PASS (0 falhas, 0 regressões) |
+| Tipagem estrita / lint do projeto (app + infra CDK) | Erro de tipo ou violação de estilo não pego | Estático | `corepack pnpm run typecheck`, `typecheck:infra`, `lint` | comandos | PASS (exit 0, sem output) |
+| Infra sintetiza sem erro (8 stacks, incluindo os 2 novos desta PR) | Stack CDK quebrada silenciosamente até o deploy | Infra estático | `corepack pnpm exec cdk synth --quiet` | comando | PASS (synth limpo; 1 warning informativo de cross-stack-reference, não bloqueante) |
+
+Cobertura das fatias do diff desta task (via `coverage/coverage-final.json`,
+métrica direta por arquivo — a tabela resumida do reporter texto do vitest
+trunca nomes de arquivo e alguns rótulos colidem visualmente entre
+`s3-armazenamento-bruto.gateway.ts` e `bedrock-classificador.gateway.ts`; os
+números abaixo são lidos do JSON, não da tabela impressa):
+`receber-orcamento.ts` **100%** statements/branches/functions/lines (14/14,
+6/6); `upload-url.controller.ts` **100%** (10/10, 3/3);
+`s3-armazenamento-bruto.gateway.ts` **100%** (35/35, 12/12);
+`sftp-upload.handler.ts` **100%** (11/11, 4/4);
+`auth-cognito.middleware.ts` **100%** (12/12, 4/4);
+`confirmar-upload.controller.ts` 96% statements (24/25), 88.9% branch (8/9) —
+única linha não coberta é `idempotencyKeyDoHeader`: `if (Array.isArray(valor))
+return valor[0];` (linha 18), defesa de tipo sem caminho real via HTTP (Node
+normaliza headers repetidos em string única, RFC 7230; `Array.isArray` só
+ocorreria para `set-cookie`), já documentado no comentário do próprio código
+— classificado como risco residual trivial, não bloqueante. Repositório de
+idempotência (`drizzle-idempotency-key.repository.ts`) sem cobertura vitest
+nesta rodada — mesma limitação de `DATABASE_URL` já registrada em `qa/
+test-plan.md`.
