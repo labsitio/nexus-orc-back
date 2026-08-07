@@ -1,16 +1,12 @@
 import { DecisaoWorkflow } from '../../domain/aggregates/decisao-workflow.aggregate.js';
 import type { StatusDecisaoWorkflow } from '../../domain/aggregates/decisao-workflow.aggregate.js';
 import { DecisaoWorkflowEscalonadaParaComprador } from '../../domain/events/decisao-workflow-escalonada-para-comprador.event.js';
-import type { DomainEventEnvelope } from '../../domain/events/domain-event.js';
 import { IntegracaoExternaSolicitada } from '../../domain/events/integracao-externa-solicitada.event.js';
-import { OrcamentoAprovadoParaProcessamento } from '../../domain/events/orcamento-aprovado-para-processamento.event.js';
-import { OrcamentoEncaminhadoParaComprador } from '../../domain/events/orcamento-encaminhado-para-comprador.event.js';
-import { OrcamentoReenvioSolicitado } from '../../domain/events/orcamento-reenvio-solicitado.event.js';
 import type { AgenteOrquestradorGateway } from '../../domain/gateways/agente-orquestrador.gateway.js';
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import type { OrcamentoValidadoEventACL } from '../../domain/gateways/orcamento-validado-event.acl.js';
 import type { CriarDecisaoWorkflowRepositorio } from '../../domain/repositories/decisao-workflow.repository.js';
-import type { AcaoRoteamento } from '../../domain/value-objects/decisao-roteamento.vo.js';
+import { criarEventoDesfecho } from './criar-evento-desfecho.js';
 
 /**
  * Consumidor do evento `OrcamentoValidado`/`OrcamentoValidadoComRessalva`
@@ -100,55 +96,13 @@ export class ConsolidarEDecidirWorkflow {
 
     const decisao = decisaoWorkflow.decisaoAtual!;
     await this.publisher.publicar(
-      this.criarEventoDesfecho(orcamentoId.toString(), decisao, tenantIdParaEventos),
+      criarEventoDesfecho(orcamentoId.toString(), decisao, tenantIdParaEventos),
     );
 
     if (decisao.requerIntegracaoExterna) {
       await this.publisher.publicar(
         new IntegracaoExternaSolicitada(orcamentoId.toString(), decisao.acao, tenantIdParaEventos),
       );
-    }
-  }
-
-  private criarEventoDesfecho(
-    orcamentoId: string,
-    decisao: {
-      readonly acao: AcaoRoteamento;
-      readonly agenteOrigem: 'ORQUESTRADOR' | 'HUMANO';
-      readonly criterio: string;
-      readonly nivelConfianca: { readonly valor: number } | null;
-      readonly motivoDadoAusente?: string;
-    },
-    tenantId: string,
-  ): DomainEventEnvelope {
-    const nivelConfianca = decisao.nivelConfianca?.valor ?? null;
-
-    switch (decisao.acao) {
-      case 'APROVAR':
-        return new OrcamentoAprovadoParaProcessamento(
-          orcamentoId,
-          decisao.agenteOrigem,
-          decisao.criterio,
-          nivelConfianca,
-          tenantId,
-        );
-      case 'ENCAMINHAR_COMPRADOR':
-        return new OrcamentoEncaminhadoParaComprador(
-          orcamentoId,
-          decisao.agenteOrigem,
-          decisao.criterio,
-          nivelConfianca,
-          tenantId,
-        );
-      case 'SOLICITAR_REENVIO':
-        return new OrcamentoReenvioSolicitado(
-          orcamentoId,
-          decisao.agenteOrigem,
-          decisao.criterio,
-          nivelConfianca,
-          decisao.motivoDadoAusente!,
-          tenantId,
-        );
     }
   }
 }
