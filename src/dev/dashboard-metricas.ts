@@ -86,6 +86,21 @@ export interface Deriva {
   readonly naoMapeadas: readonly ItemIssue[];
 }
 
+export interface PontoVelocidade {
+  /** Dia em UTC, `YYYY-MM-DD`. */
+  readonly dia: string;
+  readonly fechadas: number;
+}
+
+export interface Velocidade {
+  readonly serie: readonly PontoVelocidade[];
+  readonly mediaMovel7: number;
+  /** Dias entre o fechamento mais antigo do board e agora — o rótulo de confiança. */
+  readonly amostraDias: number;
+  readonly diasRestantes: number | null;
+  readonly dataProjetada: string | null;
+}
+
 export interface Metricas {
   readonly geradoEm: string;
   readonly geradoDe: string;
@@ -94,6 +109,7 @@ export interface Metricas {
   readonly fases: readonly FaseMetrica[];
   readonly caminhoCritico: readonly ItemIssue[];
   readonly deriva: Deriva;
+  readonly velocidade: Velocidade;
   readonly riscos: readonly string[];
 }
 
@@ -241,15 +257,68 @@ function deriva(issues: readonly Issue[], mapa: Mapa): Deriva {
   };
 }
 
+const JANELA_DIAS = 14;
+const MEDIA_DIAS = 7;
+const MS_DIA = 86_400_000;
+
+/** Dia UTC de um instante ISO — o `slice` basta porque `gh` sempre devolve em Z. */
+function diaUTC(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+function velocidade(issues: readonly Issue[], agora: Date, abertas: number): Velocidade {
+  const fechamentos = issues.flatMap((i) => (i.closedAt === null ? [] : [i.closedAt]));
+
+  const porDia = new Map<string, number>();
+  for (const fechamento of fechamentos) {
+    const dia = diaUTC(fechamento);
+    porDia.set(dia, (porDia.get(dia) ?? 0) + 1);
+  }
+
+  const serie: PontoVelocidade[] = [];
+  for (let atras = JANELA_DIAS - 1; atras >= 0; atras -= 1) {
+    const dia = new Date(agora.getTime() - atras * MS_DIA).toISOString().slice(0, 10);
+    serie.push({ dia, fechadas: porDia.get(dia) ?? 0 });
+  }
+
+  const mediaMovel7 =
+    serie.slice(-MEDIA_DIAS).reduce((soma, ponto) => soma + ponto.fechadas, 0) / MEDIA_DIAS;
+
+  const maisAntigo = fechamentos.reduce<string | null>(
+    (menor, atual) => (menor === null || atual < menor ? atual : menor),
+    null,
+  );
+  const amostraDias =
+    maisAntigo === null
+      ? 1
+      : Math.max(1, Math.ceil((agora.getTime() - Date.parse(maisAntigo)) / MS_DIA));
+
+  // Média zero não projeta: uma divisão por zero viraria Infinity e o dashboard
+  // anunciaria uma data. Ausência de projeção é informação honesta.
+  if (mediaMovel7 === 0) {
+    return { serie, mediaMovel7, amostraDias, diasRestantes: null, dataProjetada: null };
+  }
+
+  const diasRestantes = Math.ceil(abertas / mediaMovel7);
+  const dataProjetada = new Date(agora.getTime() + diasRestantes * MS_DIA)
+    .toISOString()
+    .slice(0, 10);
+
+  return { serie, mediaMovel7, amostraDias, diasRestantes, dataProjetada };
+}
+
 export function calcular(issues: readonly Issue[], mapa: Mapa, agora: Date): Metricas {
+  const global = resumoGlobal(issues);
+
   return {
     geradoEm: agora.toISOString(),
     geradoDe: mapa.gerado_de,
-    global: resumoGlobal(issues),
+    global,
     specs: metricasPorSpec(issues),
     fases: metricasPorFase(issues, mapa),
     caminhoCritico: caminhoCritico(issues, mapa),
     deriva: deriva(issues, mapa),
+    velocidade: velocidade(issues, agora, global.abertas),
     riscos: mapa.riscos,
   };
 }

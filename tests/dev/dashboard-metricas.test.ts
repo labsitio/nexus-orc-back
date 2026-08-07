@@ -269,3 +269,66 @@ describe('calcular — caminho crítico e deriva', () => {
     expect(calcular([], mapa, AGORA).riscos).toEqual(['risco A', 'risco B']);
   });
 });
+
+describe('calcular — velocidade', () => {
+  it('monta uma série de 14 dias terminando no dia de agora', () => {
+    const { velocidade } = calcular([], mapaVazio, AGORA);
+
+    expect(velocidade.serie).toHaveLength(14);
+    expect(velocidade.serie.at(0)?.dia).toBe('2026-07-24');
+    expect(velocidade.serie.at(-1)?.dia).toBe('2026-08-06');
+  });
+
+  it('conta as issues fechadas em cada dia da série', () => {
+    const issues = [
+      issue({ number: 1, state: 'CLOSED', closedAt: '2026-08-05T09:00:00Z' }),
+      issue({ number: 2, state: 'CLOSED', closedAt: '2026-08-05T21:00:00Z' }),
+      issue({ number: 3, state: 'CLOSED', closedAt: '2026-08-06T01:00:00Z' }),
+    ];
+
+    const { velocidade } = calcular(issues, mapaVazio, AGORA);
+
+    expect(velocidade.serie.find((p) => p.dia === '2026-08-05')?.fechadas).toBe(2);
+    expect(velocidade.serie.find((p) => p.dia === '2026-08-06')?.fechadas).toBe(1);
+    expect(velocidade.serie.find((p) => p.dia === '2026-08-04')?.fechadas).toBe(0);
+  });
+
+  it('ignora fechamento anterior à janela de 14 dias na série, mas não na amostra', () => {
+    const issues = [issue({ number: 1, state: 'CLOSED', closedAt: '2026-06-01T00:00:00Z' })];
+
+    const { velocidade } = calcular(issues, mapaVazio, AGORA);
+
+    // 66 dias inteiros e mais 12 horas entre 2026-06-01T00:00Z e AGORA — o ceil sobe para 67.
+    expect(velocidade.serie.every((p) => p.fechadas === 0)).toBe(true);
+    expect(velocidade.amostraDias).toBe(67);
+  });
+
+  it('projeta a partir da média móvel de 7 dias', () => {
+    // 7 fechadas nos últimos 7 dias => média 1/dia; 3 abertas => 3 dias => 2026-08-09.
+    const fechadas = ['08-06', '08-05', '08-04', '08-03', '08-02', '08-01', '07-31'].map(
+      (dia, indice) =>
+        issue({ number: indice + 1, state: 'CLOSED', closedAt: `2026-${dia}T10:00:00Z` }),
+    );
+    const abertas = [issue({ number: 101 }), issue({ number: 102 }), issue({ number: 103 })];
+
+    const { velocidade } = calcular([...fechadas, ...abertas], mapaVazio, AGORA);
+
+    expect(velocidade.mediaMovel7).toBe(1);
+    expect(velocidade.diasRestantes).toBe(3);
+    expect(velocidade.dataProjetada).toBe('2026-08-09');
+  });
+
+  it('suprime a projeção quando nada fechou nos últimos 7 dias', () => {
+    const issues = [issue({ number: 1 }), issue({ number: 2 })];
+
+    const { velocidade } = calcular(issues, mapaVazio, AGORA);
+
+    expect(velocidade.mediaMovel7).toBe(0);
+    expect(velocidade.diasRestantes).toBeNull();
+    expect(velocidade.dataProjetada).toBeNull();
+  });
+
+  it('reporta amostra de 1 dia no mínimo, mesmo sem histórico', () => {
+    expect(calcular([], mapaVazio, AGORA).velocidade.amostraDias).toBe(1);
+  });
+});
