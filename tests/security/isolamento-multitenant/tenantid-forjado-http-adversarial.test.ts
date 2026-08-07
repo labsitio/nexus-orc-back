@@ -48,6 +48,13 @@ function middlewareParaTenant(tenantId: TenantId): ReturnType<typeof criarTenant
   return criarTenantContextMiddleware({ userPoolId: 'us-east-1_teste', clientId: 'client-teste' });
 }
 
+/** Só API pública do VO (`toString()`) — nunca o campo privado `valor`. */
+function chamadaComTenant(spy: ReturnType<typeof vi.fn>, tenantId: TenantId): boolean {
+  return spy.mock.calls.some(
+    (chamada) => (chamada[0] as TenantId).toString() === tenantId.toString(),
+  );
+}
+
 function criarReferenciaBruta(): ReferenciaS3 {
   return ReferenciaS3.de({
     bucket: 'nexo-orcamentos-raw',
@@ -120,12 +127,8 @@ describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — tenantId forjad
     expect(resposta.statusCode).toBe(200);
     // Efeito, não só resposta: fábrica de repositório e evento publicado carregam
     // o tenant do token (A), nunca o forjado no body (B).
-    expect(criarRepositorioSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantA.toString() }),
-    );
-    expect(criarRepositorioSpy).not.toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantB.toString() }),
-    );
+    expect(chamadaComTenant(criarRepositorioSpy, tenantA)).toBe(true);
+    expect(chamadaComTenant(criarRepositorioSpy, tenantB)).toBe(false);
     expect(publisher.eventosPublicados).toHaveLength(1);
     expect((publisher.eventosPublicados[0] as { tenantId: string }).tenantId).toBe(
       tenantA.toString(),
@@ -149,9 +152,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — tenantId forjad
     });
 
     expect(resposta.statusCode).toBe(200);
-    expect(criarRepositorioSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantA.toString() }),
-    );
+    expect(chamadaComTenant(criarRepositorioSpy, tenantA)).toBe(true);
     expect((publisher.eventosPublicados[0] as { tenantId: string }).tenantId).toBe(
       tenantA.toString(),
     );
@@ -174,9 +175,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/confirmar-upload — tenantId forjad
     });
 
     expect(resposta.statusCode).toBe(200);
-    expect(criarRepositorioSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantA.toString() }),
-    );
+    expect(chamadaComTenant(criarRepositorioSpy, tenantA)).toBe(true);
     expect((publisher.eventosPublicados[0] as { tenantId: string }).tenantId).toBe(
       tenantA.toString(),
     );
@@ -239,12 +238,8 @@ describe('POST /v1/orcamentos/{orcamentoId}/revisao-humana — tenantId forjado 
     });
 
     expect(resposta.statusCode).toBe(200);
-    expect(criarRepositorioSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantA.toString() }),
-    );
-    expect(criarRepositorioSpy).not.toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantB.toString() }),
-    );
+    expect(chamadaComTenant(criarRepositorioSpy, tenantA)).toBe(true);
+    expect(chamadaComTenant(criarRepositorioSpy, tenantB)).toBe(false);
     expect(publisher.eventosPublicados).toHaveLength(1);
     expect((publisher.eventosPublicados[0] as { tenantId: string }).tenantId).toBe(
       tenantA.toString(),
@@ -269,9 +264,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/revisao-humana — tenantId forjado 
     });
 
     expect(resposta.statusCode).toBe(200);
-    expect(criarRepositorioSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantA.toString() }),
-    );
+    expect(chamadaComTenant(criarRepositorioSpy, tenantA)).toBe(true);
     expect((publisher.eventosPublicados[0] as { tenantId: string }).tenantId).toBe(
       tenantA.toString(),
     );
@@ -295,9 +288,7 @@ describe('POST /v1/orcamentos/{orcamentoId}/revisao-humana — tenantId forjado 
     });
 
     expect(resposta.statusCode).toBe(200);
-    expect(criarRepositorioSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantA.toString() }),
-    );
+    expect(chamadaComTenant(criarRepositorioSpy, tenantA)).toBe(true);
     expect((publisher.eventosPublicados[0] as { tenantId: string }).tenantId).toBe(
       tenantA.toString(),
     );
@@ -366,12 +357,8 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — tenantId forjado (issue #6
 
     expect(resposta.statusCode).toBe(200);
     expect(resposta.json()).toMatchObject({ orcamentoId: id.toString() });
-    expect(criarRepositorioSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantA.toString() }),
-    );
-    expect(criarRepositorioSpy).not.toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantB.toString() }),
-    );
+    expect(chamadaComTenant(criarRepositorioSpy, tenantA)).toBe(true);
+    expect(chamadaComTenant(criarRepositorioSpy, tenantB)).toBe(false);
     await app.close();
   });
 
@@ -398,9 +385,7 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — tenantId forjado (issue #6
 
     expect(resposta.statusCode).toBe(200);
     expect(resposta.json()).toMatchObject({ orcamentoId: id.toString() });
-    expect(criarRepositorioSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ valor: tenantA.toString() }),
-    );
+    expect(chamadaComTenant(criarRepositorioSpy, tenantA)).toBe(true);
     await app.close();
   });
 
