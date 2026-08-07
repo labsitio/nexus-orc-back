@@ -80,9 +80,9 @@ export interface ItemIssue {
 }
 
 export interface Deriva {
-  /** Issues citadas nas prioridades do mapa que já fecharam — sinal de plano defasado. */
+  /** Issues citadas em qualquer lista do mapa (fases ou prioridades) que já fecharam — sinal de plano defasado. */
   readonly mapaJaFechadas: number;
-  /** Issues abertas que nenhuma prioridade do mapa cita — sinal de triagem pendente. */
+  /** Issues abertas que nenhuma lista do mapa (fases ou prioridades) cita — sinal de triagem pendente. */
   readonly naoMapeadas: readonly ItemIssue[];
 }
 
@@ -232,9 +232,11 @@ function metricasPorFase(issues: readonly Issue[], mapa: Mapa): FaseMetrica[] {
   });
 }
 
-function todosOsNumerosPriorizados(mapa: Mapa): Set<number> {
+/** União de toda lista do mapa — prioridades e fases — usada pelos sinais de deriva. */
+function todosOsNumerosDoMapa(mapa: Mapa): Set<number> {
   const { P0, P1, P2, P3 } = mapa.prioridades;
-  return new Set([...P0, ...P1, ...P2, ...P3]);
+  const dasFases = mapa.fases.flatMap((fase) => fase.issues);
+  return new Set([...P0, ...P1, ...P2, ...P3, ...dasFases]);
 }
 
 function caminhoCritico(issues: readonly Issue[], mapa: Mapa): ItemIssue[] {
@@ -246,12 +248,12 @@ function caminhoCritico(issues: readonly Issue[], mapa: Mapa): ItemIssue[] {
 }
 
 function deriva(issues: readonly Issue[], mapa: Mapa): Deriva {
-  const priorizadas = todosOsNumerosPriorizados(mapa);
+  const doMapa = todosOsNumerosDoMapa(mapa);
 
   return {
-    mapaJaFechadas: issues.filter((i) => i.state === 'CLOSED' && priorizadas.has(i.number)).length,
+    mapaJaFechadas: issues.filter((i) => i.state === 'CLOSED' && doMapa.has(i.number)).length,
     naoMapeadas: issues
-      .filter((i) => i.state === 'OPEN' && !priorizadas.has(i.number))
+      .filter((i) => i.state === 'OPEN' && !doMapa.has(i.number))
       .sort((a, b) => a.number - b.number)
       .map(paraItem),
   };

@@ -247,6 +247,18 @@ describe('calcular — caminho crítico e deriva', () => {
     expect(deriva.mapaJaFechadas).toBe(2);
   });
 
+  it('conta na deriva a issue fechada listada só numa fase, fora de qualquer prioridade', () => {
+    const mapa: Mapa = {
+      ...mapaVazio,
+      fases: [{ id: '2', titulo: 'Fase 2', status: 'em-andamento', issues: [50] }],
+    };
+    const issues = [issue({ number: 50, state: 'CLOSED', closedAt: '2026-08-01T00:00:00Z' })];
+
+    const { deriva } = calcular(issues, mapa, AGORA);
+
+    expect(deriva.mapaJaFechadas).toBe(1);
+  });
+
   it('reporta issue aberta que não está em nenhuma prioridade do mapa', () => {
     const mapa: Mapa = { ...mapaVazio, prioridades: { P0: [], P1: [10], P2: [], P3: [] } };
     const issues = [issue({ number: 10 }), issue({ number: 40, title: '[008] issue nova' })];
@@ -261,6 +273,18 @@ describe('calcular — caminho crítico e deriva', () => {
         spec: '008',
       },
     ]);
+  });
+
+  it('não reporta como não mapeada uma issue aberta listada só numa fase', () => {
+    const mapa: Mapa = {
+      ...mapaVazio,
+      fases: [{ id: '2', titulo: 'Fase 2', status: 'em-andamento', issues: [60] }],
+    };
+    const issues = [issue({ number: 60 })];
+
+    const { deriva } = calcular(issues, mapa, AGORA);
+
+    expect(deriva.naoMapeadas).toEqual([]);
   });
 
   it('repassa os riscos do mapa sem transformação', () => {

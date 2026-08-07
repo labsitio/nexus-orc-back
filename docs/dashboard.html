@@ -69,14 +69,14 @@
 <body>
 <main>
   <h1>Status do projeto <span class="g">Nexo</span></h1>
-  <p class="sub">Gerado em 2026-08-07T01:50:06.158Z · camada curada: docs/plano-finalizacao.md — 3ª revisão, 2026-08-06</p>
+  <p class="sub">Gerado em 2026-08-07T11:06:30.401Z · camada curada: docs/plano-finalizacao.md — 3ª revisão, 2026-08-06</p>
 
   <div class="kpis">
-    <div class="kpi"><div class="v">64.7%</div><div class="k">concluído</div></div>
-    <div class="kpi"><div class="v">275/425</div><div class="k">issues fechadas</div></div>
-    <div class="kpi"><div class="v">150</div><div class="k">abertas</div></div>
+    <div class="kpi"><div class="v">64.9%</div><div class="k">concluído</div></div>
+    <div class="kpi"><div class="v">276/425</div><div class="k">issues fechadas</div></div>
+    <div class="kpi"><div class="v">149</div><div class="k">abertas</div></div>
     <div class="kpi"><div class="v">145</div><div class="k">prontas p/ pegar</div></div>
-    <div class="kpi"><div class="v">2</div><div class="k">em andamento</div></div>
+    <div class="kpi"><div class="v">1</div><div class="k">em andamento</div></div>
     <div class="kpi"><div class="v">0</div><div class="k">bloqueadas</div></div>
   </div>
 
@@ -99,8 +99,8 @@
     <article class="fase em-andamento">
       <header><span class="id">Fase 2</span><span class="pill">em andamento</span></header>
       <h3>Completar 005 (decisão, reenvio, integração) e 003 (categorização)</h3>
-      <div class="barra"><div class="preenchida" style="width:18.8%"></div></div>
-      <p class="num">6/32 · 18.8%</p>
+      <div class="barra"><div class="preenchida" style="width:21.9%"></div></div>
+      <p class="num">7/32 · 21.9%</p>
       
     </article>
     <article class="fase pendente">
@@ -146,8 +146,8 @@
     </div>
     <div class="linha">
       <span class="rotulo">003</span>
-      <div class="barra"><div class="preenchida" style="width:79.6%"></div></div>
-      <span class="num">43/54 · 79.6%</span>
+      <div class="barra"><div class="preenchida" style="width:81.5%"></div></div>
+      <span class="num">44/54 · 81.5%</span>
     </div>
     <div class="linha">
       <span class="rotulo">004</span>
@@ -180,17 +180,12 @@
       <span class="num">2/2 · 100%</span>
     </div>
 
-  <h2>Caminho crítico — P1 em aberto (15)</h2>
+  <h2>Caminho crítico — P1 em aberto (14)</h2>
   <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
          <tbody>
     <tr>
       <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/150">#150</a></td>
       <td>[003] T040: Integration test: item com descrição livre → `AgenteCategorizadorItemGateway` retorna categoria do catálogo → regra de preço compara contra a `FaixaPreco` correta → resultado determinístico (dentro/fora de faixa) independente da IA.</td>
-      <td class="mono">003</td>
-    </tr>
-    <tr>
-      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/153">#153</a></td>
-      <td>[003] T043: Infrastructure: `DrizzleFaixaPrecoRepository` (T023) completo com escrita (`upsert`) além da leitura já usada em US1.</td>
       <td class="mono">003</td>
     </tr>
     <tr>
@@ -313,20 +308,20 @@
         <div class="haste" style="height:11.39240506329114%"></div>
         <span>08-06</span>
       </div>
-      <div class="coluna" title="2026-08-07: 4">
-        <div class="haste" style="height:5.063291139240507%"></div>
+      <div class="coluna" title="2026-08-07: 5">
+        <div class="haste" style="height:6.329113924050633%"></div>
         <span>08-07</span>
       </div></div><p class="num">Projeção: <strong>2026-08-16</strong>
            (9 dias no ritmo atual de
-           17.3/dia)
+           17.4/dia)
            <span class="pill aviso">amostra de 9 dias</span></p>
 
   <h2>Riscos</h2>
   <ul class="riscos"><li>Cutover de tenantId já é produção-visível em 004/005, mas nenhuma dessas Lambdas rodou em AWS real — LocalStack não aplica IAM nem RLS Postgres como o Aurora.</li><li>#635 (teste adversarial de tenantId forjado) segue OPEN: o retrofit de segurança fechou por código, sem prova automatizada sob adversário.</li><li>005 é o BC de maior risco financeiro e menor cobertura de regra de negócio, e agora sem gate formal na frente — fácil de adiar por conveniência.</li><li>#664 (modelo Bedrock do Agente Orquestrador) é decisão em aberto sem ADR; trabalho em 005 que assuma um cliente específico corre risco de retrabalho.</li><li>001-003 seguem sem handler de produção (#613-#616) enquanto 004/005 já têm — o pipeline de produção está desbalanceado.</li><li>Ollama (#617, #619, #620, #621) não reduz a necessidade de validação com Bedrock real na Fase 5.</li></ul>
 
   <h2>Deriva entre o plano e o board</h2>
-  <p class="sub">11 issues citadas no mapa já fecharam.
-     2 abertas não aparecem em nenhuma prioridade —
+  <p class="sub">32 issues citadas no mapa já fecharam.
+     2 abertas não aparecem em nenhuma lista do mapa —
      sinal de que <code>docs/plano-finalizacao.md</code> precisa de revisão.</p>
   <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
          <tbody>

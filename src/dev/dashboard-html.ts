@@ -187,7 +187,7 @@ export function renderizar(metricas: Metricas): string {
 
   <h2>Deriva entre o plano e o board</h2>
   <p class="sub">${metricas.deriva.mapaJaFechadas} issues citadas no mapa já fecharam.
-     ${metricas.deriva.naoMapeadas.length} abertas não aparecem em nenhuma prioridade —
+     ${metricas.deriva.naoMapeadas.length} abertas não aparecem em nenhuma lista do mapa —
      sinal de que <code>docs/plano-finalizacao.md</code> precisa de revisão.</p>
   ${
     metricas.deriva.naoMapeadas.length === 0
