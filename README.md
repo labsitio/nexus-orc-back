@@ -263,6 +263,7 @@ Divergir de `NEXO_BUCKET_RAW`/`NEXO_EVENT_BUS` em relação às stacks CDK inval
 | `pnpm typecheck:infra` | `tsc --noEmit` no CDK (`infra/tsconfig.json`) |
 | `pnpm lint` / `lint:fix` | ESLint (inclui regras próprias em `eslint-rules/`) |
 | `pnpm format` / `format:check` | Prettier |
+| `pnpm dashboard` | Gera `docs/dashboard.html` com o status do projeto a partir do board |
 
 Husky + lint-staged rodam `eslint --fix` e `prettier --write` no pre-commit.
 

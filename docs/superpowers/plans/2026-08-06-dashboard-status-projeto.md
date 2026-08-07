@@ -497,7 +497,7 @@ Criar `docs/dashboard-mapa.json`. Os arrays de `fases` e `prioridades` P0-P2 aba
       "titulo": "Validação com AWS real",
       "status": "pendente",
       "nota": "exige credencial AWS — o time não tem acesso hoje",
-      "issues": [63, 64, 107, 109, 157, 158, 202, 203, 258, 259, 314, 315, 316, 317, 318]
+      "issues": [63, 64, 107, 109, 157, 158, 202, 203, 258, 259, 314, 315, 316, 317, 318, 580]
     },
     {
       "id": "6",
