@@ -274,11 +274,24 @@ Página única com o progresso do back-end: percentual global, barras por spec, 
 
 ```bash
 gh auth status      # pré-requisito: gh instalado e autenticado no repo (privado)
-pnpm dashboard      # consulta o board e reescreve docs/dashboard.html
+pnpm dashboard      # consulta o board e reescreve os dois HTMLs
 start docs/dashboard.html   # Windows; macOS: open, Linux: xdg-open
 ```
 
 Não precisa de servidor, container nem token: o HTML é autocontido e abre por duplo clique. Sem JavaScript — os cards que expandem usam `<details>` nativo.
+
+### PDF
+
+`pnpm dashboard` grava **dois** arquivos:
+
+| Arquivo | Para quê |
+|--------|-----------|
+| `docs/dashboard.html` | leitura em tela — tema escuro, seções longas colapsadas |
+| `docs/dashboard-impressao.html` | Ctrl+P vira PDF — tema claro, **tudo aberto**, quebras de página controladas |
+
+Abra o segundo e imprima para PDF. Não há dependência nova: nenhum headless Chrome, nenhum Puppeteer.
+
+Os dois arquivos existem porque **CSS sozinho não resolve**: forçar um `<details>` fechado a abrir na impressão não é confiável (o Chrome esconde o conteúdo por mecanismo interno que a regra de `@media print` não vence), então o PDF sairia sem a fila de demandas. A versão de impressão gera markup diferente — seções planas em vez de `<details>` — a partir dos mesmos dados e dos mesmos helpers de renderização.
 
 **É um snapshot, não um painel ao vivo.** Os números são congelados no instante da geração, e o cabeçalho mostra esse instante em horário de Brasília justamente para o leitor saber a idade do dado. Reabrir o arquivo não atualiza nada; só `pnpm dashboard` atualiza.
 
