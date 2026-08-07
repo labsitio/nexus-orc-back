@@ -321,6 +321,24 @@ describe('POST /v1/orcamentos/{orcamentoId}/revisao-humana — tenantId forjado 
     expect(publisher.eventosPublicados).toHaveLength(0);
     await app.close();
   });
+
+  it('401 Problem Details sem token — TenantContextMiddleware real rejeita antes do controller (issue #635, item 2)', async () => {
+    const tenantA = TenantId.novo();
+    const repositorio = new OrcamentoRepositoryFake();
+    const publisher = new EventPublisherFake();
+    const { app } = montarApp(repositorio, publisher, tenantA);
+
+    const resposta = await app.inject({
+      method: 'POST',
+      url: `/v1/orcamentos/${OrcamentoId.novo().toString()}/revisao-humana`,
+      payload: { fornecedorIdentificado: 'X', formatoIdentificado: 'PDF' },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
+    expect(publisher.eventosPublicados).toHaveLength(0);
+    await app.close();
+  });
 });
 
 describe('GET /v1/orcamentos/{orcamentoId}/status — tenantId forjado (issue #635)', () => {
@@ -466,6 +484,29 @@ describe('POST /v1/orcamentos/upload-url — tenantId forjado (issue #635)', () 
 
     expect(resposta.statusCode).toBe(201);
     expect(armazenamento.gerarUrlUpload).toHaveBeenCalledWith(expect.anything(), 'orcamento.pdf');
+    await app.close();
+  });
+
+  it('401 Problem Details sem token — TenantContextMiddleware real rejeita antes do controller (issue #635, item 2)', async () => {
+    const tenantA = TenantId.novo();
+    const armazenamento: ArmazenamentoBrutoGateway = {
+      armazenar: vi.fn(),
+      lerConteudoBruto: vi.fn(),
+      gerarUrlUpload: vi.fn(),
+      confirmarUpload: vi.fn(),
+    };
+    const app = Fastify();
+    registrarRotaUploadUrl(app, armazenamento, { preHandler: middlewareParaTenant(tenantA) });
+
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/v1/orcamentos/upload-url',
+      payload: { canal: 'PORTAL_WEB', nomeArquivo: 'orcamento.pdf' },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
+    expect(armazenamento.gerarUrlUpload).not.toHaveBeenCalled();
     await app.close();
   });
 });
