@@ -137,6 +137,15 @@ export function registrarRotaDecisaoHumanaWorkflow(
           return;
         }
 
+        // `CriterioAusenteError` e `AprovacaoSemValidacaoError` são estruturalmente
+        // inalcançáveis por este controller hoje: o primeiro só dispara quando
+        // `agenteOrigem !== 'HUMANO'` (sempre 'HUMANO' aqui); o segundo exige
+        // `contextoValidacao` ausente/reprovado, mas `ContextoValidacao` só é
+        // instanciável com `VALIDADO`/`VALIDADO_COM_RESSALVA` (sempre aprovável) e
+        // `consolidarContexto` exige o contexto presente para chegar a
+        // `PENDENTE_REVISAO_HUMANA`. Mantidos no mapeamento por defesa em
+        // profundidade — se essas invariantes do agregado mudarem no futuro, o erro
+        // já cai em 409 em vez de 500 silencioso.
         if (
           erro instanceof TransicaoInvalidaDecisaoWorkflowError ||
           erro instanceof AprovacaoSemValidacaoError ||

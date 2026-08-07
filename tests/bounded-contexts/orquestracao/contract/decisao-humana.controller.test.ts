@@ -215,6 +215,19 @@ describe('POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana — controll
     expect(resposta.headers['content-type']).toContain('application/problem+json');
   });
 
+  it('400 — Zod já rejeita motivoDadoAusente só com espaços (mesma checagem do domínio, mas antes dele)', async () => {
+    const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726bd');
+    await repositorio.salvar(agregadoPendenteRevisaoHumana(id, TENANT_ID));
+
+    const resposta = await app.inject({
+      method: 'POST',
+      url: `/v1/orcamentos/${id.toString()}/workflow/decisao-humana`,
+      payload: { acao: 'SOLICITAR_REENVIO', justificativa: 'x', motivoDadoAusente: '   ' },
+    });
+
+    expect(resposta.statusCode).toBe(400);
+  });
+
   describe('Segurança — papel "comprador responsável" (ADR-010)', () => {
     it('403 quando request.papeis não contém comprador-responsavel, mesmo com "papeis" forjado no body', async () => {
       montarApp(criarPreHandlerFakeAutenticado(TENANT_ID, ['outro-papel']));
