@@ -56,6 +56,12 @@ function metricas(parcial: Partial<Metricas> = {}): Metricas {
     caminhoCritico: [item({ number: 10 })],
     tarefasEmAndamento: [],
     tarefasBloqueadas: [],
+    filaPorPrioridade: [
+      { tier: 'P0', itens: [] },
+      { tier: 'P1', itens: [item({ number: 10 })] },
+      { tier: 'P2', itens: [] },
+      { tier: 'P3', itens: [] },
+    ],
     deriva: { mapaJaFechadas: 3, naoMapeadas: [item({ number: 20 })] },
     velocidade: {
       serie: [
@@ -74,7 +80,19 @@ function metricas(parcial: Partial<Metricas> = {}): Metricas {
 
 describe('renderizar — caminho crítico', () => {
   it('mostra a mensagem de vazio e nenhuma tabela quando não há P1 aberta', () => {
-    const html = renderizar(metricas({ caminhoCritico: [] }));
+    // Fila zerada para a contagem de tabelas isolar o caminho crítico:
+    // a seção de prioridades também emite tabela.
+    const html = renderizar(
+      metricas({
+        caminhoCritico: [],
+        filaPorPrioridade: [
+          { tier: 'P0', itens: [] },
+          { tier: 'P1', itens: [] },
+          { tier: 'P2', itens: [] },
+          { tier: 'P3', itens: [] },
+        ],
+      }),
+    );
 
     expect(html).toContain('Nenhuma P1 aberta.');
     // Única tabela restante na página é a da seção de deriva.
@@ -169,7 +187,8 @@ describe('renderizar — KPI em andamento clicável', () => {
     const html = renderizar(metricas({ tarefasEmAndamento: [] }));
 
     // `abrivel` sozinho não serve de asserção: a classe existe no CSS sempre.
-    expect(html).not.toContain('<details');
+    // E `<details` sozinho também não: a seção de prioridades usa o mesmo elemento.
+    expect(html).not.toContain('<details class="kpi abrivel">');
     expect(html).toContain('<div class="k">em andamento</div>');
   });
 
@@ -232,6 +251,57 @@ describe('renderizar — KPI bloqueadas clicável', () => {
 
     expect(html).toContain('@&lt;b&gt;x&lt;/b&gt;');
     expect(html).not.toContain('@<b>x</b>');
+  });
+});
+
+describe('renderizar — fila por prioridade', () => {
+  it('soma todas as faixas no título da seção', () => {
+    const html = renderizar(
+      metricas({
+        filaPorPrioridade: [
+          { tier: 'P0', itens: [] },
+          { tier: 'P1', itens: [item({ number: 1 }), item({ number: 2 })] },
+          { tier: 'P2', itens: [item({ number: 3 })] },
+          { tier: 'P3', itens: [] },
+        ],
+      }),
+    );
+
+    expect(html).toContain('Demandas em aberto por prioridade (3)');
+  });
+
+  it('renderiza um bloco por faixa não vazia e omite as vazias', () => {
+    const html = renderizar(
+      metricas({
+        filaPorPrioridade: [
+          { tier: 'P0', itens: [] },
+          { tier: 'P1', itens: [item({ number: 1 })] },
+          { tier: 'P2', itens: [item({ number: 2 })] },
+          { tier: 'P3', itens: [] },
+        ],
+      }),
+    );
+
+    expect(html.match(/<details class="fila">/g)).toHaveLength(2);
+    expect(html).toContain('>P1</span>');
+    expect(html).toContain('>P2</span>');
+    expect(html).not.toContain('>P3</span>');
+  });
+
+  it('concorda o plural com a contagem', () => {
+    const uma = renderizar(
+      metricas({
+        filaPorPrioridade: [
+          { tier: 'P0', itens: [] },
+          { tier: 'P1', itens: [item({ number: 1 })] },
+          { tier: 'P2', itens: [] },
+          { tier: 'P3', itens: [] },
+        ],
+      }),
+    );
+
+    // Espaços normalizados: o template quebra linha entre a contagem e o caret.
+    expect(uma.replace(/\s+/g, ' ')).toContain('P1</span> 1 demanda <span class="caret">');
   });
 });
 

@@ -373,6 +373,52 @@ describe('calcular — tarefas em andamento', () => {
   });
 });
 
+describe('calcular — fila por prioridade', () => {
+  it('agrupa as abertas por faixa, ordenadas por número, ignorando as fechadas', () => {
+    const mapa: Mapa = {
+      ...mapaVazio,
+      prioridades: { P0: [], P1: [30, 10], P2: [20], P3: [40] },
+    };
+    const issues = [
+      issue({ number: 10, title: '[003] a' }),
+      issue({ number: 20, title: '[005] b' }),
+      issue({ number: 30, state: 'CLOSED', closedAt: '2026-08-01T00:00:00Z' }),
+      issue({ number: 40, title: '[008] d' }),
+    ];
+
+    const { filaPorPrioridade } = calcular(issues, mapa, AGORA);
+    const porTier = new Map(filaPorPrioridade.map((f) => [f.tier, f.itens.map((i) => i.number)]));
+
+    expect(porTier.get('P0')).toEqual([]);
+    expect(porTier.get('P1')).toEqual([10]);
+    expect(porTier.get('P2')).toEqual([20]);
+    expect(porTier.get('P3')).toEqual([40]);
+  });
+
+  it('conta a issue citada em duas faixas só na mais alta', () => {
+    const mapa: Mapa = { ...mapaVazio, prioridades: { P0: [], P1: [10], P2: [10], P3: [10] } };
+    const issues = [issue({ number: 10 })];
+
+    const { filaPorPrioridade } = calcular(issues, mapa, AGORA);
+    const total = filaPorPrioridade.reduce((s, f) => s + f.itens.length, 0);
+
+    expect(total).toBe(1);
+    expect(filaPorPrioridade.find((f) => f.tier === 'P1')?.itens.map((i) => i.number)).toEqual([
+      10,
+    ]);
+    expect(filaPorPrioridade.find((f) => f.tier === 'P2')?.itens).toEqual([]);
+  });
+
+  it('devolve as quatro faixas mesmo quando vazias', () => {
+    expect(calcular([], mapaVazio, AGORA).filaPorPrioridade.map((f) => f.tier)).toEqual([
+      'P0',
+      'P1',
+      'P2',
+      'P3',
+    ]);
+  });
+});
+
 describe('calcular — velocidade', () => {
   it('monta uma série de 14 dias terminando no dia de agora', () => {
     const { velocidade } = calcular([], mapaVazio, AGORA);

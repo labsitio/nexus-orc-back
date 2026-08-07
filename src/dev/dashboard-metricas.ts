@@ -82,6 +82,13 @@ export interface ItemIssue {
   readonly responsaveis: readonly string[];
 }
 
+export type Prioridade = 'P0' | 'P1' | 'P2' | 'P3';
+
+export interface FilaPrioridade {
+  readonly tier: Prioridade;
+  readonly itens: readonly ItemIssue[];
+}
+
 export interface Deriva {
   /** Issues citadas em qualquer lista do mapa (fases ou prioridades) que já fecharam — sinal de plano defasado. */
   readonly mapaJaFechadas: number;
@@ -115,6 +122,8 @@ export interface Metricas {
   readonly tarefasEmAndamento: readonly ItemIssue[];
   /** Issues abertas com label `blocked` — o gate técnico em vigor hoje. */
   readonly tarefasBloqueadas: readonly ItemIssue[];
+  /** Tudo que falta, agrupado por faixa de prioridade do mapa curado. */
+  readonly filaPorPrioridade: readonly FilaPrioridade[];
   readonly deriva: Deriva;
   readonly velocidade: Velocidade;
   readonly riscos: readonly string[];
@@ -274,6 +283,35 @@ function caminhoCritico(issues: readonly Issue[], mapa: Mapa): ItemIssue[] {
     .map(paraItem);
 }
 
+const TIERS: readonly Prioridade[] = ['P0', 'P1', 'P2', 'P3'];
+
+/**
+ * Fila de tudo que falta, por faixa de prioridade. Issue citada em mais de uma
+ * faixa conta só na mais alta — sem isso a soma das filas passa do total de
+ * abertas e o leitor vê trabalho que não existe.
+ *
+ * Não há ordem interna dentro da faixa: o `plano-finalizacao.md` prioriza por
+ * critério e por fase, não issue a issue. Ordenar por número é honesto sobre
+ * isso; inventar um ranking seria pior.
+ */
+function filaPorPrioridade(issues: readonly Issue[], mapa: Mapa): FilaPrioridade[] {
+  const abertas = new Map(issues.filter((i) => i.state === 'OPEN').map((i) => [i.number, i]));
+  const jaContadas = new Set<number>();
+
+  return TIERS.map((tier) => {
+    const itens: ItemIssue[] = [];
+    for (const numero of [...mapa.prioridades[tier]].sort((a, b) => a - b)) {
+      const issue = abertas.get(numero);
+      if (issue === undefined || jaContadas.has(numero)) {
+        continue;
+      }
+      jaContadas.add(numero);
+      itens.push(paraItem(issue));
+    }
+    return { tier, itens };
+  });
+}
+
 function deriva(issues: readonly Issue[], mapa: Mapa): Deriva {
   const doMapa = todosOsNumerosDoMapa(mapa);
 
@@ -348,6 +386,7 @@ export function calcular(issues: readonly Issue[], mapa: Mapa, agora: Date): Met
     caminhoCritico: caminhoCritico(issues, mapa),
     tarefasEmAndamento: tarefasComLabel(issues, 'in-progress'),
     tarefasBloqueadas: tarefasComLabel(issues, 'blocked'),
+    filaPorPrioridade: filaPorPrioridade(issues, mapa),
     deriva: deriva(issues, mapa),
     velocidade: velocidade(issues, agora, global.abertas),
     riscos: mapa.riscos,
