@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Ciclo de vida do orcamento",
+    "subtitle": "Do upload/SFTP a decisao de workflow, atravessando os 5 bounded contexts via EventBridge",
+    "quality_profile": "standard",
+    "output": "docs/architecture-diagrams/ciclo-vida-orcamento.html",
+    "views": [
+      {
+        "id": "caminho-feliz",
+        "label": "Caminho feliz",
+        "focus": ["upload", "ingestao", "extracao", "validacao", "decisao", "integracao"],
+        "note": "Orcamento entra, e classificado, extraido, validado e vira decisao de workflow."
+      },
+      {
+        "id": "excecoes",
+        "label": "Escalonamento humano",
+        "focus": ["ingestao", "extracao", "validacao", "revisao"],
+        "note": "Baixa confianca ou inconsistencia para o fluxo e devolve ao humano."
+      },
+      {
+        "id": "leitura",
+        "label": "Trilha de leitura",
+        "focus": ["validacao", "indexacao"],
+        "note": "OrcamentoValidado tambem alimenta embeddings e busca hibrida."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "canais", "label": "Canais de entrada" },
+    { "id": "ingestao", "label": "001 - Ingestao & Identificacao" },
+    { "id": "extracao", "label": "002 - Extracao" },
+    { "id": "validacao", "label": "003 - Validacao" },
+    { "id": "busca", "label": "004 - Busca & Indexacao" },
+    { "id": "orquestracao", "label": "005 - Orquestracao" },
+    { "id": "integracoes", "label": "Sistemas externos" },
+    { "id": "humano", "label": "Revisao humana", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "entrada", "label": "Entrada", "fromCol": 0, "toCol": 1 },
+    { "id": "enriquecimento", "label": "Enriquecimento", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "decisao", "label": "Decisao", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [],
+  "mainPath": ["upload", "ingestao", "extracao", "validacao", "decisao"],
+  "nodes": [
+    { "id": "upload", "lane": "canais", "col": 0, "type": "external", "label": "Entrada", "sublabel": "Portal - SFTP", "tag": "presigned URL" },
+    { "id": "ingestao", "lane": "ingestao", "col": 1, "type": "backend", "label": "Ingestao", "sublabel": "classifica IA", "tag": "OrcamentoRecebido" },
+    { "id": "extracao", "lane": "extracao", "col": 2, "type": "backend", "label": "Extracao", "sublabel": "agente extrator", "tag": "SQS" },
+    { "id": "validacao", "lane": "validacao", "col": 3, "type": "backend", "label": "Validacao", "sublabel": "regras + preco", "tag": "categoriza item" },
+    { "id": "indexacao", "lane": "busca", "col": 5, "type": "database", "label": "Indexacao", "sublabel": "embeddings", "tag": "OpenSearch" },
+    { "id": "decisao", "lane": "orquestracao", "col": 4, "type": "backend", "label": "Orquestracao", "sublabel": "decide workflow" },
+    { "id": "integracao", "lane": "integracoes", "col": 5, "type": "cloud", "label": "Integracao", "sublabel": "Compras - ERP" },
+    { "id": "revisao", "lane": "humano", "col": 2, "type": "security", "label": "Revisao", "sublabel": "humano decide" }
+  ],
+  "edges": [
+    { "id": "e-upload", "from": "upload", "to": "ingestao", "label": "S3 PutObject", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "drop", "labelDy": 11 },
+    { "id": "e-classificado", "from": "ingestao", "to": "extracao", "label": "OrcamentoClassificado", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "drop", "labelDy": 11, "labelDx": 28 },
+    { "id": "e-extraido", "from": "extracao", "to": "validacao", "label": "OrcamentoExtraido", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "drop", "labelDy": 11 },
+    { "id": "e-validado-busca", "from": "validacao", "to": "indexacao", "label": "OrcamentoValidado", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "drop" },
+    { "id": "e-validado-orq", "from": "validacao", "to": "decisao", "label": "OrcamentoValidado", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "drop", "labelDx": 18 },
+    { "id": "e-integracao", "from": "decisao", "to": "integracao", "label": "IntegracaoExternaSolicitada", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "route": "drop" },
+    { "id": "e-esc-ingestao", "from": "ingestao", "to": "revisao", "label": "baixa confianca", "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "drop", "labelDx": -24 },
+    { "id": "e-esc-extracao", "from": "extracao", "to": "revisao", "label": "pendencia", "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "drop", "labelDx": 44 },
+    { "id": "e-esc-validacao", "from": "validacao", "to": "revisao", "label": "inconsistencia", "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "drop" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Eventos do caminho principal",
+      "items": [
+        "nexo.ingestao-identificacao / OrcamentoRecebido",
+        "nexo.ingestao-identificacao / OrcamentoClassificado",
+        "nexo.extracao / OrcamentoExtraido",
+        "nexo.validacao / OrcamentoValidado",
+        "nexo.busca-indexacao / OrcamentoIndexado"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Escalonamento humano",
+      "items": [
+        "OrcamentoEscalonadoParaRevisaoHumana (001)",
+        "ExtracaoEscalonadaParaRevisaoHumana (002)",
+        "OrcamentoInconsistenciaDetectada (003)",
+        "Retorno: OrcamentoReclassificadoPorRevisaoHumana",
+        "Retorno: OrcamentoExtraidoComPendenciaConfirmada"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Saidas da orquestracao",
+      "items": [
+        "OrcamentoAprovadoParaProcessamento",
+        "OrcamentoEncaminhadoParaComprador",
+        "OrcamentoReenvioSolicitado",
+        "DecisaoWorkflowEscalonadaParaComprador",
+        "IntegracaoExternaSolicitada"
+      ]
+    }
+  ]
+}
