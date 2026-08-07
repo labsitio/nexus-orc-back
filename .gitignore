@@ -9,6 +9,9 @@ coverage/
 cdk.out/
 .claude/worktrees/
 .claude/settings.local.json
+
+# Rascunho de agentes (ledgers, briefs, relatórios de revisão) — não é artefato do produto.
+.superpowers/
 allure-results/
 allure-report/
 .tmp-bin/

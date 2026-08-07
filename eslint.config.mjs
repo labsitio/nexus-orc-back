@@ -11,7 +11,9 @@ import noCrossBoundedContextImport from './eslint-rules/no-cross-bounded-context
 const boundaryRule = {
   files: ['src/bounded-contexts/**/*.ts'],
   plugins: {
-    'nexo-boundaries': { rules: { 'no-cross-bounded-context-import': noCrossBoundedContextImport } },
+    'nexo-boundaries': {
+      rules: { 'no-cross-bounded-context-import': noCrossBoundedContextImport },
+    },
   },
   rules: {
     'nexo-boundaries/no-cross-bounded-context-import': 'error',
@@ -20,7 +22,10 @@ const boundaryRule = {
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
+    // `.claude/worktrees/**` são cópias completas do repositório criadas por
+    // agentes. Sem ignorá-las, o typescript-eslint acha vários tsconfig
+    // candidatos e derruba `pnpm lint` com "No tsconfigRootDir was set".
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.claude/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

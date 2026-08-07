@@ -17,6 +17,7 @@ Plataforma de **ingestão, entendimento e processamento automático de orçament
 - [Início rápido](#início-rápido)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Scripts](#scripts)
+- [Dashboard de status do projeto](#dashboard-de-status-do-projeto)
 - [Banco de dados](#banco-de-dados)
 - [Gateways de IA — Bedrock ou Ollama](#gateways-de-ia--bedrock-ou-ollama)
 - [Testes e qualidade](#testes-e-qualidade)
@@ -263,8 +264,36 @@ Divergir de `NEXO_BUCKET_RAW`/`NEXO_EVENT_BUS` em relação às stacks CDK inval
 | `pnpm typecheck:infra` | `tsc --noEmit` no CDK (`infra/tsconfig.json`) |
 | `pnpm lint` / `lint:fix` | ESLint (inclui regras próprias em `eslint-rules/`) |
 | `pnpm format` / `format:check` | Prettier |
+| `pnpm dashboard` | Gera `docs/dashboard.html` com o status do projeto a partir do board |
 
 Husky + lint-staged rodam `eslint --fix` e `prettier --write` no pre-commit.
+
+## Dashboard de status do projeto
+
+Página única com o progresso do back-end: percentual global, barras por spec, fases do plano, caminho crítico, ritmo de fechamento e riscos. Os cards **em andamento** e **bloqueadas** abrem ao clique e listam quais issues são, com responsável e link.
+
+```bash
+gh auth status      # pré-requisito: gh instalado e autenticado no repo (privado)
+pnpm dashboard      # consulta o board e reescreve docs/dashboard.html
+start docs/dashboard.html   # Windows; macOS: open, Linux: xdg-open
+```
+
+Não precisa de servidor, container nem token: o HTML é autocontido e abre por duplo clique. Sem JavaScript — os cards que expandem usam `<details>` nativo.
+
+**É um snapshot, não um painel ao vivo.** Os números são congelados no instante da geração, e o cabeçalho mostra esse instante em horário de Brasília justamente para o leitor saber a idade do dado. Reabrir o arquivo não atualiza nada; só `pnpm dashboard` atualiza.
+
+De onde vem cada coisa:
+
+| Fonte | O que fornece |
+|--------|-----------|
+| `gh issue list` | estado vivo de todas as issues — contagens, labels, responsáveis, datas de fechamento |
+| [`docs/dashboard-mapa.json`](docs/dashboard-mapa.json) | camada curada que não existe no board: fases, prioridades P0-P3 e riscos, extraídos de [`docs/plano-finalizacao.md`](docs/plano-finalizacao.md) |
+
+O agrupamento por spec usa o prefixo `[00X]` do título, não a milestone — 111 issues estão sem milestone, enquanto o prefixo cobre 419 de 432 e nunca diverge da milestone onde ambos existem.
+
+**Manutenção**: quando o `plano-finalizacao.md` for revisado, atualize o `dashboard-mapa.json` e regere. A seção "Deriva entre o plano e o board" da própria página avisa quando isso está atrasado — ela conta as issues do mapa que já fecharam e lista as abertas que nenhuma lista do mapa cita.
+
+`docs/dashboard.html` é **arquivo gerado e commitado** (marcado como tal no topo). Não edite à mão; o `git log` dele serve de histórico de progresso.
 
 ## Banco de dados
 
