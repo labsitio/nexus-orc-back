@@ -19,6 +19,7 @@
     "db:migrate": "drizzle-kit migrate",
     "dev:seed": "tsx --env-file-if-exists=.env src/dev/seed-localstack.ts",
     "dev": "tsx --env-file-if-exists=.env src/dev/local.ts",
+    "dashboard": "tsx src/dev/dashboard.ts",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",

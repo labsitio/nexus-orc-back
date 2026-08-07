@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexo — Status do projeto</title>
+<!--
+  ARQUIVO GERADO — não edite à mão.
+  Regerar com: pnpm dashboard
+  Fonte curada: docs/dashboard-mapa.json (docs/plano-finalizacao.md — 3ª revisão, 2026-08-06)
+-->
+<style>
+  :root{
+    --bg:#0B0E14; --surface:#171B24; --surface-2:#1E2430; --border:rgba(255,255,255,.08);
+    --magenta:#FF0099; --blue:#02A4F2; --gradient:linear-gradient(135deg,#FF0099,#02A4F2);
+    --text:#F5F6FA; --text-muted:#9AA3B2; --success:#22C55E; --warning:#F5A623; --danger:#EF4444;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px;}
+  a{color:var(--blue);text-decoration:none;} a:hover{text-decoration:underline;}
+  main{max-width:1100px;margin:0 auto;padding:48px 5vw 80px;}
+  h1{font-size:clamp(26px,4vw,40px);font-weight:800;letter-spacing:-.5px;}
+  h1 .g{background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  h2{font-size:19px;font-weight:800;margin:48px 0 18px;letter-spacing:-.2px;}
+  h3{font-size:14.5px;font-weight:700;margin:6px 0 12px;}
+  .sub{color:var(--text-muted);font-size:13px;margin-top:8px;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;}
+  .pill{display:inline-block;border:1px solid var(--border);background:var(--surface-2);border-radius:999px;padding:2px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);}
+  .pill.aviso{border-color:var(--warning);color:var(--warning);}
+  .nota{color:var(--warning);font-size:12.5px;margin-top:10px;}
+  .num{color:var(--text-muted);font-size:12.5px;}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:28px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+  .kpi .v{font-size:26px;font-weight:800;letter-spacing:-.5px;}
+  .kpi .k{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-top:4px;}
+
+  .barra{background:var(--surface-2);border-radius:999px;height:9px;overflow:hidden;}
+  .preenchida{height:100%;background:var(--gradient);border-radius:999px;}
+
+  .fases{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;}
+  .fase{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+  .fase.concluida{border-color:rgba(34,197,94,.4);}
+  .fase.em-andamento{border-color:rgba(2,164,242,.5);}
+  .fase header{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .fase .id{font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);}
+  .fase .num{margin-top:8px;}
+
+  .linha{display:grid;grid-template-columns:52px 1fr 130px;align-items:center;gap:14px;padding:7px 0;}
+  .linha .rotulo{font-family:ui-monospace,monospace;font-size:12.5px;font-weight:700;}
+  .linha .num{text-align:right;}
+
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:top;}
+  th{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);}
+  tr:last-child td{border-bottom:none;}
+
+  .grafico{display:flex;align-items:flex-end;gap:5px;height:140px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+  .coluna{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:6px;}
+  .coluna .haste{width:100%;background:var(--gradient);border-radius:4px 4px 0 0;min-height:2px;}
+  .coluna span{font-size:9.5px;color:var(--text-muted);white-space:nowrap;}
+
+  ul.riscos{list-style:none;display:grid;gap:10px;}
+  ul.riscos li{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--danger);border-radius:10px;padding:12px 16px;font-size:13.5px;}
+  .vazio{color:var(--text-muted);font-size:13.5px;}
+</style>
+</head>
+<body>
+<main>
+  <h1>Status do projeto <span class="g">Nexo</span></h1>
+  <p class="sub">Gerado em 2026-08-07T01:50:06.158Z · camada curada: docs/plano-finalizacao.md — 3ª revisão, 2026-08-06</p>
+
+  <div class="kpis">
+    <div class="kpi"><div class="v">64.7%</div><div class="k">concluído</div></div>
+    <div class="kpi"><div class="v">275/425</div><div class="k">issues fechadas</div></div>
+    <div class="kpi"><div class="v">150</div><div class="k">abertas</div></div>
+    <div class="kpi"><div class="v">145</div><div class="k">prontas p/ pegar</div></div>
+    <div class="kpi"><div class="v">2</div><div class="k">em andamento</div></div>
+    <div class="kpi"><div class="v">0</div><div class="k">bloqueadas</div></div>
+  </div>
+
+  <h2>Fases</h2>
+  <div class="fases">
+    <article class="fase concluida">
+      <header><span class="id">Fase 0</span><span class="pill">concluída</span></header>
+      <h3>Desbloqueio imediato</h3>
+      <div class="barra"><div class="preenchida" style="width:100%"></div></div>
+      <p class="num">2/2 · 100%</p>
+      
+    </article>
+    <article class="fase concluida">
+      <header><span class="id">Fase 1</span><span class="pill">concluída</span></header>
+      <h3>Retrofit multi-tenant 007 (001-005)</h3>
+      <div class="barra"><div class="preenchida" style="width:100%"></div></div>
+      <p class="num">18/18 · 100%</p>
+      
+    </article>
+    <article class="fase em-andamento">
+      <header><span class="id">Fase 2</span><span class="pill">em andamento</span></header>
+      <h3>Completar 005 (decisão, reenvio, integração) e 003 (categorização)</h3>
+      <div class="barra"><div class="preenchida" style="width:18.8%"></div></div>
+      <p class="num">6/32 · 18.8%</p>
+      
+    </article>
+    <article class="fase pendente">
+      <header><span class="id">Fase 3</span><span class="pill">pendente</span></header>
+      <h3>Encadear o pipeline local completo (001→005)</h3>
+      <div class="barra"><div class="preenchida" style="width:0%"></div></div>
+      <p class="num">0/2 · 0%</p>
+      
+    </article>
+    <article class="fase pendente">
+      <header><span class="id">Fase 4</span><span class="pill">pendente</span></header>
+      <h3>Handlers de produção 001-003, IAM e Acompanhamento</h3>
+      <div class="barra"><div class="preenchida" style="width:13.5%"></div></div>
+      <p class="num">5/37 · 13.5%</p>
+      
+    </article>
+    <article class="fase pendente">
+      <header><span class="id">Fase 5</span><span class="pill">pendente</span></header>
+      <h3>Validação com AWS real</h3>
+      <div class="barra"><div class="preenchida" style="width:0%"></div></div>
+      <p class="num">0/16 · 0%</p>
+      <p class="nota">⚠ exige credencial AWS — o time não tem acesso hoje</p>
+    </article>
+    <article class="fase pendente">
+      <header><span class="id">Fase 6</span><span class="pill">pendente</span></header>
+      <h3>008 LGPD e 009 custo (restante)</h3>
+      <div class="barra"><div class="preenchida" style="width:0%"></div></div>
+      <p class="num">0/62 · 0%</p>
+      
+    </article></div>
+
+  <h2>Progresso por spec</h2>
+  
+    <div class="linha">
+      <span class="rotulo">001</span>
+      <div class="barra"><div class="preenchida" style="width:80.8%"></div></div>
+      <span class="num">59/73 · 80.8%</span>
+    </div>
+    <div class="linha">
+      <span class="rotulo">002</span>
+      <div class="barra"><div class="preenchida" style="width:90%"></div></div>
+      <span class="num">45/50 · 90%</span>
+    </div>
+    <div class="linha">
+      <span class="rotulo">003</span>
+      <div class="barra"><div class="preenchida" style="width:79.6%"></div></div>
+      <span class="num">43/54 · 79.6%</span>
+    </div>
+    <div class="linha">
+      <span class="rotulo">004</span>
+      <div class="barra"><div class="preenchida" style="width:75%"></div></div>
+      <span class="num">39/52 · 75%</span>
+    </div>
+    <div class="linha">
+      <span class="rotulo">005</span>
+      <div class="barra"><div class="preenchida" style="width:62.3%"></div></div>
+      <span class="num">38/61 · 62.3%</span>
+    </div>
+    <div class="linha">
+      <span class="rotulo">007</span>
+      <div class="barra"><div class="preenchida" style="width:56%"></div></div>
+      <span class="num">28/50 · 56%</span>
+    </div>
+    <div class="linha">
+      <span class="rotulo">008</span>
+      <div class="barra"><div class="preenchida" style="width:31.9%"></div></div>
+      <span class="num">15/47 · 31.9%</span>
+    </div>
+    <div class="linha">
+      <span class="rotulo">009</span>
+      <div class="barra"><div class="preenchida" style="width:16.7%"></div></div>
+      <span class="num">6/36 · 16.7%</span>
+    </div>
+    <div class="linha">
+      <span class="rotulo">sem-spec</span>
+      <div class="barra"><div class="preenchida" style="width:100%"></div></div>
+      <span class="num">2/2 · 100%</span>
+    </div>
+
+  <h2>Caminho crítico — P1 em aberto (15)</h2>
+  <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
+         <tbody>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/150">#150</a></td>
+      <td>[003] T040: Integration test: item com descrição livre → `AgenteCategorizadorItemGateway` retorna categoria do catálogo → regra de preço compara contra a `FaixaPreco` correta → resultado determinístico (dentro/fora de faixa) independente da IA.</td>
+      <td class="mono">003</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/153">#153</a></td>
+      <td>[003] T043: Infrastructure: `DrizzleFaixaPrecoRepository` (T023) completo com escrita (`upsert`) além da leitura já usada em US1.</td>
+      <td class="mono">003</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/154">#154</a></td>
+      <td>[003] T044: Interface: controllers `POST`/`GET /v1/configuracoes/faixas-preco-categoria` (Zod schema, papel administrativo distinto via Cognito, transaction script sem agregado rico).</td>
+      <td class="mono">003</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/155">#155</a></td>
+      <td>[003] T045: IAM: role dedicada `ValidarOrcamentoLambdaRole` (T028) estendida com `bedrock:InvokeModel` restrito ao ARN do modelo de categorização aprovado.</td>
+      <td class="mono">003</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/229">#229</a></td>
+      <td>[005] T023: Contract test `GET /v1/orcamentos/{orcamentoId}/workflow/status` em `tests/bounded-contexts/orquestracao/contract/`.</td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/238">#238</a></td>
+      <td>[005] T032: IAM: roles dedicadas `RegistrarContextoClassificacaoLambdaRole`, `RegistrarContextoExtracaoLambdaRole`, `ConsolidarEDecidirWorkflowLambdaRole` (least privilege: `bedrock:InvokeModel` restrito ao ARN do modelo aprovado apenas na última, se</td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/250">#250</a></td>
+      <td>[005] T044: Interface: controller `POST /v1/orcamentos/{orcamentoId}/workflow/decisao-humana`, Zod schema (`acao`, `justificativa` obrigatória, `motivoDadoAusente` obrigatório quando `acao === &#39;SOLICITAR_REENVIO&#39;`), papel &quot;comprador responsável&quot; via </td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/251">#251</a></td>
+      <td>[005] T045: IAM: roles dedicadas `RevisarDecisaoWorkflowComIALambdaRole`, `RegistrarDecisaoHumanaWorkflowLambdaRole`, least privilege.</td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/252">#252</a></td>
+      <td>[005] T046: Unit test `DecisaoRoteamento` (T010) — construtor rejeita `acao: &#39;SOLICITAR_REENVIO&#39;` sem `motivoDadoAusente` não vazio; aceita quando referencia uma inconsistência/pendência concreta presente no `contextoValidacao`/`contextoExtracao`.</td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/253">#253</a></td>
+      <td>[005] T047: Unit test: publicação de `IntegracaoExternaSolicitada` ocorre se e somente se `requerIntegracaoExterna === true` na decisão registrada, com payload restrito a `orcamentoId`/`acaoOrigem`/`ocorreuEm` (nenhum campo de protocolo específico).</td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/254">#254</a></td>
+      <td>[005] T048: Integration test: cenário de reenvio válido (fundamento presente) → `OrcamentoReenvioSolicitado` publicado com `motivoDadoAusente`; cenário de reenvio sem fundamento → nenhum evento de reenvio publicado, tentativa registrada no histórico </td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/255">#255</a></td>
+      <td>[005] T049: Application: estender `ConsolidarEDecidirWorkflow` e `RevisarDecisaoWorkflowComIA` para publicar `IntegracaoExternaSolicitada` em conjunto com o evento de desfecho quando `requerIntegracaoExterna === true` (ADR-003 do `plan.md`).</td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/256">#256</a></td>
+      <td>[005] T050: Domain: garantir que `ReenvioSemFundamentoError` inclui referência legível ao que faltou validar/preencher (nunca mensagem genérica) — mesma disciplina de `InconsistenciaDetectada.detalhe` da spec 003.</td>
+      <td class="mono">005</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/635">#635</a></td>
+      <td>[007] Teste adversarial: tenantId forjado no body deve ser ignorado nos endpoints HTTP de 001</td>
+      <td class="mono">007</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/664">#664</a></td>
+      <td>[005] Decisão em aberto: modelo Bedrock do Agente Orquestrador + cliente Bedrock (legado vs Mantle) — a decidir</td>
+      <td class="mono">005</td>
+    </tr></tbody></table>
+
+  <h2>Ritmo de fechamento — últimos 14 dias</h2>
+  <div class="grafico">
+      <div class="coluna" title="2026-07-25: 0">
+        <div class="haste" style="height:0%"></div>
+        <span>07-25</span>
+      </div>
+      <div class="coluna" title="2026-07-26: 0">
+        <div class="haste" style="height:0%"></div>
+        <span>07-26</span>
+      </div>
+      <div class="coluna" title="2026-07-27: 0">
+        <div class="haste" style="height:0%"></div>
+        <span>07-27</span>
+      </div>
+      <div class="coluna" title="2026-07-28: 0">
+        <div class="haste" style="height:0%"></div>
+        <span>07-28</span>
+      </div>
+      <div class="coluna" title="2026-07-29: 19">
+        <div class="haste" style="height:24.050632911392405%"></div>
+        <span>07-29</span>
+      </div>
+      <div class="coluna" title="2026-07-30: 56">
+        <div class="haste" style="height:70.88607594936708%"></div>
+        <span>07-30</span>
+      </div>
+      <div class="coluna" title="2026-07-31: 79">
+        <div class="haste" style="height:100%"></div>
+        <span>07-31</span>
+      </div>
+      <div class="coluna" title="2026-08-01: 18">
+        <div class="haste" style="height:22.78481012658228%"></div>
+        <span>08-01</span>
+      </div>
+      <div class="coluna" title="2026-08-02: 24">
+        <div class="haste" style="height:30.37974683544304%"></div>
+        <span>08-02</span>
+      </div>
+      <div class="coluna" title="2026-08-03: 40">
+        <div class="haste" style="height:50.63291139240506%"></div>
+        <span>08-03</span>
+      </div>
+      <div class="coluna" title="2026-08-04: 18">
+        <div class="haste" style="height:22.78481012658228%"></div>
+        <span>08-04</span>
+      </div>
+      <div class="coluna" title="2026-08-05: 8">
+        <div class="haste" style="height:10.126582278481013%"></div>
+        <span>08-05</span>
+      </div>
+      <div class="coluna" title="2026-08-06: 9">
+        <div class="haste" style="height:11.39240506329114%"></div>
+        <span>08-06</span>
+      </div>
+      <div class="coluna" title="2026-08-07: 4">
+        <div class="haste" style="height:5.063291139240507%"></div>
+        <span>08-07</span>
+      </div></div><p class="num">Projeção: <strong>2026-08-16</strong>
+           (9 dias no ritmo atual de
+           17.3/dia)
+           <span class="pill aviso">amostra de 9 dias</span></p>
+
+  <h2>Riscos</h2>
+  <ul class="riscos"><li>Cutover de tenantId já é produção-visível em 004/005, mas nenhuma dessas Lambdas rodou em AWS real — LocalStack não aplica IAM nem RLS Postgres como o Aurora.</li><li>#635 (teste adversarial de tenantId forjado) segue OPEN: o retrofit de segurança fechou por código, sem prova automatizada sob adversário.</li><li>005 é o BC de maior risco financeiro e menor cobertura de regra de negócio, e agora sem gate formal na frente — fácil de adiar por conveniência.</li><li>#664 (modelo Bedrock do Agente Orquestrador) é decisão em aberto sem ADR; trabalho em 005 que assuma um cliente específico corre risco de retrabalho.</li><li>001-003 seguem sem handler de produção (#613-#616) enquanto 004/005 já têm — o pipeline de produção está desbalanceado.</li><li>Ollama (#617, #619, #620, #621) não reduz a necessidade de validação com Bedrock real na Fase 5.</li></ul>
+
+  <h2>Deriva entre o plano e o board</h2>
+  <p class="sub">11 issues citadas no mapa já fecharam.
+     2 abertas não aparecem em nenhuma prioridade —
+     sinal de que <code>docs/plano-finalizacao.md</code> precisa de revisão.</p>
+  <table><thead><tr><th>issue</th><th>título</th><th>spec</th></tr></thead>
+         <tbody>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/469">#469</a></td>
+      <td>[ops] Executar runbook Cognito custom:tenant_id em dev/staging/prod</td>
+      <td class="mono">007</td>
+    </tr>
+    <tr>
+      <td class="mono"><a href="https://github.com/labsitio/nexus-orc-back/issues/477">#477</a></td>
+      <td>[ops] Confirmar Managed Workflow (tag) do AWS Transfer Family antes de T016</td>
+      <td class="mono">007</td>
+    </tr></tbody></table>
+
+  <p class="sub" style="margin-top:48px">Arquivo gerado por <code>pnpm dashboard</code> — não editar à mão.
+     Amostra de velocidade: 9 dias.</p>
+</main>
+</body>
+</html>
