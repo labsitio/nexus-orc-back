@@ -116,7 +116,7 @@ export function renderizar(metricas: Metricas): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nexo — Status do projeto</title>
+<title>Nexo Back-end — Status do projeto</title>
 <!--
   ARQUIVO GERADO — não edite à mão.
   Regerar com: pnpm dashboard
@@ -194,7 +194,7 @@ export function renderizar(metricas: Metricas): string {
 </head>
 <body>
 <main>
-  <h1>Status do projeto <span class="g">Nexo</span></h1>
+  <h1>Status do projeto <span class="g">Nexo Back-end</span></h1>
   <p class="sub">Gerado em ${dataHoraBrasilia(metricas.geradoEm)} (Brasília) · camada curada: ${escapar(metricas.geradoDe)}</p>
 
   <div class="kpis">
