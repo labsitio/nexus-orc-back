@@ -1,0 +1,13 @@
+{
+  "_comment": "Copie para .claude/settings.local.json (gitignored) e ajuste. Sem este arquivo os hooks de .claude/hooks/ caem nos defaults — e o usage-guard, sem CLAUDE_5H_COST_LIMIT nem bloco histórico de 5h, NÃO aplica o gate (avisa e libera). Calibre o teto rodando /usage e `ccusage blocks --active` no mesmo instante e cruzando os valores: /usage em 40% com ccusage em $8.44 => teto ~= $21.",
+
+  "env": {
+    "CLAUDE_5H_COST_LIMIT": "50",
+    "CLAUDE_5H_THRESHOLD_PCT": "80",
+    "CLAUDE_MAX_INPROGRESS": "4"
+  },
+
+  "permissions": {
+    "allow": ["Bash(cd *)", "Agent"]
+  }
+}

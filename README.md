@@ -187,6 +187,7 @@ Todos com envelope versionado (`schemaVersion`) e `tenantId`.
 - Node.js 24 (`nvm use` — o `.nvmrc` fixa a versão; o hook de pre-commit resolve o Node via nvm)
 - pnpm 11 (`corepack enable`)
 - Docker + Docker Compose
+- GitHub CLI autenticado (`gh auth login`) — o fluxo de issues, o hook `.claude/hooks/task-limit.sh` e a esteira de PR dependem dele; sem auth o hook degrada em silêncio
 
 ### Passos
 
