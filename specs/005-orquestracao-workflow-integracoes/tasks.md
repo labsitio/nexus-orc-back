@@ -116,7 +116,7 @@
 
 - [ ] T046 [P] [US3] Unit test `DecisaoRoteamento` (T010) — construtor rejeita `acao: 'SOLICITAR_REENVIO'` sem `motivoDadoAusente` não vazio; aceita quando referencia uma inconsistência/pendência concreta presente no `contextoValidacao`/`contextoExtracao`.
 - [ ] T047 [P] [US3] Unit test: publicação de `IntegracaoExternaSolicitada` ocorre se e somente se `requerIntegracaoExterna === true` na decisão registrada, com payload restrito a `orcamentoId`/`acaoOrigem`/`ocorreuEm` (nenhum campo de protocolo específico).
-- [ ] T048 [P] [US3] Integration test: cenário de reenvio válido (fundamento presente) → `OrcamentoReenvioSolicitado` publicado com `motivoDadoAusente`; cenário de reenvio sem fundamento → nenhum evento de reenvio publicado, tentativa registrada no histórico como falha de invariante.
+- [x] T048 [P] [US3] Integration test: cenário de reenvio válido (fundamento presente) → `OrcamentoReenvioSolicitado` publicado com `motivoDadoAusente`; cenário de reenvio sem fundamento → nenhum evento de reenvio publicado, tentativa registrada no histórico como falha de invariante. (#254 — nota: `ReenvioSemFundamentoError` é invariante estrutural de `DecisaoRoteamento`/#256, rejeita antes de qualquer mutação — nunca anexa `historico`; rastro de auditoria real é o log estruturado do handler SQS, não uma entrada de `historico`. Ver comentário do teste.)
 
 ### Implementation (US3)
 
