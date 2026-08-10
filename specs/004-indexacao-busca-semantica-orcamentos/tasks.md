@@ -93,7 +93,7 @@
 
 ### Implementation (US2)
 
-- [ ] T037 [US2] Infrastructure: `BedrockInterpretadorConsultaGateway` + `BedrockInterpretacaoConsultaACL` (structured output/tool-use restrito ao catálogo de categorias configurado, nunca parsing de texto livre por regex; mitigação de prompt injection via bloco delimitado de conteúdo, mesmo padrão das specs 001–003, aplicado aqui à consulta do usuário).
+- [x] T037 [US2] Infrastructure: `BedrockInterpretadorConsultaGateway` + `BedrockInterpretacaoConsultaACL` (structured output/tool-use restrito ao catálogo de categorias configurado, nunca parsing de texto livre por regex; mitigação de prompt injection via bloco delimitado de conteúdo, mesmo padrão das specs 001–003, aplicado aqui à consulta do usuário).
 - [ ] T038 [US2] Application: caso de uso `BuscarOrcamentos(tenantId, ...)` (interpreta consulta via `AgenteInterpretadorConsultaGateway`, mescla com filtros explícitos, gera vetor de consulta via `AgenteEmbeddingGateway` sobre `textoLivreResidual`, executa `IndiceOrcamentoRepository.buscarPorCriterioEVetor(tenantId, ...)`, mapeia para `ResultadoBusca[]`).
 - [ ] T039 [US2] Interface: controller `POST /v1/orcamentos/busca` (Zod schema de request/response, paginação, Problem Details para erro) + autenticação Cognito (JWT) atrás do `TenantContextMiddleware` compartilhado (spec 007) — `tenantId` sempre do middleware, nunca de body/query.
 - [ ] T040 [US2] IAM: role dedicada `BuscarOrcamentosLambdaRole` (least privilege: `bedrock:InvokeModel` restrito aos dois modelos — embedding e interpretação de consulta —, apenas leitura em `indices_orcamento`, nenhuma escrita, **sem `BYPASSRLS`**).
