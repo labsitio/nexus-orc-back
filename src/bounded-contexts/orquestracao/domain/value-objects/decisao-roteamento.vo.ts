@@ -17,10 +17,17 @@ export class AprovacaoSemValidacaoError extends ErroDominio {
 }
 
 export class ReenvioSemFundamentoError extends ErroDominio {
-  constructor() {
+  constructor(motivoDadoAusenteRecebido: string | undefined) {
     super(
-      'Decisão de SOLICITAR_REENVIO exige motivoDadoAusente não vazio, referenciando inconsistência/pendência concreta',
+      `Decisão de SOLICITAR_REENVIO exige motivoDadoAusente não vazio, referenciando inconsistência/pendência concreta; ${ReenvioSemFundamentoError.descreverRecebido(motivoDadoAusenteRecebido)}`,
     );
+  }
+
+  private static descreverRecebido(motivoDadoAusenteRecebido: string | undefined): string {
+    if (motivoDadoAusenteRecebido === undefined) {
+      return 'motivoDadoAusente não foi informado';
+    }
+    return `motivoDadoAusente recebido contém apenas espaço em branco ("${motivoDadoAusenteRecebido}")`;
   }
 }
 
@@ -82,7 +89,7 @@ export class DecisaoRoteamento {
     }
 
     if (input.acao === 'SOLICITAR_REENVIO' && !input.motivoDadoAusente?.trim()) {
-      throw new ReenvioSemFundamentoError();
+      throw new ReenvioSemFundamentoError(input.motivoDadoAusente);
     }
 
     if (input.agenteOrigem !== 'HUMANO' && !input.criterio?.trim()) {
