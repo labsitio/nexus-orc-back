@@ -111,7 +111,7 @@ class AgenteCategorizadorLentoFake implements AgenteCategorizadorItemGateway {
   constructor(private readonly categoria: CategoriaItem) {}
 
   async categorizar(_input: AgenteCategorizadorItemInput): Promise<CategoriaItem> {
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await new Promise((resolve) => queueMicrotask(resolve));
     return this.categoria;
   }
 }
