@@ -7,6 +7,7 @@ import {
 } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/decisao-roteamento.vo.js';
 import { NivelConfianca } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/nivel-confianca.vo.js';
 import { ContextoValidacao } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/contexto-validacao.vo.js';
+import { ContextoExtracao } from '../../../../../src/bounded-contexts/orquestracao/domain/value-objects/contexto-extracao.vo.js';
 
 describe('DecisaoRoteamento', () => {
   it('rejeita APROVAR sem contextoValidacao', () => {
@@ -94,6 +95,45 @@ describe('DecisaoRoteamento', () => {
       motivoDadoAusente: 'CNPJ do fornecedor ausente no item 3',
     });
     expect(decisao.motivoDadoAusente).toBe('CNPJ do fornecedor ausente no item 3');
+  });
+
+  it('aceita SOLICITAR_REENVIO quando motivoDadoAusente referencia inconsistência concreta do contextoValidacao', () => {
+    const contextoValidacao = ContextoValidacao.de({
+      resultado: 'VALIDADO_COM_RESSALVA',
+      inconsistenciasAceitas: [
+        { regra: 'CNPJ_DIVERGENTE', detalhe: 'CNPJ do fornecedor diverge do cadastro' },
+      ],
+    });
+    const [inconsistencia] = contextoValidacao.inconsistenciasAceitas;
+    const decisao = DecisaoRoteamento.criar({
+      acao: 'SOLICITAR_REENVIO',
+      nivelConfianca: NivelConfianca.de(85),
+      criterio: 'validação apontou inconsistência não sanável sem reenvio',
+      agenteOrigem: 'ORQUESTRADOR',
+      requerIntegracaoExterna: false,
+      motivoDadoAusente: inconsistencia?.detalhe,
+      contextoValidacao,
+    });
+    expect(decisao.motivoDadoAusente).toBe('CNPJ do fornecedor diverge do cadastro');
+  });
+
+  it('aceita SOLICITAR_REENVIO quando motivoDadoAusente referencia pendência concreta do contextoExtracao', () => {
+    const contextoExtracao = ContextoExtracao.de({
+      itensResumo: '3 itens, 1 com quantidade pendente de confirmação',
+      condicoesComerciaisResumo: 'prazo de pagamento 30 dias',
+      houvePendenciaConfirmada: true,
+    });
+    const decisao = DecisaoRoteamento.criar({
+      acao: 'SOLICITAR_REENVIO',
+      nivelConfianca: NivelConfianca.de(80),
+      criterio: 'extração reportou pendência de confirmação não resolvida',
+      agenteOrigem: 'ORQUESTRADOR',
+      requerIntegracaoExterna: false,
+      motivoDadoAusente: contextoExtracao.houvePendenciaConfirmada
+        ? contextoExtracao.itensResumo
+        : undefined,
+    });
+    expect(decisao.motivoDadoAusente).toBe('3 itens, 1 com quantidade pendente de confirmação');
   });
 
   it('rejeita decisão automática (agenteOrigem !== HUMANO) sem criterio', () => {

@@ -114,7 +114,7 @@
 
 ### Tests (US3)
 
-- [ ] T046 [P] [US3] Unit test `DecisaoRoteamento` (T010) — construtor rejeita `acao: 'SOLICITAR_REENVIO'` sem `motivoDadoAusente` não vazio; aceita quando referencia uma inconsistência/pendência concreta presente no `contextoValidacao`/`contextoExtracao`.
+- [x] T046 [P] [US3] Unit test `DecisaoRoteamento` (T010) — construtor rejeita `acao: 'SOLICITAR_REENVIO'` sem `motivoDadoAusente` não vazio; aceita quando referencia uma inconsistência/pendência concreta presente no `contextoValidacao`/`contextoExtracao`. Cobertura já existia parcialmente desde T010 (#497); completada em `tests/bounded-contexts/orquestracao/domain/value-objects/decisao-roteamento.vo.test.ts` com 2 novos casos: `motivoDadoAusente` derivado de `ContextoValidacao.inconsistenciasAceitas[].detalhe` e de `ContextoExtracao.itensResumo` (via `houvePendenciaConfirmada`), fechando a lacuna de rastreabilidade entre o texto do fundamento e o dado concreto de origem.
 - [ ] T047 [P] [US3] Unit test: publicação de `IntegracaoExternaSolicitada` ocorre se e somente se `requerIntegracaoExterna === true` na decisão registrada, com payload restrito a `orcamentoId`/`acaoOrigem`/`ocorreuEm` (nenhum campo de protocolo específico).
 - [ ] T048 [P] [US3] Integration test: cenário de reenvio válido (fundamento presente) → `OrcamentoReenvioSolicitado` publicado com `motivoDadoAusente`; cenário de reenvio sem fundamento → nenhum evento de reenvio publicado, tentativa registrada no histórico como falha de invariante.
 
