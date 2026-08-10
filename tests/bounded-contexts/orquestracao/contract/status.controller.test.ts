@@ -159,6 +159,72 @@ describe('GET /v1/orcamentos/{orcamentoId}/workflow/status — controller', () =
     expect(corpo.historico[0].motivoInsucesso).toContain('abaixo do limiar');
   });
 
+  it('200 CONTEXTO_CONSOLIDADO — os 3 contextos presentes, decisão ainda não tentada', async () => {
+    const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726c1');
+    const decisaoWorkflow = DecisaoWorkflow.criar(id, TENANT_ID);
+    decisaoWorkflow.registrarContextoClassificacao(
+      ContextoClassificacao.de({
+        fornecedorIdentificado: 'Fornecedor XPTO',
+        formatoIdentificado: 'PDF',
+      }),
+      TENANT_ID,
+    );
+    decisaoWorkflow.registrarContextoExtracao(
+      ContextoExtracao.de({
+        itensResumo: '3 itens',
+        condicoesComerciaisResumo: '30 dias',
+        houvePendenciaConfirmada: false,
+      }),
+      TENANT_ID,
+    );
+    decisaoWorkflow.registrarContextoValidacao(
+      ContextoValidacao.de({ resultado: 'VALIDADO' }),
+      TENANT_ID,
+    );
+    decisaoWorkflow.consolidarContexto();
+    await repositorio.salvar(decisaoWorkflow);
+
+    const resposta = await app.inject({
+      method: 'GET',
+      url: `/v1/orcamentos/${id.toString()}/workflow/status`,
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json()).toEqual({
+      orcamentoId: id.toString(),
+      status: 'CONTEXTO_CONSOLIDADO',
+      contextoClassificacao: {
+        fornecedorIdentificado: 'Fornecedor XPTO',
+        formatoIdentificado: 'PDF',
+      },
+      contextoExtracao: {
+        itensResumo: '3 itens',
+        condicoesComerciaisResumo: '30 dias',
+        houvePendenciaConfirmada: false,
+      },
+      contextoValidacao: { resultado: 'VALIDADO', inconsistenciasAceitas: [] },
+      historico: [],
+    });
+  });
+
+  it('401 Problem Details — tenantContext ausente (fallback defensivo do controller)', async () => {
+    app = Fastify();
+    registrarRotaStatusDecisaoWorkflow(
+      app,
+      new ConsultarStatusDecisaoWorkflow(() => repositorio),
+      { preHandler: async () => {} }, // não popula request.tenantContext
+    );
+    const id = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726c2');
+
+    const resposta = await app.inject({
+      method: 'GET',
+      url: `/v1/orcamentos/${id.toString()}/workflow/status`,
+    });
+
+    expect(resposta.statusCode).toBe(401);
+    expect(resposta.headers['content-type']).toContain('application/problem+json');
+  });
+
   it('404 Problem Details para orcamentoId inexistente', async () => {
     const idInexistente = OrcamentoId.de('01890a5d-ac96-774b-bcce-b02c8f2726a4');
 
