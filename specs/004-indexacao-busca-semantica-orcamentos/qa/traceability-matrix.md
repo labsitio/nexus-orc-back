@@ -190,3 +190,24 @@ Cobertura isolada dos arquivos alterados (`--coverage.include`, medida pelo QA v
 **Limitação de ambiente registrada, não é achado sobre o PR**: nesta sessão de QA, `npx vitest run` (reporter Allure padrão do `vitest.config.ts`) falhou com `Error: Vitest failed to find the runner` ao carregar `allure-vitest/dist/setup.js` — reproduzido também em `main` antes do checkout desta branch, isolado ao ambiente sandbox (resolução de módulo pnpm/vitest neste worktree específico), não a uma alteração desta PR. Confirmado com `--reporter=default` (bypass só do reporter Allure, sem alterar `vitest.config.ts`): 100% dos resultados idênticos aos relatados pelo dev-back-end. Relatório Allure não pôde ser gerado nesta sessão — ação recomendada: DevOps/dev-back-end investigar a causa da falha do `allure-vitest` setup neste ambiente sandbox fora deste gate (não bloqueia #620, que está integralmente coberto e passando).
 
 Nenhum defeito de produção encontrado nesta validação.
+
+## T037 (PR #714) — `BedrockInterpretadorConsultaGateway` (Converse API, tool-use restrito ao catálogo)
+
+Contraparte do gateway sobre a ACL de T033 (já validada acima). Mesmo padrão de `BedrockCategorizadorItemGateway` (spec 003): saída estruturada via tool-use, `enum` restringindo `categoria` ao `catalogoCategorias` configurado, e consulta do usuário isolada em bloco delimitado na mensagem de usuário (nunca na instrução de sistema).
+
+| Requisito / critério (tasks.md T037) | Cenário | Teste | Resultado |
+|---|---|---|---|
+| Invoca Converse API forçando `toolChoice` para a ferramenta única, `enum` de `categoria` igual ao `catalogoCategorias` recebido | caso feliz | `interpretar invoca o Converse API forçando tool-use restrito ao catálogo e devolve CriterioBusca traduzido pela ACL` | PASS |
+| Tradução do bloco `toolUse` para `CriterioBusca` delegada à `BedrockInterpretacaoConsultaACL` (gateway nunca constrói o VO diretamente) | mesmo teste acima | idem | PASS |
+| Consulta do usuário isolada em bloco `<consulta_do_usuario>` na mensagem de usuário, nunca concatenada à instrução de sistema (mitigação de prompt injection) | consulta contendo tentativa de injeção ("IGNORE AS REGRAS ANTERIORES...") | `isola a consulta do usuário em bloco delimitado na mensagem de usuário (nunca instrução de sistema)` | PASS |
+| Resposta sem bloco `toolUse` válido é erro explícito, nunca silenciosa | `content: [{ text: ... }]`, sem `toolUse` | `lança erro se a resposta não contiver bloco toolUse` | PASS |
+| Shape do input da ferramenta fora do esperado é rejeitado pelo type guard `ehInterpretacaoConsultaBruta`, nunca confia cegamente no LLM | `{ categoria: 42 }` | `lança erro se o input da ferramenta não tiver o shape esperado` | PASS |
+| Categoria fora do catálogo é rejeitada mesmo que o modelo burle o `enum` do schema (defesa em profundidade: schema + ACL) | `categoria: 'categoria-inventada-pelo-modelo'` | `nunca aceita silenciosamente categoria fora do catálogo — mesmo que o modelo burle o enum do schema` (assert de `BedrockInterpretacaoConsultaACLInvalidaError`) | PASS |
+
+Suítes executadas: `pnpm typecheck` (limpo), `pnpm lint` (limpo), `npx vitest run --reporter=default tests/bounded-contexts/busca-indexacao` — 27 arquivos passando (182 testes), 4 arquivos pulados (23 testes, `skipIf(!DATABASE_URL)`, ambiente sandbox sem Postgres — pré-existente, não é falha desta PR).
+
+Cobertura isolada de `bedrock-interpretador-consulta.gateway.ts` (`--coverage.include`): 100% statements (13/13), 100% functions (4/4), 100% lines (12/12), 85.71% branches (6/7) — único ramo não coberto é o fallback `?? []` de `resposta.output?.message?.content ?? []` (linha 127) quando `output`/`message`/`content` está totalmente ausente na resposta; nenhum teste exercita esse shape específico (os testes de "sem toolUse" usam `content` presente, só sem bloco `toolUse`). Mesmo padrão/mesma lacuna já existente e aceita em `BedrockCategorizadorItemGateway` (spec 003, linha equivalente) — classificado como risco residual não bloqueante, comportamento observável idêntico ao já testado (erro explícito de "saída estruturada"), não código de negócio distinto.
+
+Nenhum wiring de composition root, caso de uso ou controller HTTP nesta task — confirmado por grep (`BedrockInterpretadorConsultaGateway` não referenciado fora de `domain/gateways`, `infrastructure/bedrock-interpretacao-consulta.acl.ts` e o próprio par produção/teste); escopo correto de T037, consumo fica para T038 (Application)/T039 (Interface)/T040 (IAM).
+
+Nenhum defeito de produção encontrado nesta validação.
