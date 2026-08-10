@@ -80,6 +80,19 @@ describe('DecisaoRoteamento', () => {
     ).toThrow(/motivoDadoAusente não foi informado/);
   });
 
+  it('rejeita SOLICITAR_REENVIO com motivoDadoAusente string vazia — mensagem distingue de whitespace', () => {
+    expect(() =>
+      DecisaoRoteamento.criar({
+        acao: 'SOLICITAR_REENVIO',
+        nivelConfianca: NivelConfianca.de(85),
+        criterio: 'dado essencial ausente',
+        agenteOrigem: 'ORQUESTRADOR',
+        requerIntegracaoExterna: false,
+        motivoDadoAusente: '',
+      }),
+    ).toThrow(/motivoDadoAusente recebido é uma string vazia/);
+  });
+
   it('rejeita SOLICITAR_REENVIO com motivoDadoAusente vazio/whitespace — mensagem referencia o valor recebido', () => {
     expect(() =>
       DecisaoRoteamento.criar({

@@ -27,6 +27,9 @@ export class ReenvioSemFundamentoError extends ErroDominio {
     if (motivoDadoAusenteRecebido === undefined) {
       return 'motivoDadoAusente não foi informado';
     }
+    if (motivoDadoAusenteRecebido === '') {
+      return 'motivoDadoAusente recebido é uma string vazia';
+    }
     return `motivoDadoAusente recebido contém apenas espaço em branco ("${motivoDadoAusenteRecebido}")`;
   }
 }
