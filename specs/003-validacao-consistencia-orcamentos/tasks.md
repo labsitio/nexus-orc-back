@@ -105,7 +105,7 @@
 
 - [x] T038 [P] [US3] Contract test `POST` / `GET /v1/configuracoes/faixas-preco-categoria` (CRUD simples, transaction script — ver nota de complexidade do `plan.md`).
 - [x] T039 [P] [US3] Unit test `BedrockCategorizacaoACL` (mock de saída do Bedrock) — saída estruturada restrita ao catálogo de categorias configurado, nunca uma categoria inventada fora do catálogo. Implementada em `src/bounded-contexts/validacao/infrastructure/bedrock-categorizacao.acl.ts` (apenas a ACL de tradução, pura, sem chamada AWS) + `tests/bounded-contexts/validacao/infrastructure/bedrock-categorizacao.acl.test.ts`; `BedrockCategorizadorItemGateway` (chamada Bedrock real) permanece escopo de T041/#151.
-- [ ] T040 [P] [US3] Integration test: item com descrição livre → `AgenteCategorizadorItemGateway` retorna categoria do catálogo → regra de preço compara contra a `FaixaPreco` correta → resultado determinístico (dentro/fora de faixa) independente da IA.
+- [x] T040 [P] [US3] Integration test: item com descrição livre → `AgenteCategorizadorItemGateway` retorna categoria do catálogo → regra de preço compara contra a `FaixaPreco` correta → resultado determinístico (dentro/fora de faixa) independente da IA. Implementado em `validar-orcamento-categorizacao.integration.test.ts` (issue #150) — exercita `ValidarOrcamento` com dois fakes de gateway com latências distintas ("IA rápida"/"IA lenta") retornando a mesma categoria, provando que o resultado dentro/fora de faixa depende só da regra de preço, nunca da IA.
 
 ### Implementation (US3)
 
