@@ -120,7 +120,7 @@
 
 ### Implementation (US3)
 
-- [ ] T049 [US3] Application: estender `ConsolidarEDecidirWorkflow` e `RegistrarDecisaoHumanaWorkflow` para publicar `IntegracaoExternaSolicitada` em conjunto com o evento de desfecho quando `requerIntegracaoExterna === true` (ADR-003 do `plan.md`).
+- [x] T049 [US3] Application: estender `ConsolidarEDecidirWorkflow` e `RegistrarDecisaoHumanaWorkflow` para publicar `IntegracaoExternaSolicitada` em conjunto com o evento de desfecho quando `requerIntegracaoExterna === true` (ADR-003 do `plan.md`). (#255) Já entregue: `ConsolidarEDecidirWorkflow` publica desde a extração de `criar-evento-desfecho.ts` (T042/#248, ver `consolidar-e-decidir-workflow.ts` linhas 102-106) e `RegistrarDecisaoHumanaWorkflow` publica desde sua própria implementação (T042/#248, `registrar-decisao-humana-workflow.ts` linhas 64-68). O terceiro caso de uso citado no `tasks.md` histórico (`RevisarDecisaoWorkflowComIA`) foi removido — Agente Revisor de Workflow deixou de existir (nota da Fase 4). Cobertura confirmada em `tests/bounded-contexts/orquestracao/application/consolidar-e-decidir-workflow.test.ts` (caso "publica IntegracaoExternaSolicitada junto do desfecho quando requerIntegracaoExterna") e `tests/bounded-contexts/orquestracao/application/registrar-decisao-humana-workflow.test.ts` (mesmo caso).
 - [ ] T050 [US3] Domain: garantir que `ReenvioSemFundamentoError` inclui referência legível ao que faltou validar/preencher (nunca mensagem genérica) — mesma disciplina de `InconsistenciaDetectada.detalhe` da spec 003.
 
 **Checkpoint**: todas as user stories funcionais e testáveis independentemente; reenvio sempre fundamentado; integração externa sempre desacoplada de protocolo específico.
