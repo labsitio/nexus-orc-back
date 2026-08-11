@@ -3,7 +3,10 @@ import type { Logger } from 'pino';
 import type { ReceberOrcamento } from '../../application/use-cases/receber-orcamento.js';
 import type { SftpTenantResolverGateway } from '../../domain/gateways/sftp-tenant-resolver.gateway.js';
 import { criarLogger } from '../../infrastructure/observability/logger.js';
-import { ReferenciaS3 } from '../../domain/value-objects/referencia-s3.vo.js';
+import {
+  ReferenciaS3,
+  ReferenciaS3KeyInvalidaError,
+} from '../../domain/value-objects/referencia-s3.vo.js';
 
 /** Prefixo do canal SFTP — o mesmo usado pela regra de notificação S3/Transfer Family (plan.md). */
 const PREFIXO_SFTP = 'sftp-incoming/';
@@ -50,7 +53,21 @@ export function criarHandlerSftpUpload(
         );
       }
 
-      const referenciaBruta = ReferenciaS3.de({ bucket, key, versionId });
+      let referenciaBruta: ReferenciaS3;
+      try {
+        referenciaBruta = ReferenciaS3.de({ bucket, key, versionId });
+      } catch (erro) {
+        if (erro instanceof ReferenciaS3KeyInvalidaError) {
+          logger
+            .child({ bucket, key, versionId })
+            .error(
+              `Key inválida no depósito SFTP — registro pulado, objeto órfão no bucket para auditoria: ${erro.message}`,
+            );
+          continue;
+        }
+        throw erro;
+      }
+
       const tenantId = await resolverTenant.resolver(referenciaBruta);
       if (!tenantId) {
         logger

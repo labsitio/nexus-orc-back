@@ -236,4 +236,54 @@ describe('criarHandlerSftpUpload', () => {
     );
     expect(salvar).not.toHaveBeenCalled();
   });
+
+  it('key com segmento final inválido (issue #730, ADR-013 emendado) gera log.error e pula o registro, sem derrubar o batch', async () => {
+    const { useCase, salvar } = receberOrcamentoFake();
+    const resolver = vi.fn();
+    const resolverTenant: SftpTenantResolverGateway = { resolver };
+    const childLogger = { error: vi.fn(), child: vi.fn() };
+    const logger = { child: vi.fn().mockReturnValue(childLogger) };
+    const handler = criarHandlerSftpUpload(
+      useCase,
+      resolverTenant,
+      logger as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    );
+    const keyInvalida = 'sftp-incoming/arquivo..pdf';
+
+    await expect(
+      handler(
+        eventoS3([{ bucket: 'nexo-orcamentos-raw', key: keyInvalida, versionId: 'v-1' }]),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        {} as any,
+        () => undefined,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(logger.child).toHaveBeenCalledWith({
+      bucket: 'nexo-orcamentos-raw',
+      key: keyInvalida,
+      versionId: 'v-1',
+    });
+    expect(childLogger.error).toHaveBeenCalledOnce();
+    expect(childLogger.error).toHaveBeenCalledWith(expect.stringContaining('Key inválida'));
+    expect(resolver).not.toHaveBeenCalled();
+    expect(salvar).not.toHaveBeenCalled();
+  });
+
+  it('processa o restante do lote quando um registro tem key com segmento final inválido', async () => {
+    const { useCase, salvar } = receberOrcamentoFake();
+    const handler = criarHandlerSftpUpload(useCase, resolverTenantFake());
+
+    await handler(
+      eventoS3([
+        { bucket: 'b', key: 'sftp-incoming/arquivo..pdf', versionId: 'v-1' },
+        { bucket: 'b', key: 'sftp-incoming/valido.pdf', versionId: 'v-2' },
+      ]),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {} as any,
+      () => undefined,
+    );
+
+    expect(salvar).toHaveBeenCalledTimes(1);
+  });
 });
