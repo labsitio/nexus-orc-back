@@ -20,14 +20,13 @@ describe('OllamaClassificadorGateway', () => {
     globalThis.fetch = fetchOriginal;
   });
 
-  it('classificar chama /api/chat com format:"json" e devolve o resultado estruturado', async () => {
+  it('classificar chama /api/chat com JSON Schema real em "format" e devolve o resultado estruturado', async () => {
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock.mockResolvedValue(
       respostaOllama(200, {
         message: {
           content: JSON.stringify({
             fornecedorIdentificado: 'Acme Ltda',
-            formatoIdentificado: 'PDF',
             nivelConfianca: 92,
           }),
         },
@@ -39,7 +38,6 @@ describe('OllamaClassificadorGateway', () => {
 
     expect(resultado).toEqual({
       fornecedorIdentificado: 'Acme Ltda',
-      formatoIdentificado: 'PDF',
       nivelConfianca: 92,
     });
 
@@ -47,11 +45,14 @@ describe('OllamaClassificadorGateway', () => {
     expect(url).toBe('http://localhost:11434/api/chat');
     const corpo = JSON.parse(init.body as string) as {
       model: string;
-      format: string;
+      format: { type: string; properties: Record<string, unknown>; required: string[] };
       messages: { role: string; content: string }[];
     };
     expect(corpo.model).toBe('llama3.1');
-    expect(corpo.format).toBe('json');
+    expect(corpo.format).not.toBe('json');
+    expect(corpo.format.type).toBe('object');
+    expect(corpo.format.required).toEqual(['fornecedorIdentificado', 'nivelConfianca']);
+    expect(corpo.format.properties).not.toHaveProperty('formatoIdentificado');
     expect(corpo.messages[1]?.content).toContain('<conteudo_do_documento>');
   });
 
@@ -62,7 +63,6 @@ describe('OllamaClassificadorGateway', () => {
         message: {
           content: JSON.stringify({
             fornecedorIdentificado: 'X',
-            formatoIdentificado: 'PDF',
             nivelConfianca: 50,
           }),
         },

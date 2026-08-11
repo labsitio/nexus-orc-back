@@ -70,9 +70,11 @@ async function processarMensagemClassificadorQueue(
   const resultadoBruto = await gateway.classificar(
     'texto já convertido pelo MarkItDownConversaoACL',
   );
+  // (ADR-012) formatoIdentificado não vem do gateway — aqui o teste simula o valor
+  // já derivado da extensão, que é o que `ClassificarOrcamento` real passaria.
   const resultado = ResultadoClassificacao.criar({
     fornecedorIdentificado: resultadoBruto.fornecedorIdentificado,
-    formatoIdentificado: resultadoBruto.formatoIdentificado,
+    formatoIdentificado: 'PDF',
     nivelConfianca: NivelConfianca.de(resultadoBruto.nivelConfianca),
     agenteOrigem: 'CLASSIFICADOR',
   });
@@ -104,7 +106,6 @@ describe('Consumidor de classificador-queue (integração simulada)', () => {
     const orcamento = novoOrcamentoRecebido();
     const gateway = new AgenteClassificadorGatewayFake({
       fornecedorIdentificado: 'Fornecedor X',
-      formatoIdentificado: 'PDF',
       nivelConfianca: 92,
     });
     const publisher = new EventPublisherFake();
@@ -121,7 +122,6 @@ describe('Consumidor de classificador-queue (integração simulada)', () => {
     const orcamento = novoOrcamentoRecebido();
     const gateway = new AgenteClassificadorGatewayFake({
       fornecedorIdentificado: 'Fornecedor Y',
-      formatoIdentificado: 'XLSX',
       nivelConfianca: 79,
     });
     const publisher = new EventPublisherFake();
@@ -139,7 +139,6 @@ describe('Consumidor de classificador-queue (integração simulada)', () => {
     const orcamento = novoOrcamentoRecebido();
     const gateway = new AgenteClassificadorGatewayFake({
       fornecedorIdentificado: 'Fornecedor Z',
-      formatoIdentificado: 'PDF',
       nivelConfianca: 101,
     });
     const publisher = new EventPublisherFake();

@@ -3,6 +3,7 @@ import {
   ClassificarOrcamento,
   OrcamentoNaoEncontradoParaClassificacaoError,
   TenantDivergenciaError,
+  derivarFormatoIdentificado,
 } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/classificar-orcamento.js';
 import { Orcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
 import { Canal } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/canal.vo.js';
@@ -24,13 +25,16 @@ import { NivelConfianca } from '../../../../src/bounded-contexts/ingestao-identi
 import { ResultadoClassificacao } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/value-objects/resultado-classificacao.vo.js';
 import { TenantId } from '../../../../src/shared-kernel/tenant/tenant-id.vo.js';
 
-function novoOrcamentoRecebido(tenantId: TenantId = TenantId.novo()): Orcamento {
+function novoOrcamentoRecebido(
+  tenantId: TenantId = TenantId.novo(),
+  key = 'portal-web/orcamento.pdf',
+): Orcamento {
   return Orcamento.receber({
     id: OrcamentoId.novo(),
     canal: Canal.de('PORTAL_WEB'),
     referenciaBruta: ReferenciaS3.de({
       bucket: 'nexo-orcamentos-raw',
-      key: 'portal-web/orcamento.pdf',
+      key,
       versionId: 'v1',
     }),
     tenantId,
@@ -105,7 +109,6 @@ describe('ClassificarOrcamento', () => {
       new ConversorFake(),
       new AgenteClassificadorFake({
         fornecedorIdentificado: 'Acme Ltda',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 90,
       }),
       publisher,
@@ -129,7 +132,6 @@ describe('ClassificarOrcamento', () => {
       new ConversorFake(),
       new AgenteClassificadorFake({
         fornecedorIdentificado: 'Acme Ltda',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 40,
       }),
       publisher,
@@ -152,7 +154,6 @@ describe('ClassificarOrcamento', () => {
       new ConversorFake(),
       new AgenteClassificadorFake({
         fornecedorIdentificado: 'X',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 90,
       }),
       publisher,
@@ -182,7 +183,6 @@ describe('ClassificarOrcamento', () => {
       new ConversorFake(),
       new AgenteClassificadorFake({
         fornecedorIdentificado: 'X',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 90,
       }),
       publisher,
@@ -202,7 +202,6 @@ describe('ClassificarOrcamento', () => {
       new ConversorFake(),
       new AgenteClassificadorFake({
         fornecedorIdentificado: 'Acme Ltda',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 90,
       }),
       publisher,
@@ -227,7 +226,6 @@ describe('ClassificarOrcamento', () => {
       new ConversorFake(),
       new AgenteClassificadorFake({
         fornecedorIdentificado: 'X',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 90,
       }),
       publisher,
@@ -260,7 +258,6 @@ describe('ClassificarOrcamento', () => {
       new ConversorFake(),
       new AgenteClassificadorFake({
         fornecedorIdentificado: 'X',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 90,
       }),
       publisher,
@@ -286,7 +283,6 @@ describe('ClassificarOrcamento', () => {
       new ConversorFake(),
       new AgenteClassificadorFake({
         fornecedorIdentificado: 'X',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 90,
       }),
       publisher,
@@ -300,5 +296,54 @@ describe('ClassificarOrcamento', () => {
     expect((erro as TenantDivergenciaError).motivo).toBe('DIVERGENTE');
     expect(publisher.eventosPublicados).toHaveLength(0);
     expect(repositorio.salvos).toHaveLength(0);
+  });
+
+  it('(ADR-012, #725) deriva formatoIdentificado da extensão do arquivo, nunca do agente — mesmo que o gateway não devolva o campo', async () => {
+    const orcamento = novoOrcamentoRecebido(
+      TenantId.novo(),
+      'sftp-incoming/018f4b1a-0000-7000-8000-000000000000-orcamento.txt',
+    );
+    const repositorio = new RepositorioFake(orcamento);
+    const publisher = new EventPublisherFake();
+    const useCase = new ClassificarOrcamento(
+      () => repositorio,
+      new ArmazenamentoBrutoFake(),
+      new ConversorFake(),
+      new AgenteClassificadorFake({
+        fornecedorIdentificado: 'Acme Ltda',
+        nivelConfianca: 90,
+      }),
+      publisher,
+    );
+
+    await useCase.executar(orcamento.id.toString(), orcamento.tenantId);
+
+    const evento = publisher.eventosPublicados[0] as OrcamentoClassificado;
+    expect(evento.resultado.formatoIdentificado).toBe('TXT');
+  });
+});
+
+describe('derivarFormatoIdentificado', () => {
+  it('deriva a extensão em maiúsculas a partir do nome no formato real <uuid>-nome.ext', () => {
+    expect(derivarFormatoIdentificado('018f4b1a-0000-7000-8000-000000000000-orcamento.pdf')).toBe(
+      'PDF',
+    );
+    expect(derivarFormatoIdentificado('018f4b1a-0000-7000-8000-000000000000-nota.txt')).toBe('TXT');
+  });
+
+  it('cai em DESCONHECIDO quando o nome não tem extensão', () => {
+    expect(derivarFormatoIdentificado('018f4b1a-0000-7000-8000-000000000000-orcamento')).toBe(
+      'DESCONHECIDO',
+    );
+  });
+
+  it('cai em DESCONHECIDO quando o "." é o último caractere (sem extensão real)', () => {
+    expect(derivarFormatoIdentificado('arquivo.')).toBe('DESCONHECIDO');
+  });
+
+  it('cai em DESCONHECIDO para extensão atípica (não alfanumérica ou absurdamente longa)', () => {
+    expect(derivarFormatoIdentificado('arquivo.tar.gz')).toBe('GZ');
+    expect(derivarFormatoIdentificado('arquivo.exe; rm -rf')).toBe('DESCONHECIDO');
+    expect(derivarFormatoIdentificado(`arquivo.${'a'.repeat(20)}`)).toBe('DESCONHECIDO');
   });
 });
