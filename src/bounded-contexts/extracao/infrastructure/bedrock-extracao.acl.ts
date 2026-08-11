@@ -131,7 +131,7 @@ function paraCampoExtraido<TBruto, TVo>(
   return CampoExtraido.extraido(valorConstruido, confianca, 'EXTRATOR');
 }
 
-const REGEX_DATA_ISO = /^\d{4}-\d{2}-\d{2}/;
+const REGEX_DATA_ISO = /^(\d{4})-(\d{2})-(\d{2})/;
 const REGEX_DATA_BR = /^(\d{2})\/(\d{2})\/(\d{4})$/;
 const REGEX_PERIODO_RELATIVO = /(\d+)\s*(dias?|semanas?|mes(?:es)?|mês(?:es)?|anos?)/i;
 
@@ -143,7 +143,6 @@ const UNIDADES_PERIODO_RELATIVO: Readonly<Record<string, 'dia' | 'semana' | 'mes
   mes: 'mes',
   meses: 'mes',
   mês: 'mes',
-  mêses: 'mes',
   ano: 'ano',
   anos: 'ano',
 };
@@ -173,9 +172,20 @@ function somarMeses(inicio: Date, meses: number): Date {
 function resolverDataAbsoluta(texto: string): Date | undefined {
   const textoLimpo = texto.trim();
 
-  if (REGEX_DATA_ISO.test(textoLimpo)) {
-    const data = new Date(textoLimpo);
-    return Number.isNaN(data.getTime()) ? undefined : data;
+  const matchIso = REGEX_DATA_ISO.exec(textoLimpo);
+  if (matchIso) {
+    const [, anoIso, mesIso, diaIso] = matchIso;
+    const ano = Number(anoIso);
+    const mes = Number(mesIso);
+    const dia = Number(diaIso);
+    const data = new Date(Date.UTC(ano, mes - 1, dia));
+    // `new Date('2026-02-30')` não lança nem devolve Invalid Date — faz
+    // overflow silencioso para 02/03/2026 (dia inexistente). Round-trip
+    // contra os componentes parseados rejeita isso, mesma disciplina do
+    // caminho dd/mm/yyyy abaixo — nunca aceitar data de calendário inválida.
+    const dataValidaIso =
+      data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia;
+    return dataValidaIso ? data : undefined;
   }
 
   const matchBr = REGEX_DATA_BR.exec(textoLimpo);
@@ -216,6 +226,12 @@ function resolverPeriodoRelativo(texto: string, referencia: Date): Date | undefi
  * texto livre, nunca calcula data (aritmética de data é proibida ao modelo
  * pela spec.md). Três caminhos, nessa ordem: data absoluta, período relativo
  * (dia/semana/mês/ano) e residual (`undefined`, traduzido em `naoExtraido`).
+ *
+ * `referencia` é lida em componentes UTC (dia calendário UTC, não fuso do
+ * Brasil) — mesma convenção de `somarMeses` e `resolverDataAbsoluta` acima,
+ * para manter toda a aritmética desta função num único fuso. `referencia` é
+ * parâmetro justamente para trocar a fonte/fuso depois sem tocar no resto
+ * (ver limitação aceita na issue #740 — hoje é sempre `new Date()`).
  */
 export function resolverPrazoValidade(
   texto: string,

@@ -207,6 +207,13 @@ describe('resolverPrazoValidade (ADR-015)', () => {
     },
   );
 
+  it('rejeita data ISO de calendário inexistente ("2026-02-30") em vez de fazer overflow silencioso para 02/03', () => {
+    // `new Date('2026-02-30')` não lança nem devolve Invalid Date — o
+    // runtime faz overflow silencioso. Round-trip contra os componentes
+    // parseados tem que rejeitar isso e cair no residual.
+    expect(resolverPrazoValidade('2026-02-30', new Date())).toBeUndefined();
+  });
+
   it('ARMADILHA: "10/09/2026" nunca resolve para 9 de outubro (new Date cru interpretaria mês/dia)', () => {
     const resultado = resolverPrazoValidade('10/09/2026', new Date());
 
