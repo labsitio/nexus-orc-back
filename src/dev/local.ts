@@ -71,6 +71,9 @@ import { registrarRotaFaixaPrecoCategoria } from '../bounded-contexts/validacao/
 import { criarValidadorQueueHandler } from '../bounded-contexts/validacao/interface/events/validador-queue.handler.js';
 import { criarIndexadorQueueHandler } from '../bounded-contexts/busca-indexacao/interface/events/indexador-queue.handler.js';
 import { registrarRotaStatusIndexacao } from '../bounded-contexts/busca-indexacao/interface/http/indexacao-status.controller.js';
+import { registrarRotaBuscaOrcamentos } from '../bounded-contexts/busca-indexacao/interface/http/busca-orcamentos.controller.js';
+import type { AgenteInterpretadorConsultaGateway } from '../bounded-contexts/busca-indexacao/domain/gateways/agente-interpretador-consulta.gateway.js';
+import { CriterioBusca } from '../bounded-contexts/busca-indexacao/domain/value-objects/criterio-busca.vo.js';
 import { DrizzlePgvectorIndiceOrcamentoRepository } from '../bounded-contexts/busca-indexacao/infrastructure/persistence/drizzle-pgvector-indice-orcamento.repository.js';
 import { criarContextoClassificacaoQueueHandler } from '../bounded-contexts/orquestracao/interface/events/contexto-classificacao-queue.handler.js';
 import { criarContextoExtracaoQueueHandler } from '../bounded-contexts/orquestracao/interface/events/contexto-extracao-queue.handler.js';
@@ -117,6 +120,26 @@ const EXTENSOES_SUPORTADAS_SEM_MARKITDOWN = ['.txt', '.md', '.csv'];
 const ERRO_SEM_MARKITDOWN =
   'Conversão de documento binário exige o Lambda MarkItDown, que ainda não existe (issues #588/#590). ' +
   `Localmente só ${EXTENSOES_SUPORTADAS_SEM_MARKITDOWN.join(', ')} atravessam o fluxo.`;
+
+/**
+ * `AgenteInterpretadorConsultaGateway` tem uma única implementação
+ * (`BedrockInterpretadorConsultaGateway`, T037) — não existe contraparte Ollama,
+ * e Bedrock não existe no LocalStack. Sem este stub a rota
+ * `POST /v1/orcamentos/busca` não pode ser registrada localmente.
+ *
+ * O stub NÃO interpreta linguagem natural: devolve a consulta inteira como
+ * `textoLivreResidual` e nenhum filtro estruturado. Consequência honesta — a
+ * busca vetorial roda de verdade (embedding real via `mxbai-embed-large` +
+ * pgvector), mas categoria, faixa de preço e período só entram na busca se
+ * vierem explícitos no body, nunca inferidos do texto. Filtro implícito de
+ * consulta em linguagem natural é o único pedaço de 004 que este ambiente não
+ * exercita.
+ */
+const interpretadorConsultaLocal: AgenteInterpretadorConsultaGateway = {
+  async interpretar({ consultaLinguagemNatural }) {
+    return CriterioBusca.de({ textoLivreResidual: consultaLinguagemNatural });
+  },
+};
 
 const conversorLocal: MarkItDownConversaoACL = {
   async converterParaTexto(conteudoBruto: Uint8Array, nomeArquivo: string): Promise<string> {
@@ -242,6 +265,20 @@ registrarRotaDecisaoHumanaValidacao(
 );
 registrarRotaFaixaPrecoCategoria(app, validacao.gatewayFaixaPreco, opts);
 registrarRotaStatusIndexacao(app, criarRepositorioIndiceOrcamentoHttp, opts);
+registrarRotaBuscaOrcamentos(
+  app,
+  {
+    interpretador: interpretadorConsultaLocal,
+    embeddingGateway: agenteEmbedding,
+    criarRepositorio: criarRepositorioIndiceOrcamentoHttp,
+    // `catalogoCategorias` só é repassado ao interpretador (`buscar-orcamentos.ts:78`),
+    // e o stub local ignora — em produção ele restringe o `enum` de `categoria`
+    // na saída do LLM. Vazio aqui em vez de consultar `faixas_preco_categoria`:
+    // seria consulta sem efeito nenhum neste ambiente.
+    catalogoCategorias: [],
+  },
+  opts,
+);
 registrarRotaStatusDecisaoWorkflow(app, consultarStatusDecisaoWorkflow, opts);
 registrarRotaDecisaoHumanaWorkflow(
   app,
