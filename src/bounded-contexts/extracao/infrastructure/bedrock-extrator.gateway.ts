@@ -64,7 +64,10 @@ const FERRAMENTA_EXTRACAO: Tool = {
                 quantidade: campoExtraidoSchema({ type: ['number', 'null'] }),
                 precoUnitario: campoExtraidoSchema({
                   type: ['object', 'null'],
-                  properties: { valorCentavos: { type: 'integer' }, moeda: { type: 'string' } },
+                  properties: {
+                    valorCentavos: { type: 'integer' },
+                    moeda: { type: 'string', pattern: '^[A-Z]{3}$' },
+                  },
                 }),
               },
               required: ['descricao', 'quantidade', 'precoUnitario'],

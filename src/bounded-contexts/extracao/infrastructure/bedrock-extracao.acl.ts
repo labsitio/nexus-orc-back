@@ -47,11 +47,68 @@ export interface ExtracaoBruta {
   readonly condicoesComerciais: CondicoesComerciaisBruto;
 }
 
-/** Type guard estrutural — nunca confia cegamente no shape reportado pelo LLM. */
+/**
+ * Valida o shape de um `CampoBruto<T>`: `confianca` numérica e `valor` nulo
+ * (contrato de "não extraído") ou aprovado por `validarValor`. Nunca rejeita
+ * `null` — é dado legítimo do contrato, só shape errado é defeito (ADR-014).
+ */
+function ehCampoBruto(campo: unknown, validarValor: (valor: unknown) => boolean): boolean {
+  if (typeof campo !== 'object' || campo === null) return false;
+  const registro = campo as Record<string, unknown>;
+  if (typeof registro.confianca !== 'number') return false;
+  return registro.valor === null || validarValor(registro.valor);
+}
+
+function ehDescricaoValor(valor: unknown): boolean {
+  if (typeof valor !== 'object' || valor === null) return false;
+  const registro = valor as Record<string, unknown>;
+  return (
+    typeof registro.descricao === 'string' &&
+    (registro.sku === undefined || typeof registro.sku === 'string')
+  );
+}
+
+function ehPrecoUnitarioValor(valor: unknown): boolean {
+  if (typeof valor !== 'object' || valor === null) return false;
+  const registro = valor as Record<string, unknown>;
+  return typeof registro.valorCentavos === 'number' && typeof registro.moeda === 'string';
+}
+
+function ehItemOrcamentoBruto(item: unknown): boolean {
+  if (typeof item !== 'object' || item === null) return false;
+  const registro = item as Record<string, unknown>;
+  return (
+    ehCampoBruto(registro.descricao, ehDescricaoValor) &&
+    ehCampoBruto(registro.quantidade, (v) => typeof v === 'number') &&
+    ehCampoBruto(registro.precoUnitario, ehPrecoUnitarioValor)
+  );
+}
+
+function ehCondicoesComerciaisBruto(valor: unknown): boolean {
+  if (typeof valor !== 'object' || valor === null) return false;
+  const registro = valor as Record<string, unknown>;
+  const ehTexto = (v: unknown) => typeof v === 'string';
+  return (
+    ehCampoBruto(registro.condicoesPagamento, ehTexto) &&
+    ehCampoBruto(registro.prazoValidade, ehTexto) &&
+    ehCampoBruto(registro.condicoesEntrega, ehTexto)
+  );
+}
+
+/**
+ * Type guard estrutural — nunca confia cegamente no shape reportado pelo
+ * LLM. Valida também o `CampoBruto` aninhado de cada campo (ADR-014): shape
+ * inválido (ex.: `descricao.valor` string em vez de objeto) é rejeitado
+ * aqui, antes de chegar a qualquer Value Object de domínio.
+ */
 export function ehExtracaoBruta(valor: unknown): valor is ExtracaoBruta {
   if (typeof valor !== 'object' || valor === null) return false;
   const registro = valor as Record<string, unknown>;
-  return Array.isArray(registro.itens) && typeof registro.condicoesComerciais === 'object';
+  return (
+    Array.isArray(registro.itens) &&
+    registro.itens.every(ehItemOrcamentoBruto) &&
+    ehCondicoesComerciaisBruto(registro.condicoesComerciais)
+  );
 }
 
 function paraCampoExtraido<TBruto, TVo>(
@@ -68,6 +125,20 @@ function paraCampoExtraido<TBruto, TVo>(
 }
 
 /**
+ * Variantes de notação de moeda conhecidas — normalização explícita e
+ * enumerada (camada 2 do ADR-014), nunca heurística. Variante fora deste
+ * mapa segue para a camada 3 (`Dinheiro.de`) e é rejeitada, nunca
+ * "adivinhada".
+ */
+const VARIANTES_MOEDA_CONHECIDAS: Readonly<Record<string, string>> = {
+  R$: 'BRL',
+};
+
+function normalizarMoeda(moeda: string): string {
+  return VARIANTES_MOEDA_CONHECIDAS[moeda] ?? moeda;
+}
+
+/**
  * Anti-Corruption Layer que traduz a saída estruturada (tool-use) do Bedrock
  * em Value Objects do domínio, aplicando o limiar de confiança por campo.
  * Nunca repassa o JSON bruto do modelo para fora da Infrastructure — mesma
@@ -77,6 +148,11 @@ function paraCampoExtraido<TBruto, TVo>(
  */
 export class BedrockExtracaoACL {
   converter(bruto: ExtracaoBruta): AgenteExtratorResultado {
+    if (!ehExtracaoBruta(bruto)) {
+      throw new BedrockExtracaoACLInvalidaError(
+        'CampoBruto aninhado com shape inválido (ver ADR-014)',
+      );
+    }
     if (bruto.itens.length === 0) {
       throw new BedrockExtracaoACLInvalidaError('itens não pode ser vazio');
     }
@@ -88,7 +164,7 @@ export class BedrockExtracaoACL {
         ),
         quantidade: paraCampoExtraido(item.quantidade, (v) => Quantidade.de(v)),
         precoUnitario: paraCampoExtraido(item.precoUnitario, (v) =>
-          Dinheiro.de(v.valorCentavos, v.moeda),
+          Dinheiro.de(v.valorCentavos, normalizarMoeda(v.moeda)),
         ),
       }),
     );
