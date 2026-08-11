@@ -50,6 +50,9 @@ function validarSegmentoFinalDaKey(key: string): void {
   if (segmentoFinal.includes('..')) {
     throw new ReferenciaS3KeyInvalidaError(key, 'contém ".." no segmento final');
   }
+  // `/` é inalcançável por construção (`segmentoFinal` começa depois do último
+  // `/` da key) — mantido de propósito para que a regra continue correta se a
+  // forma de extrair o segmento mudar. Hoje, só `\` dispara aqui.
   if (/[/\\]/.test(segmentoFinal)) {
     throw new ReferenciaS3KeyInvalidaError(
       key,
