@@ -1,0 +1,246 @@
+{
+  "info": {
+    "name": "Nexo Orçamentos — API v1",
+    "_postman_id": "b3f1c2d4-5a6e-47b8-9c0d-1e2f3a4b5c6d",
+    "description": "Endpoints HTTP de todos os Bounded Contexts (001 a 005), prontos para executar contra o ambiente local (`pnpm dev`, http://localhost:3000).\n\n## tenantId — LEIA ANTES DE USAR\n\n`tenantId` **nunca** é enviado em body, query ou header. A única fonte é a claim verificada do JWT Cognito (`src/interface/shared/tenant-context.middleware.ts`). Não existe nenhum campo `tenantId` nesta collection de propósito — mandar um seria escalação de privilégio, e o backend ignoraria.\n\n- **Local (`pnpm dev`)**: o runner substitui o middleware por `tenantContextLocal` (`src/dev/local.ts`), que popula tenant e papéis a partir de `NEXO_LOCAL_TENANT_ID` e `NEXO_LOCAL_PAPEIS` do `.env`. Não precisa de token — as requisições rodam como estão.\n- **Qualquer ambiente com Cognito**: preencha a variável `token` com um JWT válido. A collection já manda `Authorization: Bearer {{token}}`. O tenant vem da claim do token, e os papéis da claim `cognito:groups`.\n\nPara trocar de tenant no local, edite `NEXO_LOCAL_TENANT_ID` no `.env` e reinicie o `pnpm dev`.\n\n## Ordem de execução\n\nAs pastas estão na ordem do pipeline. Rode `1. Ingestão` de cima para baixo: os requests salvam `orcamentoId` e `uploadUrl` nas variáveis da collection automaticamente, então os demais já vêm preenchidos.\n\nO pipeline é assíncrono (EventBridge → SQS → handler). Com Ollama local em CPU, a classificação leva ~15s e a extração alguns minutos — os `GET .../status` respondem 404 até o BC correspondente ter registro.\n\n## Papéis exigidos\n\n- `POST /v1/configuracoes/faixas-preco-categoria` e `GET` da lista → `compliance-admin`\n- `POST /v1/orcamentos/{id}/workflow/decisao-humana` → `comprador-responsavel`\n\nNo local, ambos já estão em `NEXO_LOCAL_PAPEIS`. O guard é fail-closed: sem papel, 403 Problem Details.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "token", "value": "", "type": "string", "description": "JWT Cognito. Deixe vazio no ambiente local — tenant e papéis vêm de NEXO_LOCAL_TENANT_ID/NEXO_LOCAL_PAPEIS." },
+    { "key": "orcamentoId", "value": "", "type": "string", "description": "Preenchido automaticamente pelo request 1.1." },
+    { "key": "uploadUrl", "value": "", "type": "string", "description": "Presigned URL do S3, preenchida automaticamente pelo request 1.1." },
+    { "key": "canal", "value": "API_REST", "type": "string", "description": "PORTAL_WEB | API_REST | APP_MOBILE" },
+    { "key": "nomeArquivo", "value": "orcamento-9001.txt", "type": "string", "description": "Validado na borda: sem / \\ .. nem caractere de controle, máx 255 (ADR-013)." }
+  ],
+  "item": [
+    {
+      "name": "1. Ingestão e Identificação (001)",
+      "item": [
+        {
+          "name": "1.1 POST upload-url — cria orçamento e devolve presigned URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('orcamentoId', body.orcamentoId);",
+                  "pm.collectionVariables.set('uploadUrl', body.uploadUrl);",
+                  "console.log('orcamentoId =', body.orcamentoId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canal\": \"{{canal}}\",\n  \"nomeArquivo\": \"{{nomeArquivo}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/upload-url", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "upload-url"] },
+            "description": "Body: `canal` (PORTAL_WEB | API_REST | APP_MOBILE) e `nomeArquivo`. Resposta 201 com `orcamentoId` e `uploadUrl`.\n\nNenhum `tenantId` no body — vem da claim do token (ou do `.env` no local)."
+          }
+        },
+        {
+          "name": "1.2 PUT presigned URL — envia o arquivo ao S3",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "text/plain" }],
+            "body": {
+              "mode": "raw",
+              "raw": "Metalurgica Sao Jorge S/A\nOrcamento 9001 - emitido em 11/08/2026\n\n1. Chapa de aco carbono 2mm - SKU MC-2045 - quantidade 10 - preco unitario BRL 450,00\n2. Parafuso sextavado M8 - SKU PS-M8 - quantidade 200 - preco unitario BRL 3,50\n\nCondicoes de pagamento: 30 dias\nCondicoes de entrega: CIF\nValidade da proposta: 30 dias\n"
+            },
+            "url": { "raw": "{{uploadUrl}}", "host": ["{{uploadUrl}}"] },
+            "description": "Vai direto ao S3/LocalStack, sem passar pelo backend — por isso `auth: noauth`. Só `.txt`, `.md` e `.csv` atravessam o fluxo local (MarkItDown ainda não existe: #588/#590)."
+          }
+        },
+        {
+          "name": "1.3 POST confirmar-upload — dispara o pipeline",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"canal\": \"{{canal}}\",\n  \"nomeArquivo\": \"{{nomeArquivo}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/confirmar-upload", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "confirmar-upload"] },
+            "description": "Confirma que o objeto está no S3 e publica `OrcamentoRecebido`. `referenciaExterna` é opcional. A partir daqui o fluxo é assíncrono."
+          }
+        },
+        {
+          "name": "1.4 GET status — classificação (001)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/status", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "status"] },
+            "description": "Status do orçamento, resultado da classificação e histórico append-only.\n\n`RECEBIDO` → `CLASSIFICADO` (ou `PENDENTE_REVISAO_HUMANA` se a confiança ficar abaixo do limiar). Com Ollama local, leva ~15s. 404 significa que o orçamento não existe **ou** pertence a outro tenant — nunca 403, para não revelar existência cross-tenant."
+          }
+        },
+        {
+          "name": "1.5 POST revisao-humana — confirma fornecedor e formato",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fornecedorIdentificado\": \"Metalurgica Sao Jorge S/A\",\n  \"formatoIdentificado\": \"TXT\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/revisao-humana", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "revisao-humana"] },
+            "description": "Só é transição válida a partir de `PENDENTE_REVISAO_HUMANA`. O valor humano prevalece sobre o derivado automaticamente (ADR-012, `spec.md:152`: a pessoa corrige fornecedor e/ou formato)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Extração (002)",
+      "item": [
+        {
+          "name": "2.1 GET extracao/status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/extracao/status", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "extracao", "status"] },
+            "description": "Itens e condições comerciais extraídos, cada campo com confiança e origem.\n\n404 até a extração rodar. Com Ollama local em CPU leva minutos por tentativa, e documento com muitos itens pode não completar antes da DLQ (ver §5 de `docs/plano-infra-ambientes.md`)."
+          }
+        },
+        {
+          "name": "2.2 POST extracao/revisao-humana — confirma campos pendentes",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"camposConfirmados\": [\n    {\n      \"caminho\": \"condicoesComerciais.prazoValidade\",\n      \"valor\": \"2026-09-10\",\n      \"indisponivel\": false\n    },\n    {\n      \"caminho\": \"itens.0.descricao\",\n      \"valor\": null,\n      \"indisponivel\": true\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/extracao/revisao-humana", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "extracao", "revisao-humana"] },
+            "description": "Cada campo recebe valor real **ou** `indisponivel: true` — nunca os dois ausentes (`valor: null` só é válido com `indisponivel: true`).\n\nTodos os campos com valor real → `EXTRAIDO`. Algum confirmado como indisponível → `EXTRAIDO_COM_PENDENCIA_CONFIRMADA` (terminal, é decisão humana, não falha)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Validação (003)",
+      "item": [
+        {
+          "name": "3.1 POST faixas-preco-categoria — configura faixa (compliance-admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoria\": \"ACO\",\n  \"precoMinimo\": { \"valorCentavos\": 10000, \"moeda\": \"BRL\" },\n  \"precoMaximo\": { \"valorCentavos\": 9000000, \"moeda\": \"BRL\" }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/configuracoes/faixas-preco-categoria", "host": ["{{baseUrl}}"], "path": ["v1", "configuracoes", "faixas-preco-categoria"] },
+            "description": "Exige papel `compliance-admin` (guard fail-closed, 403 Problem Details sem o papel).\n\n`precoMinimo`/`precoMaximo` são objetos `{valorCentavos, moeda}` — moeda em ISO-4217. Passar campo plano dá 400."
+          }
+        },
+        {
+          "name": "3.2 GET faixas-preco-categoria — lista faixas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/configuracoes/faixas-preco-categoria", "host": ["{{baseUrl}}"], "path": ["v1", "configuracoes", "faixas-preco-categoria"] },
+            "description": "Dado de configuração, escopado por tenant. Exige `compliance-admin`."
+          }
+        },
+        {
+          "name": "3.3 GET validacao/status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/validacao/status", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "validacao", "status"] },
+            "description": "Resultado das regras de consistência e da checagem de faixa de preço. 404 até a validação rodar — depende da extração ter concluído."
+          }
+        },
+        {
+          "name": "3.4 POST validacao/decisao-humana",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decisao\": \"ACEITE_COM_RESSALVA\",\n  \"justificativa\": \"Preço acima da faixa, aceito por acordo comercial vigente.\",\n  \"dadosCorrigidos\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/validacao/decisao-humana", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "validacao", "decisao-humana"] },
+            "description": "`decisao`: `CORRECAO_APLICADA` ou `ACEITE_COM_RESSALVA`. `dadosCorrigidos` é opcional e nullable — use com `CORRECAO_APLICADA`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Busca e Indexação (004)",
+      "item": [
+        {
+          "name": "4.1 GET indexacao/status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/indexacao/status", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "indexacao", "status"] },
+            "description": "Estado da indexação semântica. O embedding local é `mxbai-embed-large`, que precisa emitir exatamente 1024 dimensões — `indice-orcamento.schema.ts` fixa `vector(1024)` e a ACL falha explícito se divergir (nunca truncar nem completar com zeros)."
+          }
+        },
+        {
+          "name": "4.2 POST busca — busca semântica (NÃO registrada no runner local)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"consulta\": \"chapa de aco carbono 2mm\",\n  \"pagina\": 1,\n  \"tamanhoPagina\": 20\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/busca", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "busca"] },
+            "description": "⚠️ Responde **404 no ambiente local**: a rota existe no BC (`busca-orcamentos.controller.ts`) mas `src/dev/local.ts` não a registra. Lacuna do runner local, não do Bounded Context.\n\nCampos opcionais: `categoria`, `precoMinimo`/`precoMaximo` (`{valorCentavos, moeda}`), `periodoInicio`/`periodoFim` (date), `pagina` (default 1), `tamanhoPagina` (default 20, máx 100)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Orquestração (005)",
+      "item": [
+        {
+          "name": "5.1 GET workflow/status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/workflow/status", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "workflow", "status"] },
+            "description": "Decisão de roteamento consolidada. Costuma responder 200 logo após a classificação, com `AGUARDANDO_CONTEXTO` — 005 acumula contexto de 001 a 003 antes de decidir."
+          }
+        },
+        {
+          "name": "5.2 POST workflow/decisao-humana (comprador-responsavel)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"acao\": \"ENCAMINHAR_COMPRADOR\",\n  \"justificativa\": \"Fornecedor identificado e extração completa; segue para o comprador responsável.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/orcamentos/{{orcamentoId}}/workflow/decisao-humana", "host": ["{{baseUrl}}"], "path": ["v1", "orcamentos", "{{orcamentoId}}", "workflow", "decisao-humana"] },
+            "description": "Exige papel `comprador-responsavel`. `acao`: `APROVAR`, `ENCAMINHAR_COMPRADOR` ou `SOLICITAR_REENVIO`. `motivoDadoAusente` é opcional."
+          }
+        }
+      ]
+    }
+  ]
+}
