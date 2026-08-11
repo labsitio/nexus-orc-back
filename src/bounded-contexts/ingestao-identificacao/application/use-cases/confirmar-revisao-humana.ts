@@ -90,6 +90,11 @@ export class ConfirmarRevisaoHumana {
       new OrcamentoReclassificadoPorRevisaoHumana(
         orcamento.id.toString(),
         resultado.paraPayload(),
+        {
+          bucket: orcamento.referenciaBruta.bucket,
+          key: orcamento.referenciaBruta.key,
+          versionId: orcamento.referenciaBruta.versionId,
+        },
         params.tenantId.toString(),
       ),
     );

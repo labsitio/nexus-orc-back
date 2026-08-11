@@ -50,7 +50,12 @@ describe.each([
     nome: 'OrcamentoReclassificadoPorRevisaoHumana',
     detailType: 'OrcamentoReclassificadoPorRevisaoHumana',
     criar: () =>
-      new OrcamentoReclassificadoPorRevisaoHumana(orcamentoId, resultadoPayload, tenantId),
+      new OrcamentoReclassificadoPorRevisaoHumana(
+        orcamentoId,
+        resultadoPayload,
+        referenciaBrutaPayload,
+        tenantId,
+      ),
   },
 ])('$nome', ({ detailType, criar }) => {
   it(`schemaVersion 2, orcamentoId e detailType "${detailType}"`, () => {
@@ -66,4 +71,17 @@ describe.each([
     const evento: DomainEventEnvelope = criar();
     expect(evento.prioridade).toBeUndefined();
   });
+
+  // (issue #744, escopo adicional) OrcamentoClassificado e
+  // OrcamentoReclassificadoPorRevisaoHumana reaproveitam o mesmo shape —
+  // ambos carregam referenciaBruta, sem a qual extrator-queue.handler.ts rejeita.
+  if (
+    detailType === 'OrcamentoClassificado' ||
+    detailType === 'OrcamentoReclassificadoPorRevisaoHumana'
+  ) {
+    it(`carrega referenciaBruta idêntica ao ponteiro S3 — ${detailType}`, () => {
+      const evento = criar() as unknown as { referenciaBruta: unknown };
+      expect(evento.referenciaBruta).toEqual(referenciaBrutaPayload);
+    });
+  }
 });
