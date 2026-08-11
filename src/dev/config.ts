@@ -25,6 +25,8 @@ export interface ConfigLocal {
   readonly agenteIa: 'local' | 'bedrock';
   readonly ollamaBaseUrl: string;
   readonly ollamaModeloClassificador: string;
+  /** Sem env var dedicada em produção (composition/extracao.ts também não tem default) — cai no mesmo modelo de chat do classificador. */
+  readonly ollamaModeloExtrator: string;
   readonly ollamaModeloEmbedding: string;
   readonly ollamaModeloOrquestrador: string;
   /**
@@ -58,6 +60,8 @@ export function configLocal(): ConfigLocal {
     agenteIa: process.env.NEXO_AGENTE_IA === 'bedrock' ? 'bedrock' : 'local',
     ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
     ollamaModeloClassificador: process.env.OLLAMA_MODELO_CLASSIFICADOR ?? 'llama3.1',
+    ollamaModeloExtrator:
+      process.env.OLLAMA_MODELO_EXTRATOR ?? process.env.OLLAMA_MODELO_CLASSIFICADOR ?? 'llama3.1',
     ollamaModeloEmbedding: process.env.OLLAMA_MODELO_EMBEDDING ?? 'mxbai-embed-large',
     ollamaModeloOrquestrador: process.env.OLLAMA_MODELO_ORQUESTRADOR ?? 'llama3.1',
     tenantIdLocal: process.env.NEXO_LOCAL_TENANT_ID ?? '018f4a3c-0000-7000-8000-000000000001',

@@ -146,7 +146,7 @@ const classificador = criarAgenteClassificador({
   ollamaModeloClassificador: cfg.ollamaModeloClassificador,
 });
 const extrator = selecionarAgenteExtrator(
-  { ollama: { baseUrl: cfg.ollamaBaseUrl, modelo: cfg.ollamaModeloClassificador } },
+  { ollama: { baseUrl: cfg.ollamaBaseUrl, modelo: cfg.ollamaModeloExtrator } },
   cfg.agenteIa,
 );
 const agenteEmbedding = selecionarAgenteEmbedding(
