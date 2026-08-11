@@ -5,6 +5,7 @@ import { sanitizarConteudoExtracao } from './sanitizar-conteudo-extracao.js';
 /** Payload enviado ao Lambda/layer dedicado ao MarkItDown deste BC (instância própria — ADR-002). */
 interface MarkItDownInvokePayload {
   conteudoBase64: string;
+  nomeArquivo: string;
 }
 
 /** Contrato de resposta do Lambda dedicado — texto bruto, ainda não sanitizado. */
@@ -33,9 +34,10 @@ export class MarkItDownConversaoExtracaoACL implements MarkItDownConversaoExtrac
     private readonly functionName: string,
   ) {}
 
-  async converter(bruto: Buffer): Promise<string> {
+  async converter(bruto: Buffer, nomeArquivo: string): Promise<string> {
     const payload: MarkItDownInvokePayload = {
       conteudoBase64: bruto.toString('base64'),
+      nomeArquivo,
     };
 
     const resultado = await this.lambda.send(

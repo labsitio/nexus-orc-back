@@ -131,7 +131,7 @@ const conversorLocal: MarkItDownConversaoACL = {
 };
 
 const conversorExtracaoLocal: MarkItDownConversaoExtracaoACL = {
-  async converter(bruto: Buffer): Promise<string> {
+  async converter(bruto: Buffer, _nomeArquivo: string): Promise<string> {
     return sanitizarConteudoExtracao(bruto.toString('utf8'));
   },
 };

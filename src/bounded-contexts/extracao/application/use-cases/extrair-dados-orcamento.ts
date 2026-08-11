@@ -91,7 +91,9 @@ export class ExtrairDadosOrcamento {
       );
 
     const bruto = await this.leituraBruta.ler(extracao.referenciaBrutaS3);
-    const textoConvertido = await this.conversor.converter(bruto);
+    const nomeArquivo =
+      extracao.referenciaBrutaS3.key.split('/').at(-1) ?? extracao.referenciaBrutaS3.key;
+    const textoConvertido = await this.conversor.converter(bruto, nomeArquivo);
     const resultado = await this.agenteExtrator.extrair({
       textoConvertido,
       referenciaClassificacao: extracao.referenciaClassificacao,
