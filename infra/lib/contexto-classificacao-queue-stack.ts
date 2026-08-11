@@ -7,10 +7,15 @@ import type { Construct } from 'constructs';
 
 const QUEUE_NAME = 'contexto-classificacao-queue';
 const DLQ_NAME = 'contexto-classificacao-queue-dlq';
-/** `detailType` de `OrcamentoClassificado` (domain event, spec 001) — literal aqui de propósito: infra CDK
- * roda em Node com strip-only TS e não importa `src/` (parameter properties do Domain não são suportadas
- * nesse modo); manter em sincronia manual com `OrcamentoClassificado.detailType`. */
+/** `detailType` dos eventos do BC Ingestão & Identificação que alimentam contexto de classificação
+ * (spec 001/005) — literais aqui de propósito: infra CDK roda em Node com strip-only TS e não importa
+ * `src/` (parameter properties do Domain não são suportadas nesse modo); manter em sincronia manual
+ * com os `detailType` reais. */
 const DETAIL_TYPE_ORCAMENTO_CLASSIFICADO = 'OrcamentoClassificado';
+/** Publicado por `ConfirmarRevisaoHumana` (spec 001, T055/#60) — reaproveita o shape de
+ * `OrcamentoClassificado` com `agenteOrigem: 'HUMANO'` (issue #744). */
+const DETAIL_TYPE_ORCAMENTO_RECLASSIFICADO_POR_REVISAO_HUMANA =
+  'OrcamentoReclassificadoPorRevisaoHumana';
 /** `source` fixo do BC Ingestão & Identificação no bus único (`eventbridge.publisher.ts` daquele BC). */
 const SOURCE_INGESTAO_IDENTIFICACAO = 'nexo.ingestao-identificacao';
 
@@ -51,10 +56,13 @@ export class ContextoClassificacaoQueueStack extends Stack {
     new events.Rule(this, 'OrcamentoClassificadoParaContextoClassificacaoQueue', {
       eventBus: props.dominioBus,
       description:
-        'Roteia OrcamentoClassificado do bus de domínio para contexto-classificacao-queue (T004).',
+        'Roteia OrcamentoClassificado/OrcamentoReclassificadoPorRevisaoHumana do bus de domínio para contexto-classificacao-queue (T004, #744).',
       eventPattern: {
         source: [SOURCE_INGESTAO_IDENTIFICACAO],
-        detailType: [DETAIL_TYPE_ORCAMENTO_CLASSIFICADO],
+        detailType: [
+          DETAIL_TYPE_ORCAMENTO_CLASSIFICADO,
+          DETAIL_TYPE_ORCAMENTO_RECLASSIFICADO_POR_REVISAO_HUMANA,
+        ],
       },
       targets: [new targets.SqsQueue(this.contextoClassificacaoQueue)],
     });

@@ -24,15 +24,22 @@ export interface SqsBatchResponse {
 
 /**
  * Envelope publicado pela regra EventBridge de T004, roteando
- * `OrcamentoClassificado` (`source: nexo.ingestao-identificacao`) para
- * `contexto-classificacao-queue`. `detail` é dado bruto do BC Ingestão &
- * Identificação, entrada não confiável traduzida exclusivamente por
- * `OrcamentoClassificadoEventACL` (T017/ADR-008), nunca inspecionada à mão
- * aqui além do necessário para confirmar que a mensagem foi roteada para a
- * fila correta.
+ * `OrcamentoClassificado`/`OrcamentoReclassificadoPorRevisaoHumana`
+ * (`source: nexo.ingestao-identificacao`) para `contexto-classificacao-queue`
+ * — o segundo `detailType` é publicado por `ConfirmarRevisaoHumana`
+ * (T055/#60) e reaproveita o mesmo shape (issue #744). `detail` é dado bruto
+ * do BC Ingestão & Identificação, entrada não confiável traduzida
+ * exclusivamente por `OrcamentoClassificadoEventACL` (T017/ADR-008), nunca
+ * inspecionada à mão aqui além do necessário para confirmar que a mensagem
+ * foi roteada para a fila correta.
  */
+const DETAIL_TYPES_ACEITOS = [
+  'OrcamentoClassificado',
+  'OrcamentoReclassificadoPorRevisaoHumana',
+] as const;
+
 interface EventBridgeEnvelope {
-  readonly 'detail-type': 'OrcamentoClassificado';
+  readonly 'detail-type': (typeof DETAIL_TYPES_ACEITOS)[number];
   readonly detail: unknown;
 }
 
@@ -41,12 +48,18 @@ function ehEventBridgeEnvelope(valor: unknown): valor is EventBridgeEnvelope {
     return false;
   }
   const envelope = valor as Record<string, unknown>;
-  return envelope['detail-type'] === 'OrcamentoClassificado' && 'detail' in envelope;
+  const detailType = envelope['detail-type'];
+  return (
+    typeof detailType === 'string' &&
+    (DETAIL_TYPES_ACEITOS as readonly string[]).includes(detailType) &&
+    'detail' in envelope
+  );
 }
 
 /**
  * Handler Lambda consumidor de `contexto-classificacao-queue` (T029/#235).
- * Cada mensagem envolve o evento `OrcamentoClassificado` (spec 001) roteado
+ * Cada mensagem envolve o evento `OrcamentoClassificado` ou
+ * `OrcamentoReclassificadoPorRevisaoHumana` (spec 001, issue #744) roteado
  * pela regra EventBridge de T004; traduz o envelope via
  * `OrcamentoClassificadoEventACL` (T017/ADR-008) — nunca parseando
  * `tenantId`/conteúdo à mão — e invoca `RegistrarContextoClassificacao.executar`
@@ -87,7 +100,7 @@ export function criarContextoClassificacaoQueueHandler(
         if (!ehEventBridgeEnvelope(corpo)) {
           throw new Error(
             `Mensagem ${record.messageId} não contém envelope EventBridge com detail-type ` +
-              '"OrcamentoClassificado" e detail válidos',
+              `${DETAIL_TYPES_ACEITOS.map((tipo) => `"${tipo}"`).join('|')} e detail válidos`,
           );
         }
         const traduzido = acl.traduzir(corpo.detail);

@@ -47,7 +47,7 @@ const FILAS = [
     dlq: 'extrator-queue-dlq',
     regra: 'OrcamentoClassificadoParaExtratorQueue',
     source: SOURCE_INGESTAO,
-    detailTypes: ['OrcamentoClassificado'],
+    detailTypes: ['OrcamentoClassificado', 'OrcamentoReclassificadoPorRevisaoHumana'],
   },
   {
     nome: 'validador-queue',
@@ -61,7 +61,7 @@ const FILAS = [
     dlq: 'contexto-classificacao-queue-dlq',
     regra: 'OrcamentoClassificadoParaContextoClassificacaoQueue',
     source: SOURCE_INGESTAO,
-    detailTypes: ['OrcamentoClassificado'],
+    detailTypes: ['OrcamentoClassificado', 'OrcamentoReclassificadoPorRevisaoHumana'],
   },
   {
     nome: 'contexto-extracao-queue',

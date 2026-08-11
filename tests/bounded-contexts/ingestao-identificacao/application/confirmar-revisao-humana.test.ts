@@ -81,6 +81,15 @@ describe('ConfirmarRevisaoHumana', () => {
     expect(publisher.eventosPublicados[0]?.detailType).toBe(
       OrcamentoReclassificadoPorRevisaoHumana.detailType,
     );
+    // (issue #744, escopo adicional) referenciaBruta idêntica à do agregado —
+    // sem ela, extrator-queue.handler.ts (BC Extração) rejeita a mensagem.
+    expect(
+      (publisher.eventosPublicados[0] as OrcamentoReclassificadoPorRevisaoHumana).referenciaBruta,
+    ).toEqual({
+      bucket: 'nexo-orcamentos-raw',
+      key: 'portal-web/orcamento.pdf',
+      versionId: 'v1',
+    });
   });
 
   it('preserva o histórico do Classificador — nunca apaga, apenas anexa a confirmação humana', async () => {

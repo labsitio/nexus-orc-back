@@ -16,19 +16,29 @@ function useCaseFake(
   return { executar } as unknown as RegistrarContextoClassificacao;
 }
 
-function payloadValido(orcamentoId: string, tenantId?: string | null) {
+function payloadValido(
+  orcamentoId: string,
+  tenantId?: string | null,
+  detailType:
+    'OrcamentoClassificado' | 'OrcamentoReclassificadoPorRevisaoHumana' = 'OrcamentoClassificado',
+) {
   return {
     orcamentoId,
-    detailType: 'OrcamentoClassificado',
+    detailType,
     resultado: { fornecedorIdentificado: 'Fornecedor XPTO', formatoIdentificado: 'PDF' },
     ...(tenantId === null ? {} : { tenantId: tenantId ?? TENANT_ID }),
   };
 }
 
-function envelopeEventBridge(orcamentoId: string, tenantId: string | null = TENANT_ID): string {
+function envelopeEventBridge(
+  orcamentoId: string,
+  tenantId: string | null = TENANT_ID,
+  detailType:
+    'OrcamentoClassificado' | 'OrcamentoReclassificadoPorRevisaoHumana' = 'OrcamentoClassificado',
+): string {
   return JSON.stringify({
-    'detail-type': 'OrcamentoClassificado',
-    detail: payloadValido(orcamentoId, tenantId),
+    'detail-type': detailType,
+    detail: payloadValido(orcamentoId, tenantId, detailType),
   });
 }
 
@@ -140,6 +150,35 @@ describe('criarContextoClassificacaoQueueHandler', () => {
 
     expect(executar).not.toHaveBeenCalled();
     expect(resposta.batchItemFailures).toEqual([{ itemIdentifier: 'm1' }]);
+  });
+
+  it('(#744) invoca RegistrarContextoClassificacao.executar para OrcamentoReclassificadoPorRevisaoHumana (mesmo shape, agenteOrigem HUMANO)', async () => {
+    const executar = vi.fn().mockResolvedValue(undefined);
+    const handler = criarContextoClassificacaoQueueHandler(
+      useCaseFake(executar),
+      new OrcamentoClassificadoEventACL(),
+    );
+
+    const resposta = await handler({
+      Records: [
+        {
+          messageId: 'm1',
+          body: envelopeEventBridge(
+            ORCAMENTO_ID_1,
+            TENANT_ID,
+            'OrcamentoReclassificadoPorRevisaoHumana',
+          ),
+        },
+      ],
+    });
+
+    expect(executar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orcamentoId: ORCAMENTO_ID_1,
+        detailType: 'OrcamentoReclassificadoPorRevisaoHumana',
+      }),
+    );
+    expect(resposta.batchItemFailures).toHaveLength(0);
   });
 
   it('correlaciona todo log por orcamentoId, tenantId e messageId', async () => {

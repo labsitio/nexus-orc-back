@@ -138,4 +138,37 @@ describe('OrcamentoClassificadoEventACL', () => {
       }),
     ).toThrow(/TenantId inválido/);
   });
+
+  // (issue #744) OrcamentoReclassificadoPorRevisaoHumana reaproveita o shape de
+  // OrcamentoClassificado — allow-list de 2 detailType, nunca "aceita qualquer coisa".
+  it('traduz o payload bruto de OrcamentoReclassificadoPorRevisaoHumana (revisão humana) para ContextoClassificacao', () => {
+    const acl = new OrcamentoClassificadoEventACL();
+
+    const resultado = acl.traduzir({
+      orcamentoId: ORCAMENTO_ID_VALIDO,
+      detailType: 'OrcamentoReclassificadoPorRevisaoHumana',
+      resultado: {
+        fornecedorIdentificado: 'Fornecedor XPTO',
+        formatoIdentificado: 'PDF',
+        nivelConfianca: 100,
+        agenteOrigem: 'HUMANO',
+      },
+      tenantId: TENANT_ID_VALIDO,
+    });
+
+    expect(resultado.orcamentoId.equals(OrcamentoId.de(ORCAMENTO_ID_VALIDO))).toBe(true);
+    expect(resultado.contextoClassificacao.fornecedorIdentificado).toBe('Fornecedor XPTO');
+    expect(resultado.contextoClassificacao.formatoIdentificado).toBe('PDF');
+  });
+
+  it('continua rejeitando detailType desconhecido mesmo com allow-list de 2 (não vira "aceita qualquer coisa")', () => {
+    expect(() =>
+      new OrcamentoClassificadoEventACL().traduzir({
+        orcamentoId: ORCAMENTO_ID_VALIDO,
+        detailType: 'TipoDesconhecido',
+        resultado: { fornecedorIdentificado: 'Fornecedor XPTO', formatoIdentificado: 'PDF' },
+        tenantId: TENANT_ID_VALIDO,
+      }),
+    ).toThrow(OrcamentoClassificadoEventACLInvalidoError);
+  });
 });
