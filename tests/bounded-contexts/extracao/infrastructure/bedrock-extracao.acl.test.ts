@@ -3,6 +3,7 @@ import {
   BedrockExtracaoACL,
   BedrockExtracaoACLInvalidaError,
   ehExtracaoBruta,
+  resolverPrazoValidade,
   type ExtracaoBruta,
 } from '../../../../src/bounded-contexts/extracao/infrastructure/bedrock-extracao.acl.js';
 
@@ -142,6 +143,79 @@ describe('BedrockExtracaoACL', () => {
     expect(resultado.itens[0]?.precoUnitario.valor?.moeda).toBe('BRL');
   });
 
+  it('resolve extração bem-sucedida (não PeriodoValidadeInvalidoError) para o payload real que quebrava — prazoValidade "30 dias"', () => {
+    const bruto = extracaoBrutaCompleta();
+    const comPeriodoRelativo: ExtracaoBruta = {
+      ...bruto,
+      condicoesComerciais: {
+        ...bruto.condicoesComerciais,
+        prazoValidade: { valor: '30 dias', confianca: 100 },
+      },
+    };
+
+    const resultado = new BedrockExtracaoACL().converter(comPeriodoRelativo);
+
+    expect(resultado.condicoesComerciais.prazoValidade.extraido).toBe(true);
+    expect(resultado.condicoesComerciais.prazoValidade.valor).not.toBeNull();
+  });
+
+  it('degrada prazoValidade não reconhecido para naoExtraido (residual), sem lançar erro', () => {
+    const bruto = extracaoBrutaCompleta();
+    const comTextoResidual: ExtracaoBruta = {
+      ...bruto,
+      condicoesComerciais: {
+        ...bruto.condicoesComerciais,
+        prazoValidade: { valor: 'válido enquanto durar o estoque', confianca: 95 },
+      },
+    };
+
+    const resultado = new BedrockExtracaoACL().converter(comTextoResidual);
+
+    expect(resultado.condicoesComerciais.prazoValidade.extraido).toBe(false);
+    expect(resultado.condicoesComerciais.prazoValidade.valor).toBeNull();
+  });
+});
+
+describe('resolverPrazoValidade (ADR-015)', () => {
+  const referencia = (iso: string) => new Date(iso);
+
+  it.each([
+    ['2026-09-10', undefined, '2026-09-10'],
+    ['10/09/2026', undefined, '2026-09-10'],
+    ['30 dias', '2026-08-05', '2026-09-04'],
+    ['prazo de 15 dias corridos', '2026-08-05', '2026-08-20'],
+    ['2 semanas', '2026-08-05', '2026-08-19'],
+    ['1 mês', '2026-01-31', '2026-03-01'],
+    ['1 mês', '2026-01-30', '2026-03-01'],
+    ['3 meses', '2026-11-30', '2027-03-01'],
+    ['3 meses', '2026-08-15', '2026-11-15'],
+    ['1 ano', '2026-08-05', '2027-08-05'],
+  ] as const)('"%s" com referência %s resolve para %s', (texto, ref, esperado) => {
+    const resultado = resolverPrazoValidade(
+      texto,
+      ref === undefined ? new Date() : referencia(ref),
+    );
+
+    expect(resultado).toBeDefined();
+    expect(resultado!.paraPayload().slice(0, 10)).toBe(esperado);
+  });
+
+  it.each(['válido enquanto durar o estoque', 'validade indeterminada'])(
+    '"%s" não casa nenhum caminho — undefined (residual)',
+    (texto) => {
+      expect(resolverPrazoValidade(texto, new Date())).toBeUndefined();
+    },
+  );
+
+  it('ARMADILHA: "10/09/2026" nunca resolve para 9 de outubro (new Date cru interpretaria mês/dia)', () => {
+    const resultado = resolverPrazoValidade('10/09/2026', new Date());
+
+    expect(resultado!.paraPayload().slice(0, 10)).toBe('2026-09-10');
+    expect(resultado!.paraPayload().slice(0, 10)).not.toBe('2026-10-09');
+  });
+});
+
+describe('BedrockExtracaoACL — moeda', () => {
   it('rejeita moeda desconhecida (sem normalização enumerada) como BedrockExtracaoACLInvalidaError', () => {
     const bruto = extracaoBrutaCompleta();
     const comMoedaDesconhecida: ExtracaoBruta = {

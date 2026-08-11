@@ -77,7 +77,13 @@ const FERRAMENTA_EXTRACAO: Tool = {
             type: 'object',
             properties: {
               condicoesPagamento: campoExtraidoSchema({ type: ['string', 'null'] }),
-              prazoValidade: campoExtraidoSchema({ type: ['string', 'null'] }),
+              prazoValidade: campoExtraidoSchema({
+                type: ['string', 'null'],
+                description:
+                  'Prazo de validade da proposta: data absoluta (ex.: "10/09/2026") ou ' +
+                  'período relativo em dias/semanas/meses/anos (ex.: "30 dias"), texto ' +
+                  'copiado do documento, sem cálculo.',
+              }),
               condicoesEntrega: campoExtraidoSchema({ type: ['string', 'null'] }),
             },
             required: ['condicoesPagamento', 'prazoValidade', 'condicoesEntrega'],
