@@ -17,7 +17,6 @@ describe('BedrockClassificadorGateway', () => {
     const send = vi.fn().mockResolvedValue(
       respostaComToolUse({
         fornecedorIdentificado: 'Acme Ltda',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 92,
       }),
     );
@@ -30,7 +29,6 @@ describe('BedrockClassificadorGateway', () => {
 
     expect(resultado).toEqual({
       fornecedorIdentificado: 'Acme Ltda',
-      formatoIdentificado: 'PDF',
       nivelConfianca: 92,
     });
 
@@ -45,7 +43,6 @@ describe('BedrockClassificadorGateway', () => {
     const send = vi.fn().mockResolvedValue(
       respostaComToolUse({
         fornecedorIdentificado: 'X',
-        formatoIdentificado: 'PDF',
         nivelConfianca: 50,
       }),
     );

@@ -34,6 +34,32 @@ export class OrcamentoNaoEncontradoParaClassificacaoError extends ErroDominio {
 export type MotivoTenantDivergencia = 'AUSENTE' | 'DIVERGENTE';
 
 /**
+ * (ADR-012, issue #725) Deriva `formatoIdentificado` da extensão do arquivo — nunca do
+ * LLM: medido contra `llama3.1`, o gateway devolvia "PDF" para um `.txt` em 3/3
+ * execuções, porque a porta só recebe o texto já convertido (sem nome/extensão/MIME).
+ * A extensão é fato, não inferência.
+ *
+ * `nomeArquivo` chega no formato real da key S3 (`<uuid>-nomeOriginal.ext`, ver
+ * `s3-armazenamento-bruto.gateway.ts:42,77`) — o UUID não contém ponto, então a
+ * extensão final se preserva intacta.
+ *
+ * Nunca lança: extensão ausente ou atípica (não alfanumérica, ou improvavelmente longa)
+ * cai em `DESCONHECIDO`. O documento bruto já está armazenado neste ponto do fluxo —
+ * falhar aqui perderia o orçamento por um detalhe de nome de arquivo.
+ */
+export function derivarFormatoIdentificado(nomeArquivo: string): string {
+  const indicePonto = nomeArquivo.lastIndexOf('.');
+  if (indicePonto === -1 || indicePonto === nomeArquivo.length - 1) {
+    return 'DESCONHECIDO';
+  }
+  const extensao = nomeArquivo.slice(indicePonto + 1);
+  if (!/^[a-zA-Z0-9]{1,10}$/.test(extensao)) {
+    return 'DESCONHECIDO';
+  }
+  return extensao.toUpperCase();
+}
+
+/**
  * (spec 007, T017) Disparado quando `tenantId` do agregado é ausente/undefined
  * (registro legado pré-retrofit) ou não corresponde ao `tenantId` da requisição
  * (tentativa de acesso cross-tenant). Retornado como 404 nunca 403, para não
@@ -135,7 +161,7 @@ export class ClassificarOrcamento {
     const resultadoBruto = await this.agenteClassificador.classificar(textoDocumento);
     const resultado = ResultadoClassificacao.criar({
       fornecedorIdentificado: resultadoBruto.fornecedorIdentificado,
-      formatoIdentificado: resultadoBruto.formatoIdentificado,
+      formatoIdentificado: derivarFormatoIdentificado(nomeArquivo),
       nivelConfianca: NivelConfianca.de(resultadoBruto.nivelConfianca),
       agenteOrigem: 'CLASSIFICADOR',
     });
