@@ -42,7 +42,7 @@ function inputDeTeste() {
 }
 
 describe('OllamaOrquestradorGateway', () => {
-  it('decidir chama POST /api/chat com format:"json" e devolve ResultadoOrquestrador traduzido pela ACL', async () => {
+  it('decidir chama POST /api/chat com JSON Schema real em "format" (enum de acao) e devolve ResultadoOrquestrador traduzido pela ACL', async () => {
     const fetchImpl = fetchFake(200, respostaOllama(decisaoBrutaCompleta()));
     const gateway = new OllamaOrquestradorGateway(
       'http://localhost:11434',
@@ -62,9 +62,30 @@ describe('OllamaOrquestradorGateway', () => {
       { body: string },
     ];
     expect(url).toBe('http://localhost:11434/api/chat');
-    const corpoRequisicao = JSON.parse(init.body) as { model: string; format: string };
+    const corpoRequisicao = JSON.parse(init.body) as {
+      model: string;
+      format: {
+        type: string;
+        properties: { acao: { enum: string[] } };
+        required: string[];
+        additionalProperties: boolean;
+      };
+    };
     expect(corpoRequisicao.model).toBe('qwen2.5:7b');
-    expect(corpoRequisicao.format).toBe('json');
+    expect(corpoRequisicao.format).not.toBe('json');
+    expect(corpoRequisicao.format.type).toBe('object');
+    expect(corpoRequisicao.format.properties.acao.enum).toEqual([
+      'APROVAR',
+      'ENCAMINHAR_COMPRADOR',
+      'SOLICITAR_REENVIO',
+    ]);
+    expect(corpoRequisicao.format.required).toEqual([
+      'acao',
+      'nivelConfianca',
+      'criterio',
+      'requerIntegracaoExterna',
+    ]);
+    expect(corpoRequisicao.format.additionalProperties).toBe(false);
   });
 
   it('isola o contexto consolidado em mensagem de usuário (nunca instrução de sistema)', async () => {
@@ -147,5 +168,20 @@ describe('OllamaOrquestradorGateway', () => {
     );
 
     await expect(gateway.decidir(inputDeTeste())).rejects.toThrow(/criterio/i);
+  });
+
+  it('propaga rejeição da ACL quando "acao" está fora do catálogo fechado (enum do schema não é garantia absoluta contra o modelo)', async () => {
+    const fetchImpl = fetchFake(
+      200,
+      respostaOllama({ ...decisaoBrutaCompleta(), acao: 'ACAO_INVENTADA_PELO_MODELO' }),
+    );
+    const gateway = new OllamaOrquestradorGateway(
+      'http://localhost:11434',
+      'modelo-x',
+      undefined,
+      fetchImpl,
+    );
+
+    await expect(gateway.decidir(inputDeTeste())).rejects.toThrow(/fora do catálogo fechado/i);
   });
 });
