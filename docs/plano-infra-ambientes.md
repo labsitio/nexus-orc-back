@@ -201,6 +201,17 @@ dono do repo):
 - Latência/custo real de inferência — p95 medido localmente não tem relação
   com p95 de Bedrock em produção (#107, #157, #202, #258 continuam
   bloqueadas).
+- **Completude de extração de documento dentro do orçamento de tempo do
+  pipeline** (achado ADR-015, teste ponta a ponta pós-#734/#735/#736): sem
+  GPU, extração de documento com poucos itens leva ~156s por tentativa; um
+  documento com 10 itens não completou em nenhuma das 3 tentativas
+  (`maxReceiveCount`) antes de cair na DLQ — uma por `headersTimeout` do
+  undici (~300s), outra por shape inválido do modelo. Ollama local prova o
+  encadeamento de eventos ponta a ponta (001→002→003→004→005); **não prova**
+  que extração de documento realista completa dentro do timeout do pipeline.
+  Não confundir "roda sem erro de wiring" com "processa em tempo viável" —
+  são afirmações diferentes, e só a primeira está provada pelo ambiente
+  local.
 
 Registrar essa perda no ADR (§7) e no README de dev, não escondê-la atrás do
 "ambiente local funciona".
