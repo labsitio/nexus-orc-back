@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CANAIS_UPLOAD_URL } from './upload-url.schema.js';
+import { CANAIS_UPLOAD_URL, nomeArquivoSchema } from './upload-url.schema.js';
 
 /**
  * Contrato de borda (Zod) de `POST /v1/orcamentos/{orcamentoId}/confirmar-upload`
@@ -13,7 +13,7 @@ export const confirmarUploadParamsSchema = z.object({
 
 export const confirmarUploadRequestSchema = z.object({
   canal: z.enum(CANAIS_UPLOAD_URL),
-  nomeArquivo: z.string().min(1),
+  nomeArquivo: nomeArquivoSchema,
   referenciaExterna: z.string().optional(),
 });
 export type ConfirmarUploadRequest = z.infer<typeof confirmarUploadRequestSchema>;
