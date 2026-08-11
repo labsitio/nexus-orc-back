@@ -155,7 +155,9 @@ async function processarMensagemExtratorQueue(
   publisher: EventPublisher,
 ): Promise<void> {
   const bruto = await leituraBruta.ler(extracao.referenciaBrutaS3);
-  const textoConvertido = await conversao.converter(bruto);
+  const nomeArquivo =
+    extracao.referenciaBrutaS3.key.split('/').at(-1) ?? extracao.referenciaBrutaS3.key;
+  const textoConvertido = await conversao.converter(bruto, nomeArquivo);
   const resultado = await agenteExtrator.extrair({
     textoConvertido,
     referenciaClassificacao: extracao.referenciaClassificacao,

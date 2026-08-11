@@ -6,5 +6,5 @@
  * fornecedor (conteúdo é sempre entrada não confiável, plan.md/Segurança).
  */
 export interface MarkItDownConversaoExtracaoACL {
-  converter(bruto: Buffer): Promise<string>;
+  converter(bruto: Buffer, nomeArquivo: string): Promise<string>;
 }
