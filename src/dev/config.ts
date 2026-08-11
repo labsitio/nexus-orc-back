@@ -21,6 +21,19 @@ export interface ConfigLocal {
   readonly confiancaClassificador: number;
   /** `true` deixa um campo obrigatório sem extrair, forçando escalonamento na spec 002. */
   readonly extracaoCampoFaltando: boolean;
+  /** `local` (Ollama, ADR-009) ou `bedrock` — mesma leitura de `NEXO_AGENTE_IA` dos seletores de `src/composition/*.ts`. */
+  readonly agenteIa: 'local' | 'bedrock';
+  readonly ollamaBaseUrl: string;
+  readonly ollamaModeloClassificador: string;
+  readonly ollamaModeloEmbedding: string;
+  readonly ollamaModeloOrquestrador: string;
+  /**
+   * UUID v7 fixo — substituto local da claim `custom:tenant_id` do JWT
+   * Cognito (não existe Cognito em dev). Nunca em produção.
+   */
+  readonly tenantIdLocal: string;
+  /** Substituto local da claim `cognito:groups`. Nunca em produção. */
+  readonly papeisLocais: readonly string[];
 }
 
 function inteiroDoAmbiente(nome: string, padrao: number): number {
@@ -42,6 +55,16 @@ export function configLocal(): ConfigLocal {
     porta: inteiroDoAmbiente('PORT', 3000),
     confiancaClassificador: inteiroDoAmbiente('NEXO_LOCAL_CONFIANCA', 90),
     extracaoCampoFaltando: process.env.NEXO_LOCAL_EXTRACAO_CAMPO_FALTANDO === 'true',
+    agenteIa: process.env.NEXO_AGENTE_IA === 'bedrock' ? 'bedrock' : 'local',
+    ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
+    ollamaModeloClassificador: process.env.OLLAMA_MODELO_CLASSIFICADOR ?? 'llama3.1',
+    ollamaModeloEmbedding: process.env.OLLAMA_MODELO_EMBEDDING ?? 'mxbai-embed-large',
+    ollamaModeloOrquestrador: process.env.OLLAMA_MODELO_ORQUESTRADOR ?? 'llama3.1',
+    tenantIdLocal: process.env.NEXO_LOCAL_TENANT_ID ?? '018f4a3c-0000-7000-8000-000000000001',
+    papeisLocais: (process.env.NEXO_LOCAL_PAPEIS ?? 'comprador-responsavel,compliance-admin')
+      .split(',')
+      .map((papel) => papel.trim())
+      .filter((papel) => papel.length > 0),
   };
 }
 
