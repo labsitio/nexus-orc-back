@@ -8,18 +8,25 @@ import { ContextoClassificacao } from '../domain/value-objects/contexto-classifi
 import { OrcamentoId } from '../domain/value-objects/orcamento-id.vo.js';
 
 /**
- * Shape mínimo do payload bruto do evento `OrcamentoClassificado`
- * (`source: nexo.ingestao-identificacao`, spec 001) relevante a este BC —
- * apenas os campos usados por `ContextoClassificacao`, nunca o shape
- * completo do evento (ex.: `referenciaBruta` é ignorado, este BC nunca
- * acessa o documento bruto). Contrato JSON local, não tipo de domínio
- * importado do BC Ingestão & Identificação (fronteira de Bounded Context).
+ * Shape mínimo do payload bruto dos eventos `OrcamentoClassificado`/
+ * `OrcamentoReclassificadoPorRevisaoHumana` (`source: nexo.ingestao-identificacao`,
+ * spec 001) relevante a este BC — apenas os campos usados por
+ * `ContextoClassificacao`, nunca o shape completo do evento (ex.:
+ * `referenciaBruta` é ignorado, este BC nunca acessa o documento bruto).
+ * Contrato JSON local, não tipo de domínio importado do BC Ingestão &
+ * Identificação (fronteira de Bounded Context). O segundo `detailType` é
+ * publicado por `ConfirmarRevisaoHumana` (T055/#60) e reaproveita o mesmo
+ * shape de `resultado`, com `agenteOrigem: 'HUMANO'` (issue #744).
  */
-const DETAIL_TYPE_ORCAMENTO_CLASSIFICADO = 'OrcamentoClassificado' as const;
+const DETAIL_TYPES_ORCAMENTO_CLASSIFICADO = [
+  'OrcamentoClassificado',
+  'OrcamentoReclassificadoPorRevisaoHumana',
+] as const;
+type DetailTypeOrcamentoClassificado = (typeof DETAIL_TYPES_ORCAMENTO_CLASSIFICADO)[number];
 
 interface OrcamentoClassificadoPayloadBruto {
   readonly orcamentoId: string;
-  readonly detailType: typeof DETAIL_TYPE_ORCAMENTO_CLASSIFICADO;
+  readonly detailType: DetailTypeOrcamentoClassificado;
   readonly resultado: {
     readonly fornecedorIdentificado: string;
     readonly formatoIdentificado: string;
@@ -48,7 +55,10 @@ function ehOrcamentoClassificadoPayloadBruto(
   if (typeof objeto.orcamentoId !== 'string') {
     return false;
   }
-  if (objeto.detailType !== DETAIL_TYPE_ORCAMENTO_CLASSIFICADO) {
+  if (
+    typeof objeto.detailType !== 'string' ||
+    !(DETAIL_TYPES_ORCAMENTO_CLASSIFICADO as readonly string[]).includes(objeto.detailType)
+  ) {
     return false;
   }
   const resultado = objeto.resultado;
@@ -77,7 +87,7 @@ export class OrcamentoClassificadoEventACL implements OrcamentoClassificadoEvent
   traduzir(payloadBruto: unknown): OrcamentoClassificadoEventACLResultado {
     if (!ehOrcamentoClassificadoPayloadBruto(payloadBruto)) {
       throw new OrcamentoClassificadoEventACLInvalidoError(
-        'esperado objeto com "orcamentoId" (string), "detailType" ("OrcamentoClassificado") e "resultado.fornecedorIdentificado"/"resultado.formatoIdentificado" (string)',
+        `esperado objeto com "orcamentoId" (string), "detailType" (${DETAIL_TYPES_ORCAMENTO_CLASSIFICADO.map((tipo) => `"${tipo}"`).join('|')}) e "resultado.fornecedorIdentificado"/"resultado.formatoIdentificado" (string)`,
       );
     }
     return {
