@@ -116,22 +116,27 @@ export function criarClassificadorQueueHandler(
           );
           continue;
         }
-        // (fix #640) TenantDivergenciaError é permanente (tenantId ausente ou
-        // cross-tenant) — retry nunca vai resolver, então continua sem
-        // batchItemFailures/DLQ/alarme de reprocessamento em ambos os casos
-        // (decisão da #280/T017, mantida). O que muda aqui é apenas nível e
-        // mensagem de log — os dois casos NÃO são a mesma coisa:
+        // (fix #640, ADR-011) TenantDivergenciaError é permanente (tenantId
+        // ausente ou cross-tenant) — retry nunca vai resolver, então continua
+        // sem batchItemFailures/DLQ/alarme de reprocessamento em ambos os
+        // casos (decisão da #280/T017, mantida). O que muda aqui é apenas a
+        // mensagem de log — os dois motivos NÃO são a mesma coisa, mas desde
+        // o cutover de #632 nenhum dos dois é esperado em operação normal
+        // (`orcamentos.tenant_id` é `notNull`), então ambos têm a mesma
+        // severidade `error`:
         if (erro instanceof TenantDivergenciaError) {
           if (erro.motivo === 'AUSENTE') {
-            // Registro pré-retrofit (ADR-008, fase de expand) — estado normal
-            // até o cutover de #632, depois do qual este ramo deixa de ocorrer.
-            logDaMensagem.warn(
+            // Nunca esperado hoje: `tenant_id` é NOT NULL desde a migração
+            // 0013 e o repositório reconstitui `tenantId` desde o fix #717 —
+            // não há caminho legítimo para um agregado sem `tenantId`.
+            // Métrica/alarme dedicados ficam para #641 (convenção ainda inexistente).
+            logDaMensagem.error(
               {
                 orcamentoId,
                 motivo: erro.motivo,
                 tenantIdSolicitante: erro.tenantIdSolicitante,
               },
-              'Orçamento sem tenantId no agregado (registro pré-retrofit) — ignorado como sucesso idempotente',
+              'Orçamento sem tenantId no agregado — estado inesperado, nunca deveria ocorrer',
             );
           } else {
             // Cross-tenant: tenantId da requisição ausente ou diferente do agregado.

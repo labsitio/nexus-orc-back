@@ -24,8 +24,10 @@ export class OrcamentoNaoEncontradoParaClassificacaoError extends ErroDominio {
  * (fix #640) Discrimina os dois casos que `TenantDivergenciaError` cobre —
  * materialmente diferentes para quem consome o erro (handler de fila, log,
  * alarme):
- * - `AUSENTE`: agregado sem `tenantId` (registro pré-retrofit, ADR-008). Normal
- *   durante a fase de expand; desaparece após o cutover (#632).
+ * - `AUSENTE`: agregado sem `tenantId`. Nunca esperado hoje (ADR-011): o
+ *   cutover de #632 já fechou, `tenant_id` é NOT NULL desde a migração 0013
+ *   e o repositório reconstitui `tenantId` desde o fix #717 — não há caminho
+ *   legítimo que produza esse estado.
  * - `DIVERGENTE`: `tenantId` da requisição ausente ou diferente do agregado.
  *   Nunca esperado — sinal de acesso cross-tenant/evento mal roteado.
  */
