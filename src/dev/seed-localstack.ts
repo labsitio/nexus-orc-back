@@ -24,24 +24,67 @@ import {
 
 import { clientesLocais, configLocal } from './config.js';
 
-/** Espelha `infra/lib/classificador-queue-stack.ts` e `extrator-queue-stack.ts`. */
+/**
+ * Espelha `infra/lib/*-queue-stack.ts` (nome de fila/DLQ/regra, `source` e
+ * `detailType` — literais copiados de lá, ver comentário de cada stack).
+ * `regra` reaproveita o mesmo nome do `id` lógico do `events.Rule` da stack
+ * CDK correspondente — divergir aqui invalida o teste local.
+ */
+const SOURCE_INGESTAO = 'nexo.ingestao-identificacao';
+const SOURCE_EXTRACAO = 'nexo.extracao';
+const SOURCE_VALIDACAO = 'nexo.validacao';
+
 const FILAS = [
   {
     nome: 'classificador-queue',
     dlq: 'classificador-queue-dlq',
     regra: 'OrcamentoRecebidoParaClassificadorQueue',
-    detailType: 'OrcamentoRecebido',
+    source: SOURCE_INGESTAO,
+    detailTypes: ['OrcamentoRecebido'],
   },
   {
     nome: 'extrator-queue',
     dlq: 'extrator-queue-dlq',
     regra: 'OrcamentoClassificadoParaExtratorQueue',
-    detailType: 'OrcamentoClassificado',
+    source: SOURCE_INGESTAO,
+    detailTypes: ['OrcamentoClassificado'],
+  },
+  {
+    nome: 'validador-queue',
+    dlq: 'validador-queue-dlq',
+    regra: 'OrcamentoExtraidoParaValidadorQueue',
+    source: SOURCE_EXTRACAO,
+    detailTypes: ['OrcamentoExtraido', 'OrcamentoExtraidoComPendenciaConfirmada'],
+  },
+  {
+    nome: 'contexto-classificacao-queue',
+    dlq: 'contexto-classificacao-queue-dlq',
+    regra: 'OrcamentoClassificadoParaContextoClassificacaoQueue',
+    source: SOURCE_INGESTAO,
+    detailTypes: ['OrcamentoClassificado'],
+  },
+  {
+    nome: 'contexto-extracao-queue',
+    dlq: 'contexto-extracao-queue-dlq',
+    regra: 'OrcamentoExtraidoParaContextoExtracaoQueue',
+    source: SOURCE_EXTRACAO,
+    detailTypes: ['OrcamentoExtraido', 'OrcamentoExtraidoComPendenciaConfirmada'],
+  },
+  {
+    nome: 'indexador-queue',
+    dlq: 'indexador-queue-dlq',
+    regra: 'OrcamentoValidadoParaIndexadorQueue',
+    source: SOURCE_VALIDACAO,
+    detailTypes: ['OrcamentoValidado', 'OrcamentoValidadoComRessalva'],
+  },
+  {
+    nome: 'decisao-workflow-queue',
+    dlq: 'decisao-workflow-queue-dlq',
+    regra: 'OrcamentoValidadoParaDecisaoWorkflowQueue',
+    source: SOURCE_VALIDACAO,
+    detailTypes: ['OrcamentoValidado', 'OrcamentoValidadoComRessalva'],
   },
 ] as const;
-
-/** `source` do BC Ingestão no bus único — igual ao `eventbridge.publisher.ts` daquele BC. */
-const SOURCE_INGESTAO = 'nexo.ingestao-identificacao';
 
 /** Igual ao `maxReceiveCount` das stacks CDK — redelivery e DLQ observáveis localmente. */
 const MAX_RECEIVE_COUNT = 3;
@@ -150,8 +193,8 @@ async function main(): Promise<void> {
         Name: fila.regra,
         EventBusName: eventBusName,
         EventPattern: JSON.stringify({
-          source: [SOURCE_INGESTAO],
-          'detail-type': [fila.detailType],
+          source: [fila.source],
+          'detail-type': fila.detailTypes,
         }),
       }),
     );
@@ -162,7 +205,9 @@ async function main(): Promise<void> {
         Targets: [{ Id: fila.nome, Arn: arn }],
       }),
     );
-    console.log(`fila ${fila.nome} + DLQ + regra ${fila.regra} (${fila.detailType}): pronto`);
+    console.log(
+      `fila ${fila.nome} + DLQ + regra ${fila.regra} (${fila.detailTypes.join(', ')}): pronto`,
+    );
     console.log(`  url: ${url}`);
   }
 
