@@ -41,7 +41,7 @@ function referenciaClassificacaoDeTeste(): ReferenciaClassificacao {
 }
 
 describe('OllamaExtratorGateway', () => {
-  it('extrair chama POST /api/chat com format:"json" e devolve VOs traduzidos pela ACL', async () => {
+  it('extrair chama POST /api/chat com JSON Schema real em format (não "json" livre) e devolve VOs traduzidos pela ACL', async () => {
     const fetchImpl = fetchFake(200, respostaOllama(extracaoBrutaCompleta()));
     const gateway = new OllamaExtratorGateway(
       'http://localhost:11434',
@@ -64,9 +64,48 @@ describe('OllamaExtratorGateway', () => {
       { body: string },
     ];
     expect(url).toBe('http://localhost:11434/api/chat');
-    const corpoRequisicao = JSON.parse(init.body) as { model: string; format: string };
+    const corpoRequisicao = JSON.parse(init.body) as {
+      model: string;
+      format: Record<string, unknown>;
+    };
     expect(corpoRequisicao.model).toBe('qwen2.5:7b');
-    expect(corpoRequisicao.format).toBe('json');
+
+    // format não é mais a string livre "json" — é um JSON Schema real.
+    expect(typeof corpoRequisicao.format).toBe('object');
+    expect(corpoRequisicao.format).not.toBe('json');
+    expect(corpoRequisicao.format.type).toBe('object');
+    expect(corpoRequisicao.format.required).toEqual(['itens', 'condicoesComerciais']);
+
+    // profundidade espelhando o inputSchema do Bedrock: CampoBruto aninhado,
+    // valor aceitando null, e moeda com pattern ISO-4217.
+    const propriedadesItem = (
+      (corpoRequisicao.format.properties as Record<string, unknown>).itens as Record<
+        string,
+        unknown
+      >
+    ).items as Record<string, unknown>;
+    const descricao = (propriedadesItem.properties as Record<string, unknown>).descricao as Record<
+      string,
+      unknown
+    >;
+    const descricaoValorSchema = (descricao.properties as Record<string, unknown>).valor as Record<
+      string,
+      unknown
+    >;
+    expect(descricaoValorSchema.type).toEqual(['object', 'null']);
+    expect((descricaoValorSchema.properties as Record<string, unknown>).sku).toBeDefined();
+
+    const precoUnitario = (propriedadesItem.properties as Record<string, unknown>)
+      .precoUnitario as Record<string, unknown>;
+    const precoValorSchema = (precoUnitario.properties as Record<string, unknown>).valor as Record<
+      string,
+      unknown
+    >;
+    const moedaSchema = (precoValorSchema.properties as Record<string, unknown>).moeda as Record<
+      string,
+      unknown
+    >;
+    expect(moedaSchema.pattern).toBe('^[A-Z]{3}$');
   });
 
   it('isola o texto do documento em mensagem de usuário (nunca instrução de sistema)', async () => {
