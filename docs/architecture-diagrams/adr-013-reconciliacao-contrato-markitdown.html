@@ -3837,10 +3837,10 @@
         <div class="pulse-dot"></div>
         <h1>ADR-013 - Reconciliacao do contrato MarkItDown 001/002 (nomeArquivo)</h1>
       </div>
-      <p class="subtitle">Sanitizar na origem (001), estender a porta de 002 para o que #590 ja especifica</p>
+      <p class="subtitle">Reconciliar 002 com #590; validar nomeArquivo no unico ponto que cobre todos os canais (Domain VO, nao so Zod HTTP)</p>
     </div>
 
-    <script id="archify-guided-views-data" type="application/json">[{"id":"origem-sanitizada","label":"Sanitizacao na origem (001)","focus":["fornecedor","schema","s3"],"note":"nomeArquivo vem de upload do fornecedor, entrada nao confiavel. Zod hoje so valida min(1); ADR-013 sanitiza uma vez, na origem."},{"id":"extensao-002","label":"Extensao da porta de 002","focus":["evento","extracao","aclcompleta","lambda"],"note":"002 nunca chama 001 de volta (ADR-003 spec 001) - le nomeArquivo da key ja sanitizada, recebida via evento."}]</script>
+    <script id="archify-guided-views-data" type="application/json">[{"id":"origem-sanitizada","label":"Sanitizacao na origem (001)","focus":["fornecedor","schema","s3"],"note":"nomeArquivo vem de upload do fornecedor, entrada nao confiavel. Zod hoje so valida min(1); ADR-013 sanitiza uma vez, na origem."},{"id":"extensao-002","label":"Extensao da porta de 002","focus":["evento","extracao","aclcompleta","lambda"],"note":"002 nunca chama 001 de volta (ADR-003 spec 001) - le nomeArquivo da key ja sanitizada, recebida via evento."},{"id":"emenda-sftp","label":"Emenda — SFTP tambem converge","focus":["sftp","s3"],"note":"Zod (#727) so cobre HTTP. SFTP deposita direto no S3 via Transfer Family, sem passar pelo schema."}]</script>
     <div class="guided-views no-print" id="guided-views" hidden aria-label="Guided diagram views">
       <button id="guided-view-prev" type="button" aria-label="Previous guided view" title="Previous guided view ([)">&#8592;</button>
       <div class="guided-view-copy">
@@ -3882,9 +3882,9 @@
 
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="map">
-      <svg viewBox="0 0 920 760" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="standard">
+      <svg viewBox="0 0 920 900" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="standard">
         <title id="archify-diagram-title">ADR-013 - Reconciliacao do contrato MarkItDown 001/002 (nomeArquivo)</title>
-        <desc id="archify-diagram-description">Sanitizar na origem (001), estender a porta de 002 para o que #590 ja especifica</desc>
+        <desc id="archify-diagram-description">Reconciliar 002 com #590; validar nomeArquivo no unico ponto que cobre todos os canais (Domain VO, nao so Zod HTTP)</desc>
         <!-- Definitions -->
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -3917,14 +3917,18 @@
         <rect data-graph-role="structural-frame" data-composition-frame-kind="segment" data-composition-frame-id="2" x="48" y="418" width="824" height="212" rx="10" class="c-lane" stroke-width="1"/>
         <text x="62" y="436" class="t-dim" font-size="9" font-weight="600">03 / ESTENDER PORTA DE 002 (ADR-013)</text>
 
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="segment" data-composition-frame-id="3" x="48" y="648" width="824" height="204" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="62" y="666" class="t-dim" font-size="9" font-weight="600">04 / EMENDA — GAP: SFTP NAO PASSA PELO ZOD (fechado na Domain VO)</text>
+
         <!-- Lifelines -->
-        <path d="M 62 142 L 62 695" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 170 142 L 170 695" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 278 142 L 278 695" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 386 142 L 386 695" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 494 142 L 494 695" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 602 142 L 602 695" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 710 142 L 710 695" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 62 142 L 62 835" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 170 142 L 170 835" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 278 142 L 278 835" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 386 142 L 386 835" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 494 142 L 494 835" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 602 142 L 602 835" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 710 142 L 710 835" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 818 142 L 818 835" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
 
         <!-- Messages -->
         <g data-edge-from="fornecedor" data-edge-to="schema" data-edge-label="POST upload-url {nomeArquivo}" data-edge-key="0" data-edge-id="upload">
@@ -3975,6 +3979,22 @@
         </g>
         </g>
 
+        <g data-edge-from="sftp" data-edge-to="s3" data-edge-label="deposita direto (Transfer Family) key=sftp-incoming/&lt;nomeOriginal&gt; — nunca passa pelo Zod de upload-url" data-edge-key="6" data-edge-id="sftp-deposita">
+          <path data-composition-edge-from="sftp" data-composition-edge-to="s3" data-composition-edge-id="sftp-deposita" data-composition-points="811,700;285,700" d="M 811 700 L 285 700" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <g data-detail="context">
+          <rect x="274.2" y="680" width="547.6" height="16" rx="3" class="c-mask"/>
+          <text x="548" y="690" class="t-security" font-size="9" text-anchor="middle">deposita direto (Transfer Family) key=sftp-incoming/&lt;nomeOriginal&gt; — nunca passa pelo Zod de upload-url</text>
+        </g>
+        </g>
+
+        <g data-edge-from="s3" data-edge-to="sftp" data-edge-label="ReferenciaS3.de() agora valida o segmento final da key (Domain, cobre os 4 canais)" data-edge-key="7" data-edge-id="sftp-vo">
+          <path data-composition-edge-from="s3" data-composition-edge-to="sftp" data-composition-edge-id="sftp-vo" data-composition-points="285,760;811,760" d="M 285 760 L 811 760" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+        <g data-detail="context">
+          <rect x="328.79999999999995" y="740" width="438.40000000000003" height="16" rx="3" class="c-mask"/>
+          <text x="548" y="750" class="t-muted" font-size="9" text-anchor="middle">ReferenciaS3.de() agora valida o segmento final da key (Domain, cobre os 4 canais)</text>
+        </g>
+        </g>
+
         <!-- Activations -->
         <rect x="165" y="178" width="10" height="84" rx="3" class="c-mask"/>
         <rect x="165" y="178" width="10" height="84" rx="3" class="c-backend" stroke-width="1"/>
@@ -3986,6 +4006,8 @@
         <rect x="597" y="463" width="10" height="142" rx="3" class="c-backend" stroke-width="1"/>
         <rect x="705" y="518" width="10" height="74" rx="3" class="c-mask"/>
         <rect x="705" y="518" width="10" height="74" rx="3" class="c-external" stroke-width="1"/>
+        <rect x="813" y="693" width="10" height="87" rx="3" class="c-mask"/>
+        <rect x="813" y="693" width="10" height="87" rx="3" class="c-external" stroke-width="1"/>
 
         <!-- Participants -->
         <g id="node-fornecedor" data-node-id="fornecedor" data-node-label="Fornecedor" tabindex="0" role="button" aria-label="Focus Fornecedor, upload, Sequence participant" aria-pressed="false" data-node-kind="external" data-node-sublabel="upload" data-node-context="Sequence participant">
@@ -4070,16 +4092,28 @@
           <text data-detail="context" x="710" y="111" class="t-muted" font-size="7" text-anchor="middle">MarkItDown completa</text>
         </g>
 
+        <g id="node-sftp" data-node-id="sftp" data-node-label="Deposito SFTP" tabindex="0" role="button" aria-label="Focus Deposito SFTP, Transfer Family, sem Zod, Sequence participant" aria-pressed="false" data-node-kind="external" data-node-sublabel="Transfer Family, sem Zod" data-node-context="Sequence participant">
+          <title>Deposito SFTP · Transfer Family, sem Zod · Sequence participant</title>
+          <rect x="775" y="72" width="86" height="54" rx="6" class="c-mask"/>
+          <rect x="775" y="72" width="86" height="54" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(781 78) scale(0.6875)">
+            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
+            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
+          </g>
+          <text data-detail-anchor x="818" y="94" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Deposito SFTP</text>
+          <text data-detail="context" x="818" y="111" class="t-muted" font-size="7" text-anchor="middle">Transfer Family, sem Zod</text>
+        </g>
+
         <!-- Legend -->
-        <text x="150" y="686" class="t-primary" font-size="10" font-weight="600">Legend</text>
-        <path d="M 150 706 L 184 706" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <text x="193" y="709" class="t-muted" font-size="8">request</text>
-        <path d="M 270 706 L 304 706" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
-        <text x="313" y="709" class="t-muted" font-size="8">return</text>
-        <path d="M 385 706 L 419 706" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
-        <text x="428" y="709" class="t-muted" font-size="8">security</text>
-        <path d="M 530 706 L 564 706" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
-        <text x="573" y="709" class="t-muted" font-size="8">async trace</text>
+        <text x="150" y="826" class="t-primary" font-size="10" font-weight="600">Legend</text>
+        <path d="M 150 846 L 184 846" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <text x="193" y="849" class="t-muted" font-size="8">request</text>
+        <path d="M 270 846 L 304 846" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+        <text x="313" y="849" class="t-muted" font-size="8">return</text>
+        <path d="M 385 846 L 419 846" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <text x="428" y="849" class="t-muted" font-size="8">security</text>
+        <path d="M 530 846 L 564 846" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <text x="573" y="849" class="t-muted" font-size="8">async trace</text>
       </svg>
       <p class="intent-trace-status no-print" id="intent-trace-status" role="status" aria-live="polite" aria-atomic="true"></p>
       <div class="share-chapter-cue no-print" id="share-chapter-cue" hidden role="status" aria-live="polite">
@@ -4282,12 +4316,16 @@
       <div class="card">
         <div class="card-header">
           <div class="card-dot rose"></div>
-          <h3>Decisao (b) - onde sanitizar entrada nao confiavel</h3>
+          <h3>Decisao (b), EMENDADA — validar na Domain VO, nao (so) no Zod</h3>
         </div>
         <ul>
-          <li>&bull; Verificado: 001 hoje NAO sanitiza nomeArquivo - upload-url.schema.ts/confirmar-upload.schema.ts so exigem z.string().min(1). O valor vai direto para a key S3 (`${prefixo}/${uuid}-${nomeArquivo}`, s3-armazenamento-bruto.gateway.ts) e direto para o payload do Lambda, sem strip de separador de path ou caractere de controle</li>
-          <li>&bull; S3 nao tem travessia de diretorio como filesystem, mas uma Lambda Python (#588/#590, ainda nao implementada) pode escrever arquivo temporario usando esse nome - risco real de path traversal/injecao no lado Python se nao sanitizado antes</li>
-          <li>&bull; Sanitizar UMA vez na origem (Zod de 001, upload-url.schema.ts e confirmar-upload.schema.ts): regex rejeitando /, \\, .. e caracteres de controle, cap de tamanho. Nao duplicar sanitizacao em 002 - 002 so le um valor que ja saiu seguro da unica porta de entrada (upload de fornecedor e sempre via 001)</li>
+          <li>&bull; CORRECAO (achado pos-implementacao, PR #727/#728): a decisao original dizia &#39;sanitizar uma vez, nos schemas Zod de 001&#39; — factualmente incompleta. Zod (upload-url.schema.ts/confirmar-upload.schema.ts) cobre so o canal HTTP.</li>
+          <li>&bull; Canal SFTP (sftp-upload.handler.ts) nunca passa por esses schemas: o arquivo chega direto ao S3 via AWS Transfer Family (ADR-002 da spec 001 — SFTP nao usa upload-url) e o nome escolhido por quem deposita vira a key sem qualquer validacao.</li>
+          <li>&bull; Ponto correto, verificado em codigo: ReferenciaS3.de() (Domain VO, referencia-s3.vo.ts) e o unico chokepoint estrutural — todo Orcamento, de qualquer canal presente ou futuro, exige uma ReferenciaS3 construida por essa VO antes de existir. Grep confirma 4 call sites, todos dentro de 001 (s3-armazenamento-bruto.gateway.ts x2, sftp-upload.handler.ts, drizzle-orcamento.repository.ts ao reconstituir).</li>
+          <li>&bull; Decisao emendada: ReferenciaS3.de() passa a validar o segmento final da key (apos o ultimo &#39;/&#39;) contra o mesmo padrao do Zod — sem &#39;..&#39;, sem &#39;/&#39; ou &#39;\\&#39; remanescente, sem caractere de controle, cap de tamanho. Isso cobre HTTP e SFTP em um unico lugar, estruturalmente, sem depender de nenhum canal lembrar de validar.</li>
+          <li>&bull; Zod de 001 (PR #727) NAO fica redundante nem deve ser revertido: continua sendo a validacao de borda (Interface) que devolve 400 Problem Details rapido ao chamador HTTP, antes de qualquer I/O — defesa em profundidade correta (Security by Design manda validar em toda borda de Interface E manter o invariante no Domain), nao duplicacao desperdicada.</li>
+          <li>&bull; O arquivo SFTP invalido continua existindo no bucket S3 (deposito ja aconteceu antes de qualquer validacao possivel) — mas ReferenciaS3.de() lancando erro impede o agregado Orcamento de ser criado, entao o nome inseguro nunca chega ao Lambda MarkItDown nem a nenhum processamento posterior. Mesmo padrao ja usado para tenantId nao resolvido no SFTP: log.error (nunca silencioso, Principio NON-NEGOTIABLE), registro pulado, objeto fica orfao para auditoria manual.</li>
+          <li>&bull; AWS Transfer Family Managed Workflow (issue #477) NAO e a decisao base: #477 tem escopo diferente (tagging de tenant, nao nome de arquivo) e depende de acesso AWS que o time nao tem hoje — usar isso como dependencia primaria bloquearia a correcao por infraestrutura. Pode ser defesa adicional futura (rejeitar na borda antes do objeto existir no S3), nunca substitui a validacao na VO.</li>
         </ul>
       </div>
 
@@ -4312,6 +4350,30 @@
           <li>&bull; Issue B (ADR-012, so 001) segue sozinha - sem dependencia tecnica do contrato de 002</li>
           <li>&bull; Nova Issue E (001): sanitizar nomeArquivo na origem - pequena, independente, recomendado fazer antes ou junto da Issue G por ser a correcao de risco de seguranca</li>
           <li>&bull; Nova Issue G (002): estender a porta/ACL/payload - deve ser feita ANTES da implementacao Python de #590, para o Lambda nascer com o contrato certo desde o primeiro commit</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot rose"></div>
+          <h3>Emenda (d) — issues afetadas</h3>
+        </div>
+        <ul>
+          <li>&bull; Issue E (fix(ingestao-identificacao): sanitizar nomeArquivo) muda de escopo: alvo passa a ser ReferenciaS3.de() (referencia-s3.vo.ts), nao (so) os schemas Zod. PR #727 (Zod) mergeia como esta, sem retrabalho — passa a ser defesa de borda complementar, nao a unica guarda.</li>
+          <li>&bull; Nova issue necessaria: fix(ingestao-identificacao): validar segmento final da key em ReferenciaS3.de() — cobre sftp-upload.handler.ts (gap real) e reforça os 2 call sites de s3-armazenamento-bruto.gateway.ts (ja cobertos por Zod, mas o VO passa a garantir isso independente da Interface). Depende de: nenhuma (PRs #727/#728 seguem mergeaveis).</li>
+          <li>&bull; Issue G (porta de 002 recebe nomeArquivo, PR #728) nao muda — nomeArquivo que 002 recebe vem da key ja validada pela VO de 001, entao 002 continua sem precisar de sanitizacao propria.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>Item secundario (e/f) — nomeArquivo carrega prefixo uuid</h3>
+        </div>
+        <ul>
+          <li>&bull; key = ${prefixo}/${uuid}-${nomeArquivo} (s3-armazenamento-bruto.gateway.ts) -&gt; key.split(&#39;/&#39;).at(-1) devolve &#39;&lt;uuid&gt;-nome.ext&#39;, nao o nome limpo. Os dois BCs derivam igual, sem divergencia entre eles.</li>
+          <li>&bull; (e) ADR-012 nao precisa de emenda: a decisao sempre foi &#39;extensao-&gt;formato&#39; (card Decisao (C) do ADR-012), nunca &#39;nome limpo-&gt;formato&#39;. UUID nao contem ponto, extensao final preserva-se intacta — a funcao pura funciona sem ajuste. Basta uma nota no corpo da issue #725 avisando que a entrada e &#39;&lt;uuid&gt;-nome.ext&#39;, para o dev nao gastar tempo confirmando isso na implementacao.</li>
+          <li>&bull; (f) Lambda MarkItDown recebendo &#39;&lt;uuid&gt;-nome.ext&#39; como nomeArquivo e aceitavel e consistente com o que #588/#590 ja recebem hoje (nao e segunda divergencia — os dois BCs sempre mandaram esse mesmo formato prefixado, nunca o nome cru do fornecedor). Se o Lambda usar para nomear arquivo temporario, uuid prefixado ajuda (evita colisao entre invocacoes concorrentes); se usar so para extensao, e irrelevante. Recomenda-se uma linha nos corpos de #588/#590 deixando isso explicito para quem implementar o lado Python.</li>
         </ul>
       </div>
     </div>
