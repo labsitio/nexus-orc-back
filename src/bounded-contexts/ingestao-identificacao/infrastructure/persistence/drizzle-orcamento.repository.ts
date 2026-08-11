@@ -17,6 +17,7 @@ import {
 import { TentativaClassificacao } from '../../domain/value-objects/tentativa-classificacao.vo.js';
 import { DrizzleTenantScopedRepositoryBase } from '../../../../shared-kernel/tenant/drizzle-tenant-scoped-repository-base.js';
 import type { TenantContext } from '../../../../shared-kernel/tenant/tenant-context.js';
+import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import { orcamentos, orcamentosHistorico } from './schema/orcamento.schema.js';
 
 /** Linha de `orcamentos` — nunca cruza para fora deste arquivo (plan.md, T011). */
@@ -68,6 +69,12 @@ function agregadoDaLinha(
 ): Orcamento {
   const props: OrcamentoProps = {
     id: OrcamentoId.de(linha.id),
+    // (spec 007, T018) `tenant_id` é `notNull` no schema desde 0013 — sem
+    // reconstituir aqui, todo agregado carregado sai com `tenantId` undefined e
+    // as guardas de isolamento de `ConsultarStatusOrcamento`/`ClassificarOrcamento`
+    // o tratam como registro legado pré-retrofit: 404 em toda consulta e mensagem
+    // descartada como sucesso idempotente. Mesmo mapeamento dos 4 BCs irmãos.
+    tenantId: TenantId.de(linha.tenantId),
     canal: Canal.de(linha.canal),
     recebidoEm: linha.recebidoEm,
     referenciaBruta: ReferenciaS3.de({

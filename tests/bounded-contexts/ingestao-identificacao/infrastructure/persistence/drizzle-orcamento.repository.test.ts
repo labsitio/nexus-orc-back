@@ -129,6 +129,28 @@ describe.skipIf(!DATABASE_URL)('DrizzleOrcamentoRepository (Postgres real)', () 
     }
   });
 
+  // BUG-001 (issue #716): `agregadoDaLinha` não mapeava `linha.tenantId` para
+  // `OrcamentoProps`, então todo agregado recarregado saía com `tenantId`
+  // undefined. As guardas de isolamento de `ConsultarStatusOrcamento` e
+  // `ClassificarOrcamento` interpretam isso como registro legado pré-retrofit:
+  // 404 em toda consulta de status e mensagem SQS descartada como sucesso
+  // idempotente, sem classificação e sem DLQ. Sem o mapeamento, este teste falha.
+  it('buscarPorId reconstitui o tenantId do agregado a partir da coluna tenant_id', async () => {
+    const id = OrcamentoId.novo();
+    idsParaLimpar.push(id.toString());
+
+    await repo.salvar(
+      Orcamento.receber({
+        id,
+        canal: Canal.de('API_REST'),
+        referenciaBruta: referenciaBruta('doc-reconstituicao.pdf'),
+      }),
+    );
+
+    const recarregado = await repo.buscarPorId(id);
+    expect(recarregado?.tenantId?.toString()).toBe(TENANT_A.toString());
+  });
+
   it('salva RECEBIDO, aplica classificação de alta confiança e recarrega como CLASSIFICADO com 1 entrada de histórico', async () => {
     const id = OrcamentoId.novo();
     idsParaLimpar.push(id.toString());
