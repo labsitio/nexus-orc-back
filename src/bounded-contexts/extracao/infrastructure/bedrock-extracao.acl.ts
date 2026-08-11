@@ -113,7 +113,7 @@ export function ehExtracaoBruta(valor: unknown): valor is ExtracaoBruta {
 
 function paraCampoExtraido<TBruto, TVo>(
   campo: CampoBruto<TBruto>,
-  construir: (valor: TBruto) => TVo,
+  construir: (valor: TBruto) => TVo | undefined,
 ): CampoExtraido<TVo> {
   const confianca = NivelConfianca.de(campo.confianca);
   if (campo.valor === null || !confianca.atingeLimiar(LIMIAR_CONFIANCA_CAMPO_EXTRAIDO)) {
@@ -121,7 +121,129 @@ function paraCampoExtraido<TBruto, TVo>(
     // inventa/estima valor (spec.md, Ação proibida crítica).
     return CampoExtraido.naoExtraido(confianca, 'EXTRATOR');
   }
-  return CampoExtraido.extraido(construir(campo.valor), confianca, 'EXTRATOR');
+  const valorConstruido = construir(campo.valor);
+  if (valorConstruido === undefined) {
+    // Construtor não conseguiu resolver o valor de forma determinística (ex.:
+    // prazoValidade sem data absoluta nem período relativo reconhecido,
+    // ADR-015) — residual, mesmo efeito de "não extraído" no domínio.
+    return CampoExtraido.naoExtraido(confianca, 'EXTRATOR');
+  }
+  return CampoExtraido.extraido(valorConstruido, confianca, 'EXTRATOR');
+}
+
+const REGEX_DATA_ISO = /^(\d{4})-(\d{2})-(\d{2})/;
+const REGEX_DATA_BR = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+const REGEX_PERIODO_RELATIVO = /(\d+)\s*(dias?|semanas?|mes(?:es)?|mês(?:es)?|anos?)/i;
+
+const UNIDADES_PERIODO_RELATIVO: Readonly<Record<string, 'dia' | 'semana' | 'mes' | 'ano'>> = {
+  dia: 'dia',
+  dias: 'dia',
+  semana: 'semana',
+  semanas: 'semana',
+  mes: 'mes',
+  meses: 'mes',
+  mês: 'mes',
+  ano: 'ano',
+  anos: 'ano',
+};
+
+/**
+ * `art. 132 §3` do Código Civil: "Os prazos de meses e anos expiram no dia de
+ * igual número do do início, ou no imediato, se faltar exata
+ * correspondência." Mesmo dia-número no mês destino; se aquele dia não existe
+ * lá, o dia imediato — o primeiro dia do mês seguinte. NUNCA troque por
+ * `setMonth` puro: o overflow nativo do JS dá resultado diferente da lei nos
+ * fins de mês (ex.: 31/01 + 1 mês = 01/03 pela lei, 03/03 por `setMonth`).
+ */
+function somarMeses(inicio: Date, meses: number): Date {
+  const dia = inicio.getUTCDate();
+  const y = inicio.getUTCFullYear();
+  const m = inicio.getUTCMonth() + meses;
+  const ultimoDiaDestino = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return dia <= ultimoDiaDestino ? new Date(Date.UTC(y, m, dia)) : new Date(Date.UTC(y, m + 1, 1));
+}
+
+/**
+ * Caminho 1 (data absoluta). Aceita apenas ISO (`^\d{4}-\d{2}-\d{2}`) ou
+ * `dd/mm/yyyy` parseado explicitamente por regex — NUNCA `new Date(string)`
+ * cru para formato não-ISO: `new Date('05/09/2026')` devolve 9 de maio (o
+ * runtime interpreta mês/dia), gravando data errada e plausível em silêncio.
+ */
+function resolverDataAbsoluta(texto: string): Date | undefined {
+  const textoLimpo = texto.trim();
+
+  const matchIso = REGEX_DATA_ISO.exec(textoLimpo);
+  if (matchIso) {
+    const [, anoIso, mesIso, diaIso] = matchIso;
+    const ano = Number(anoIso);
+    const mes = Number(mesIso);
+    const dia = Number(diaIso);
+    const data = new Date(Date.UTC(ano, mes - 1, dia));
+    // `new Date('2026-02-30')` não lança nem devolve Invalid Date — faz
+    // overflow silencioso para 02/03/2026 (dia inexistente). Round-trip
+    // contra os componentes parseados rejeita isso, mesma disciplina do
+    // caminho dd/mm/yyyy abaixo — nunca aceitar data de calendário inválida.
+    const dataValidaIso =
+      data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia;
+    return dataValidaIso ? data : undefined;
+  }
+
+  const matchBr = REGEX_DATA_BR.exec(textoLimpo);
+  if (!matchBr) return undefined;
+  const [, diaStr, mesStr, anoStr] = matchBr;
+  const dia = Number(diaStr);
+  const mes = Number(mesStr);
+  const ano = Number(anoStr);
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  const dataValida =
+    data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia;
+  return dataValida ? data : undefined;
+}
+
+/** Caminho 2 (período relativo). Dias/semanas: soma simples (`art. 132 caput`). Meses/anos: `somarMeses`. */
+function resolverPeriodoRelativo(texto: string, referencia: Date): Date | undefined {
+  const match = REGEX_PERIODO_RELATIVO.exec(texto.toLowerCase());
+  if (!match) return undefined;
+  const quantidade = Number(match[1]);
+  const unidade = UNIDADES_PERIODO_RELATIVO[match[2]!];
+  if (unidade === undefined || Number.isNaN(quantidade)) return undefined;
+
+  const UM_DIA_MS = 24 * 60 * 60 * 1000;
+  switch (unidade) {
+    case 'dia':
+      return new Date(referencia.getTime() + quantidade * UM_DIA_MS);
+    case 'semana':
+      return new Date(referencia.getTime() + quantidade * 7 * UM_DIA_MS);
+    case 'mes':
+      return somarMeses(referencia, quantidade);
+    case 'ano':
+      return somarMeses(referencia, quantidade * 12);
+  }
+}
+
+/**
+ * ADR-015: resolução determinística de `prazoValidade` na ACL — o LLM só lê
+ * texto livre, nunca calcula data (aritmética de data é proibida ao modelo
+ * pela spec.md). Três caminhos, nessa ordem: data absoluta, período relativo
+ * (dia/semana/mês/ano) e residual (`undefined`, traduzido em `naoExtraido`).
+ *
+ * `referencia` é lida em componentes UTC (dia calendário UTC, não fuso do
+ * Brasil) — mesma convenção de `somarMeses` e `resolverDataAbsoluta` acima,
+ * para manter toda a aritmética desta função num único fuso. `referencia` é
+ * parâmetro justamente para trocar a fonte/fuso depois sem tocar no resto
+ * (ver limitação aceita na issue #740 — hoje é sempre `new Date()`).
+ */
+export function resolverPrazoValidade(
+  texto: string,
+  referencia: Date,
+): PeriodoValidade | undefined {
+  const dataAbsoluta = resolverDataAbsoluta(texto);
+  if (dataAbsoluta !== undefined) return PeriodoValidade.de(dataAbsoluta);
+
+  const dataRelativa = resolverPeriodoRelativo(texto, referencia);
+  if (dataRelativa !== undefined) return PeriodoValidade.de(dataRelativa);
+
+  return undefined;
 }
 
 /**
@@ -172,7 +294,7 @@ export class BedrockExtracaoACL {
     const condicoesComerciais = CondicoesComerciais.de({
       condicoesPagamento: paraCampoExtraido(bruto.condicoesComerciais.condicoesPagamento, (v) => v),
       prazoValidade: paraCampoExtraido(bruto.condicoesComerciais.prazoValidade, (v) =>
-        PeriodoValidade.de(new Date(v)),
+        resolverPrazoValidade(v, new Date()),
       ),
       condicoesEntrega: paraCampoExtraido(bruto.condicoesComerciais.condicoesEntrega, (v) => v),
     });

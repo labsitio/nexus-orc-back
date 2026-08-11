@@ -101,7 +101,9 @@ const SCHEMA_EXTRACAO = {
         ),
         prazoValidade: campoExtraidoSchema(
           { type: ['string', 'null'] },
-          'Prazo de validade da proposta. null se não extraído.',
+          'Prazo de validade da proposta: data absoluta (ex.: "10/09/2026") ou período ' +
+            'relativo em dias/semanas/meses/anos (ex.: "30 dias"), texto copiado do ' +
+            'documento, sem cálculo. null se não extraído.',
         ),
         condicoesEntrega: campoExtraidoSchema(
           { type: ['string', 'null'] },
