@@ -30,7 +30,11 @@ export class Dinheiro {
     if (!moeda.trim()) {
       throw new DinheiroInvalidoError('moeda não pode ser vazia');
     }
-    return new Dinheiro(valorCentavos, moeda.toUpperCase());
+    const moedaNormalizada = moeda.toUpperCase();
+    if (!/^[A-Z]{3}$/.test(moedaNormalizada)) {
+      throw new DinheiroInvalidoError(`moeda deve seguir ISO-4217 (3 letras), recebido "${moeda}"`);
+    }
+    return new Dinheiro(valorCentavos, moedaNormalizada);
   }
 
   equals(outro: Dinheiro): boolean {

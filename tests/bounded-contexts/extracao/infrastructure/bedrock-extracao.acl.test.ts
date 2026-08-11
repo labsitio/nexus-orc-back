@@ -92,4 +92,68 @@ describe('BedrockExtracaoACL', () => {
     expect(ehExtracaoBruta('texto livre')).toBe(false);
     expect(ehExtracaoBruta(extracaoBrutaCompleta())).toBe(true);
   });
+
+  it('rejeita com BedrockExtracaoACLInvalidaError (nunca TypeError) o payload real devolvido pelo llama3.1 — descricao.valor string em vez de objeto', () => {
+    const brutoRealLlama = {
+      itens: [
+        {
+          descricao: { valor: 'Chapa de aco carbono 2mm', confianca: 100 },
+          quantidade: { valor: 10, confianca: 100 },
+          precoUnitario: { valor: { valorCentavos: 45000, moeda: 'R$' }, confianca: 100 },
+        },
+      ],
+      condicoesComerciais: {
+        condicoesPagamento: { valor: '30 dias', confianca: 100 },
+        prazoValidade: { valor: '30 dias', confianca: 100 },
+        condicoesEntrega: { valor: 'CIF', confianca: 100 },
+      },
+    } as unknown as ExtracaoBruta;
+
+    expect(ehExtracaoBruta(brutoRealLlama)).toBe(false);
+    expect(() => new BedrockExtracaoACL().converter(brutoRealLlama)).toThrow(
+      BedrockExtracaoACLInvalidaError,
+    );
+  });
+
+  it('ehExtracaoBruta aceita valor: null em qualquer CampoBruto (contrato de "não extraído")', () => {
+    const bruto = extracaoBrutaCompleta();
+    const comValorNulo: ExtracaoBruta = {
+      ...bruto,
+      itens: [{ ...bruto.itens[0]!, quantidade: { valor: null, confianca: 97 } }],
+    };
+
+    expect(ehExtracaoBruta(comValorNulo)).toBe(true);
+  });
+
+  it('normaliza moeda "R$" para "BRL" ao converter precoUnitario', () => {
+    const bruto = extracaoBrutaCompleta();
+    const comMoedaBrasileira: ExtracaoBruta = {
+      ...bruto,
+      itens: [
+        {
+          ...bruto.itens[0]!,
+          precoUnitario: { valor: { valorCentavos: 45000, moeda: 'R$' }, confianca: 100 },
+        },
+      ],
+    };
+
+    const resultado = new BedrockExtracaoACL().converter(comMoedaBrasileira);
+
+    expect(resultado.itens[0]?.precoUnitario.valor?.moeda).toBe('BRL');
+  });
+
+  it('rejeita moeda desconhecida (sem normalização enumerada) como BedrockExtracaoACLInvalidaError', () => {
+    const bruto = extracaoBrutaCompleta();
+    const comMoedaDesconhecida: ExtracaoBruta = {
+      ...bruto,
+      itens: [
+        {
+          ...bruto.itens[0]!,
+          precoUnitario: { valor: { valorCentavos: 45000, moeda: 'XYZ$' }, confianca: 100 },
+        },
+      ],
+    };
+
+    expect(() => new BedrockExtracaoACL().converter(comMoedaDesconhecida)).toThrow();
+  });
 });
