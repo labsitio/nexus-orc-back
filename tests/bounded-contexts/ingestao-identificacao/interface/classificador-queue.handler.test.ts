@@ -137,7 +137,7 @@ describe('criarClassificadorQueueHandler', () => {
     expect(linhas.some((linha) => linha.level === 50)).toBe(false);
   });
 
-  it('trata TenantDivergenciaError (AUSENTE) como sucesso idempotente, logando warn (não info) com o motivo (fix #640)', async () => {
+  it('trata TenantDivergenciaError (AUSENTE) sem batch item failure, mas loga error (nunca warn/info) — ADR-011', async () => {
     const tenantIdSolicitante = '018f0c1a-1111-7000-8000-000000000001';
     const executar = vi
       .fn()
@@ -151,11 +151,14 @@ describe('criarClassificadorQueueHandler', () => {
       Records: [{ messageId: 'm1', body: envelopeEventBridge('id-legado', tenantIdSolicitante) }],
     });
 
+    // Controle de fluxo da fila não muda (fix #640/#280/T017, mantido): estado
+    // permanente, retry não resolve, então continua sem batchItemFailures/DLQ.
     expect(resposta.batchItemFailures).toHaveLength(0);
     const linhaDivergencia = linhas.find((linha) => linha.motivo === 'AUSENTE');
-    expect(linhaDivergencia?.level).toBe(40); // pino: nível "warn"
+    expect(linhaDivergencia?.level).toBe(50); // pino: nível "error" (ADR-011)
     expect(linhaDivergencia?.orcamentoId).toBe('id-legado');
     expect(linhaDivergencia?.tenantIdSolicitante).toBe(tenantIdSolicitante);
+    expect(linhaDivergencia?.level).not.toBe(40); // nunca warn
     expect(linhaDivergencia?.level).not.toBe(30); // nunca info
   });
 

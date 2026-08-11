@@ -11,10 +11,11 @@ export class OrcamentoNaoEncontradoError extends ErroDominio {
 }
 
 /**
- * (spec 007, T017) Disparado quando `tenantId` do agregado é ausente/undefined
- * (registro legado pré-retrofit) ou não corresponde ao `tenantId` da requisição
- * (tentativa de acesso cross-tenant). Retornado como 404 nunca 403, para não
- * revelar ao cliente a existência de um orçamento pertencente a outro tenant.
+ * (spec 007, T017; ADR-011) Disparado quando `tenantId` do agregado é
+ * ausente/undefined (estado hoje inesperado — `tenant_id` é NOT NULL desde a
+ * migração 0013) ou não corresponde ao `tenantId` da requisição (tentativa de
+ * acesso cross-tenant). Retornado como 404 nunca 403, para não revelar ao
+ * cliente a existência de um orçamento pertencente a outro tenant.
  */
 export class TenantDivergenciaError extends ErroDominio {
   constructor(orcamentoId: string) {
@@ -41,9 +42,9 @@ export class ConsultarStatusOrcamento {
       throw new OrcamentoNaoEncontradoError(orcamentoId);
     }
 
-    // (spec 007, T017) Validação explícita de tenant: rejeita se agregado não tem
-    // tenantId (legado pré-retrofit) ou diverge do solicitante (cross-tenant). 404,
-    // não 403 — não revela existência a outro tenant.
+    // (spec 007, T017; ADR-011) Validação explícita de tenant: rejeita se agregado
+    // não tem tenantId (estado hoje inesperado) ou diverge do solicitante
+    // (cross-tenant). 404, não 403 — não revela existência a outro tenant.
     if (!orcamento.tenantId || orcamento.tenantId.toString() !== tenantId.toString()) {
       throw new TenantDivergenciaError(orcamentoId);
     }
