@@ -97,19 +97,22 @@ export function criarAgenteClassificador(
   );
 }
 
+// (spec 007, T018) `DrizzleOrcamentoRepository` estende
+// `DrizzleTenantScopedRepositoryBase` (T008): o `TenantContext` é fixado no
+// construtor e MUST NUNCA ser reaproveitado entre tenants. Por isso esta
+// composition root nunca constrói uma instância pronta — só uma fábrica
+// `(tenantId) => repo`, compartilhada entre os factories abaixo (que
+// permanecem singletons de longa duração; só o repositório é per-call). Cobre
+// uniformemente HTTP (1 tenant por requisição) e o lote SQS/S3 de
+// `classificador-queue.handler.ts`/`sftp-upload.handler.ts` (N tenants por
+// invocação de warm start), sem exigir reconstruir os casos de uso a cada
+// chamada.
+function criarRepositorioOrcamentoFactory(db: NodePgDatabase) {
+  return (tenantId: TenantId) => new DrizzleOrcamentoRepository(db, criarTenantContext(tenantId));
+}
+
 export function criarIngestaoIdentificacao(deps: IngestaoIdentificacaoDeps): IngestaoIdentificacao {
-  // (spec 007, T018) `DrizzleOrcamentoRepository` estende
-  // `DrizzleTenantScopedRepositoryBase` (T008): o `TenantContext` é fixado no
-  // construtor e MUST NUNCA ser reaproveitado entre tenants. Por isso esta
-  // composition root nunca constrói uma instância pronta — só uma fábrica
-  // `(tenantId) => repo`, injetada nos 4 casos de uso abaixo (que permanecem
-  // singletons de longa duração; só o repositório é per-call). Cobre
-  // uniformemente HTTP (1 tenant por requisição) e o lote SQS/S3 de
-  // `classificador-queue.handler.ts`/`sftp-upload.handler.ts` (N tenants por
-  // invocação de warm start), sem exigir reconstruir os casos de uso a cada
-  // chamada.
-  const criarRepositorioOrcamento = (tenantId: TenantId) =>
-    new DrizzleOrcamentoRepository(deps.db, criarTenantContext(tenantId));
+  const criarRepositorioOrcamento = criarRepositorioOrcamentoFactory(deps.db);
   const idempotencia = new DrizzleIdempotencyKeyRepository(deps.db);
   const publisher = new EventBridgePublisher(deps.eventBridge, deps.eventBusName);
   const armazenamento = new S3ArmazenamentoBrutoGateway(deps.s3, deps.bucket);
@@ -128,6 +131,27 @@ export function criarIngestaoIdentificacao(deps: IngestaoIdentificacaoDeps): Ing
     consultarStatusOrcamento: new ConsultarStatusOrcamento(criarRepositorioOrcamento),
     confirmarRevisaoHumana: new ConfirmarRevisaoHumana(criarRepositorioOrcamento, publisher),
   };
+}
+
+export interface CriarReceberOrcamentoDeps {
+  readonly db: NodePgDatabase;
+  readonly eventBridge: EventBridgeClient;
+  readonly eventBusName: string;
+}
+
+/**
+ * Factory enxuta para o handler Lambda `sftp-upload` (issue #613): monta só
+ * `ReceberOrcamento`, sem exigir `classificador`/`conversor` — que
+ * `criarIngestaoIdentificacao` exige por servir também `ClassificarOrcamento`
+ * (Bedrock/MarkItDown), nunca chamado por este handler. Mesmo racional das
+ * 3 factories de `composition/orquestracao.ts`: um caso de uso, uma role IAM
+ * least-privilege, um conjunto mínimo de deps.
+ */
+export function criarReceberOrcamento(deps: CriarReceberOrcamentoDeps): ReceberOrcamento {
+  const criarRepositorioOrcamento = criarRepositorioOrcamentoFactory(deps.db);
+  const idempotencia = new DrizzleIdempotencyKeyRepository(deps.db);
+  const publisher = new EventBridgePublisher(deps.eventBridge, deps.eventBusName);
+  return new ReceberOrcamento(criarRepositorioOrcamento, publisher, idempotencia);
 }
 
 /**

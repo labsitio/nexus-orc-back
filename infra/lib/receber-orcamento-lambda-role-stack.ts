@@ -1,11 +1,20 @@
 import { Stack, type StackProps } from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import type * as s3 from 'aws-cdk-lib/aws-s3';
 import type { Construct } from 'constructs';
 
-export interface ReceberOrcamentoLambdaRoleStackProps extends StackProps {
-  readonly orcamentosRawBucket: s3.IBucket;
-}
+/**
+ * Duplica `BUCKET_NAME` de `ingestao-identificacao-storage-stack.ts` — nunca
+ * `props.orcamentosRawBucket.arnForObjects('*')` (issue #613, achado de
+ * synth): passar a referência real do bucket criaria uma dependência
+ * `ReceberOrcamentoLambdaRoleStack -> IngestaoIdentificacaoStorageStack` que,
+ * somada a `IngestaoIdentificacaoStorageStack -> SftpUploadFunctionStack`
+ * (notificação S3, mesma issue) e `SftpUploadFunctionStack ->
+ * ReceberOrcamentoLambdaRoleStack` (role de execução), fecha um ciclo que o
+ * CDK recusa a sintetizar (`DependencyCycle`). ARN de bucket S3 não carrega
+ * conta/região — literal aqui é seguro e nunca diverge silenciosamente do
+ * bucket real (mesmo nome fixo hardcoded na criação do bucket).
+ */
+const BUCKET_NAME = 'nexo-orcamentos-raw';
 
 /**
  * IAM role dedicada (T026/#31) para o(s) Lambda(s) que executam
@@ -20,7 +29,7 @@ export interface ReceberOrcamentoLambdaRoleStackProps extends StackProps {
 export class ReceberOrcamentoLambdaRoleStack extends Stack {
   public readonly role: iam.Role;
 
-  constructor(scope: Construct, id: string, props: ReceberOrcamentoLambdaRoleStackProps) {
+  constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
     this.terminationProtection = true;
 
@@ -36,7 +45,7 @@ export class ReceberOrcamentoLambdaRoleStack extends Stack {
       new iam.PolicyStatement({
         sid: 'AcessoAoBucketDeOrcamentosBrutos',
         actions: ['s3:GetObject', 's3:PutObject', 's3:PutObjectRetention'],
-        resources: [props.orcamentosRawBucket.arnForObjects('*')],
+        resources: [`arn:aws:s3:::${BUCKET_NAME}/*`],
       }),
     );
   }
