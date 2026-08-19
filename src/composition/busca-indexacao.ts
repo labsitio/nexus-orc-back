@@ -4,11 +4,14 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { IndexarOrcamento } from '../bounded-contexts/busca-indexacao/application/use-cases/indexar-orcamento.js';
 import type { AgenteEmbeddingGateway } from '../bounded-contexts/busca-indexacao/domain/gateways/agente-embedding.gateway.js';
+import type { AgenteInterpretadorConsultaGateway } from '../bounded-contexts/busca-indexacao/domain/gateways/agente-interpretador-consulta.gateway.js';
 import type { OrcamentoValidadoEventDetailType } from '../bounded-contexts/busca-indexacao/domain/gateways/orcamento-validado-event.acl.js';
 import type { IndiceOrcamentoRepository } from '../bounded-contexts/busca-indexacao/domain/repositories/indice-orcamento.repository.js';
 import { BedrockEmbeddingGateway } from '../bounded-contexts/busca-indexacao/infrastructure/bedrock-embedding.gateway.js';
+import { BedrockInterpretadorConsultaGateway } from '../bounded-contexts/busca-indexacao/infrastructure/bedrock-interpretador-consulta.gateway.js';
 import { EventBridgePublisher } from '../bounded-contexts/busca-indexacao/infrastructure/eventbridge.publisher.js';
 import { OllamaEmbeddingGateway } from '../bounded-contexts/busca-indexacao/infrastructure/ollama-embedding.gateway.js';
+import { OllamaInterpretadorConsultaGateway } from '../bounded-contexts/busca-indexacao/infrastructure/ollama-interpretador-consulta.gateway.js';
 import { OrcamentoValidadoEventACL } from '../bounded-contexts/busca-indexacao/infrastructure/orcamento-validado-event.acl.js';
 import { DrizzlePgvectorIndiceOrcamentoRepository } from '../bounded-contexts/busca-indexacao/infrastructure/persistence/drizzle-pgvector-indice-orcamento.repository.js';
 import { criarTenantContext } from '../shared-kernel/tenant/tenant-context.js';
@@ -64,6 +67,42 @@ export function selecionarAgenteEmbedding(
   }
   throw new Error(
     `selecionarAgenteEmbedding: NEXO_AGENTE_IA deve ser "local" ou "bedrock" — recebido "${agenteIa ?? '(ausente)'}".`,
+  );
+}
+
+/** Config de cada implementação de `AgenteInterpretadorConsultaGateway` — só a lida é obrigatória. */
+export interface SelecaoAgenteInterpretadorConfig {
+  readonly bedrock?: { readonly client: BedrockRuntimeClient; readonly modelId: string };
+  readonly ollama?: { readonly baseUrl: string; readonly modelo: string };
+}
+
+/**
+ * Lê `NEXO_AGENTE_IA` (ADR-009, issue #746) e constrói o
+ * `AgenteInterpretadorConsultaGateway` correspondente — `local` →
+ * `OllamaInterpretadorConsultaGateway`, `bedrock` →
+ * `BedrockInterpretadorConsultaGateway`. Mesmo contrato de
+ * `selecionarAgenteEmbedding`/`selecionarAgenteExtrator`: única leitura de env
+ * desta seleção, falha rápida no boot se a variável estiver ausente/inválida
+ * ou se a config exigida pelo valor escolhido não tiver sido fornecida.
+ */
+export function selecionarAgenteInterpretador(
+  config: SelecaoAgenteInterpretadorConfig,
+  agenteIa = process.env.NEXO_AGENTE_IA,
+): AgenteInterpretadorConsultaGateway {
+  if (agenteIa === 'bedrock') {
+    if (!config.bedrock) {
+      throw new Error('selecionarAgenteInterpretador: NEXO_AGENTE_IA=bedrock exige config.bedrock');
+    }
+    return new BedrockInterpretadorConsultaGateway(config.bedrock.client, config.bedrock.modelId);
+  }
+  if (agenteIa === 'local') {
+    if (!config.ollama) {
+      throw new Error('selecionarAgenteInterpretador: NEXO_AGENTE_IA=local exige config.ollama');
+    }
+    return new OllamaInterpretadorConsultaGateway(config.ollama.baseUrl, config.ollama.modelo);
+  }
+  throw new Error(
+    `selecionarAgenteInterpretador: NEXO_AGENTE_IA deve ser "local" ou "bedrock" — recebido "${agenteIa ?? '(ausente)'}".`,
   );
 }
 

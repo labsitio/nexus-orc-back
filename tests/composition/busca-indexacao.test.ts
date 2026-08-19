@@ -4,10 +4,13 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { describe, expect, it } from 'vitest';
 import type { AgenteEmbeddingGateway } from '../../src/bounded-contexts/busca-indexacao/domain/gateways/agente-embedding.gateway.js';
 import { BedrockEmbeddingGateway } from '../../src/bounded-contexts/busca-indexacao/infrastructure/bedrock-embedding.gateway.js';
+import { BedrockInterpretadorConsultaGateway } from '../../src/bounded-contexts/busca-indexacao/infrastructure/bedrock-interpretador-consulta.gateway.js';
 import { OllamaEmbeddingGateway } from '../../src/bounded-contexts/busca-indexacao/infrastructure/ollama-embedding.gateway.js';
+import { OllamaInterpretadorConsultaGateway } from '../../src/bounded-contexts/busca-indexacao/infrastructure/ollama-interpretador-consulta.gateway.js';
 import {
   criarBuscaIndexacao,
   selecionarAgenteEmbedding,
+  selecionarAgenteInterpretador,
 } from '../../src/composition/busca-indexacao.js';
 import { TenantId } from '../../src/shared-kernel/tenant/tenant-id.vo.js';
 
@@ -94,5 +97,40 @@ describe('selecionarAgenteEmbedding', () => {
   it('falha rápido se NEXO_AGENTE_IA estiver ausente ou com valor inválido', () => {
     expect(() => selecionarAgenteEmbedding({}, undefined)).toThrow(/local.*bedrock/);
     expect(() => selecionarAgenteEmbedding({}, 'outro')).toThrow(/local.*bedrock/);
+  });
+});
+
+/**
+ * `selecionarAgenteInterpretador` (issue #746, ADR-009) — mesmo contrato de
+ * `selecionarAgenteEmbedding`/`selecionarAgenteExtrator`.
+ */
+describe('selecionarAgenteInterpretador', () => {
+  it('NEXO_AGENTE_IA=bedrock constrói BedrockInterpretadorConsultaGateway', () => {
+    const gateway = selecionarAgenteInterpretador(
+      { bedrock: { client: stub<BedrockRuntimeClient>(), modelId: 'anthropic.claude-3-haiku' } },
+      'bedrock',
+    );
+    expect(gateway).toBeInstanceOf(BedrockInterpretadorConsultaGateway);
+  });
+
+  it('NEXO_AGENTE_IA=local constrói OllamaInterpretadorConsultaGateway', () => {
+    const gateway = selecionarAgenteInterpretador(
+      { ollama: { baseUrl: 'http://localhost:11434', modelo: 'llama3.1' } },
+      'local',
+    );
+    expect(gateway).toBeInstanceOf(OllamaInterpretadorConsultaGateway);
+  });
+
+  it('lança erro se NEXO_AGENTE_IA=bedrock sem config.bedrock', () => {
+    expect(() => selecionarAgenteInterpretador({}, 'bedrock')).toThrow(/config.bedrock/);
+  });
+
+  it('lança erro se NEXO_AGENTE_IA=local sem config.ollama', () => {
+    expect(() => selecionarAgenteInterpretador({}, 'local')).toThrow(/config.ollama/);
+  });
+
+  it('falha rápido se NEXO_AGENTE_IA estiver ausente ou com valor inválido', () => {
+    expect(() => selecionarAgenteInterpretador({}, undefined)).toThrow(/local.*bedrock/);
+    expect(() => selecionarAgenteInterpretador({}, 'outro')).toThrow(/local.*bedrock/);
   });
 });

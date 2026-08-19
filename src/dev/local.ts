@@ -47,7 +47,11 @@ import {
   registrarRotasIngestaoIdentificacao,
 } from '../composition/ingestao-identificacao.js';
 import { criarExtracao, selecionarAgenteExtrator } from '../composition/extracao.js';
-import { criarBuscaIndexacao, selecionarAgenteEmbedding } from '../composition/busca-indexacao.js';
+import {
+  criarBuscaIndexacao,
+  selecionarAgenteEmbedding,
+  selecionarAgenteInterpretador,
+} from '../composition/busca-indexacao.js';
 import {
   criarRegistrarContextoClassificacao,
   criarRegistrarContextoExtracao,
@@ -72,8 +76,6 @@ import { criarValidadorQueueHandler } from '../bounded-contexts/validacao/interf
 import { criarIndexadorQueueHandler } from '../bounded-contexts/busca-indexacao/interface/events/indexador-queue.handler.js';
 import { registrarRotaStatusIndexacao } from '../bounded-contexts/busca-indexacao/interface/http/indexacao-status.controller.js';
 import { registrarRotaBuscaOrcamentos } from '../bounded-contexts/busca-indexacao/interface/http/busca-orcamentos.controller.js';
-import type { AgenteInterpretadorConsultaGateway } from '../bounded-contexts/busca-indexacao/domain/gateways/agente-interpretador-consulta.gateway.js';
-import { CriterioBusca } from '../bounded-contexts/busca-indexacao/domain/value-objects/criterio-busca.vo.js';
 import { DrizzlePgvectorIndiceOrcamentoRepository } from '../bounded-contexts/busca-indexacao/infrastructure/persistence/drizzle-pgvector-indice-orcamento.repository.js';
 import { criarContextoClassificacaoQueueHandler } from '../bounded-contexts/orquestracao/interface/events/contexto-classificacao-queue.handler.js';
 import { criarContextoExtracaoQueueHandler } from '../bounded-contexts/orquestracao/interface/events/contexto-extracao-queue.handler.js';
@@ -121,26 +123,6 @@ const ERRO_SEM_MARKITDOWN =
   'Conversão de documento binário exige o Lambda MarkItDown, que ainda não existe (issues #588/#590). ' +
   `Localmente só ${EXTENSOES_SUPORTADAS_SEM_MARKITDOWN.join(', ')} atravessam o fluxo.`;
 
-/**
- * `AgenteInterpretadorConsultaGateway` tem uma única implementação
- * (`BedrockInterpretadorConsultaGateway`, T037) — não existe contraparte Ollama,
- * e Bedrock não existe no LocalStack. Sem este stub a rota
- * `POST /v1/orcamentos/busca` não pode ser registrada localmente.
- *
- * O stub NÃO interpreta linguagem natural: devolve a consulta inteira como
- * `textoLivreResidual` e nenhum filtro estruturado. Consequência honesta — a
- * busca vetorial roda de verdade (embedding real via `mxbai-embed-large` +
- * pgvector), mas categoria, faixa de preço e período só entram na busca se
- * vierem explícitos no body, nunca inferidos do texto. Filtro implícito de
- * consulta em linguagem natural é o único pedaço de 004 que este ambiente não
- * exercita.
- */
-const interpretadorConsultaLocal: AgenteInterpretadorConsultaGateway = {
-  async interpretar({ consultaLinguagemNatural }) {
-    return CriterioBusca.de({ textoLivreResidual: consultaLinguagemNatural });
-  },
-};
-
 const conversorLocal: MarkItDownConversaoACL = {
   async converterParaTexto(conteudoBruto: Uint8Array, nomeArquivo: string): Promise<string> {
     const nome = nomeArquivo.toLowerCase();
@@ -178,6 +160,10 @@ const agenteEmbedding = selecionarAgenteEmbedding(
 );
 const agenteOrquestrador = selecionarAgenteOrquestrador(
   { ollama: { baseUrl: cfg.ollamaBaseUrl, modelo: cfg.ollamaModeloOrquestrador } },
+  cfg.agenteIa,
+);
+const agenteInterpretador = selecionarAgenteInterpretador(
+  { ollama: { baseUrl: cfg.ollamaBaseUrl, modelo: cfg.ollamaModeloInterpretador } },
   cfg.agenteIa,
 );
 
@@ -253,6 +239,16 @@ const registrarDecisaoHumanaWorkflow = new RegistrarDecisaoHumanaWorkflow(
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' } });
 const opts = { preHandler: tenantContextLocal };
 
+// `catalogoCategorias` restringe o `enum` de `categoria` na saída do LLM
+// (`AgenteInterpretadorConsultaGateway`) — lido uma vez no boot direto de
+// `faixas_preco_categoria` (mesma tabela de configuração operacional que
+// `registrarRotaFaixaPrecoCategoria` expõe). Categoria cadastrada depois do
+// boot só entra no catálogo após reiniciar o runner local; sem efeito em
+// produção, onde cada composition root resolve o catálogo por chamada.
+const catalogoCategorias = (await validacao.gatewayFaixaPreco.listarTodas()).map(
+  (faixa) => faixa.categoria.valor,
+);
+
 registrarRotasIngestaoIdentificacao(app, ingestao, opts);
 registrarRotaStatusExtracao(app, consultarStatusExtracao, opts);
 registrarRotaRevisaoHumanaExtracao(app, confirmarRevisaoHumanaExtracao, opts);
@@ -268,14 +264,10 @@ registrarRotaStatusIndexacao(app, criarRepositorioIndiceOrcamentoHttp, opts);
 registrarRotaBuscaOrcamentos(
   app,
   {
-    interpretador: interpretadorConsultaLocal,
+    interpretador: agenteInterpretador,
     embeddingGateway: agenteEmbedding,
     criarRepositorio: criarRepositorioIndiceOrcamentoHttp,
-    // `catalogoCategorias` só é repassado ao interpretador (`buscar-orcamentos.ts:78`),
-    // e o stub local ignora — em produção ele restringe o `enum` de `categoria`
-    // na saída do LLM. Vazio aqui em vez de consultar `faixas_preco_categoria`:
-    // seria consulta sem efeito nenhum neste ambiente.
-    catalogoCategorias: [],
+    catalogoCategorias,
   },
   opts,
 );
