@@ -1,3 +1,4 @@
+import type { Logger } from 'pino';
 import type { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 import type { AgenteExtratorGateway } from '../../domain/gateways/agente-extrator.gateway.js';
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
@@ -7,6 +8,8 @@ import { ExtracaoEscalonadaParaRevisaoHumana } from '../../domain/events/extraca
 import { OrcamentoExtraido } from '../../domain/events/orcamento-extraido.event.js';
 import { ErroDominio } from '../../domain/errors/erro-dominio.js';
 import { ExtracaoOrcamento } from '../../domain/extracao-orcamento.aggregate.js';
+import type { CondicoesComerciais } from '../../domain/value-objects/condicoes-comerciais.vo.js';
+import type { ItemOrcamento } from '../../domain/value-objects/item-orcamento.vo.js';
 import type { CriarExtracaoOrcamentoRepositorio } from '../../domain/repositories/extracao-orcamento.repository.js';
 import { OrcamentoId } from '../../domain/value-objects/orcamento-id.vo.js';
 import {
@@ -17,6 +20,44 @@ import {
   ReferenciaS3,
   type ReferenciaS3Params,
 } from '../../domain/value-objects/referencia-s3.vo.js';
+import { criarLogger } from '../../infrastructure/observability/logger.js';
+import { emitirMetrica } from '../../infrastructure/observability/metrica.js';
+
+/** Nomes dos campos de `ItemOrcamento`, na ordem em que `CampoExtraido.extraido` é checado (T045/#110). */
+const CAMPOS_ITEM = ['descricao', 'quantidade', 'precoUnitario'] as const;
+
+/** Nomes dos campos de `CondicoesComerciais`, mesma finalidade (T045/#110). */
+const CAMPOS_CONDICOES_COMERCIAIS = [
+  'condicoesPagamento',
+  'prazoValidade',
+  'condicoesEntrega',
+] as const;
+
+/**
+ * Emite `CampoMarcadoNaoExtraido` (ADR-016) uma vez por campo obrigatório com
+ * `extraido === false` na tentativa — dimensão `campo` de baixíssima
+ * cardinalidade (6 valores fixos). É contador de ocorrência, não taxa/percentual
+ * calculada: taxa exigiria job periódico agregando o histórico, mecanismo que
+ * não existe em nenhum artefato aprovado (mesmo escopo do T049/#54).
+ */
+function emitirMetricaCamposNaoExtraidos(
+  logger: Logger,
+  itens: readonly ItemOrcamento[],
+  condicoesComerciais: CondicoesComerciais,
+): void {
+  for (const item of itens) {
+    for (const campo of CAMPOS_ITEM) {
+      if (!item[campo].extraido) {
+        emitirMetrica(logger, 'CampoMarcadoNaoExtraido', 1, { dimensoes: { campo } });
+      }
+    }
+  }
+  for (const campo of CAMPOS_CONDICOES_COMERCIAIS) {
+    if (!condicoesComerciais[campo].extraido) {
+      emitirMetrica(logger, 'CampoMarcadoNaoExtraido', 1, { dimensoes: { campo } });
+    }
+  }
+}
 
 export interface ExtrairDadosOrcamentoParams {
   readonly orcamentoId: string;
@@ -60,6 +101,7 @@ export class ExtrairDadosOrcamento {
     private readonly conversor: MarkItDownConversaoExtracaoACL,
     private readonly agenteExtrator: AgenteExtratorGateway,
     private readonly eventPublisher: EventPublisher,
+    private readonly logger: Logger = criarLogger({ useCase: 'extrair-dados-orcamento' }),
   ) {}
 
   async executar(params: ExtrairDadosOrcamentoParams): Promise<void> {
@@ -93,13 +135,26 @@ export class ExtrairDadosOrcamento {
     const bruto = await this.leituraBruta.ler(extracao.referenciaBrutaS3);
     const nomeArquivo =
       extracao.referenciaBrutaS3.key.split('/').at(-1) ?? extracao.referenciaBrutaS3.key;
-    const textoConvertido = await this.conversor.converter(bruto, nomeArquivo);
+    let textoConvertido: string;
+    try {
+      textoConvertido = await this.conversor.converter(bruto, nomeArquivo);
+    } catch (erro) {
+      // (T045/#110, constituição — "Extração de documento prefere biblioteca
+      // open-source a serviço pago") Gatilho da exceção documentada por escrito
+      // que autorizaria serviço pago equivalente (ex.: Amazon Textract) — hoje
+      // nenhum gateway de serviço pago existe neste BC (só MarkItDown, ADR-002),
+      // então o proxy observável é esta falha de conversão, não o "uso" em si.
+      emitirMetrica(this.logger, 'ConversaoMarkItDownFalhou', 1);
+      this.logger.error({ erro }, 'Falha na conversão MarkItDown');
+      throw erro;
+    }
     const resultado = await this.agenteExtrator.extrair({
       textoConvertido,
       referenciaClassificacao: extracao.referenciaClassificacao,
     });
 
     extracao.registrarTentativaExtrator(resultado.itens, resultado.condicoesComerciais);
+    emitirMetricaCamposNaoExtraidos(this.logger, resultado.itens, resultado.condicoesComerciais);
     await repositorio.salvar(extracao);
 
     // (issue #656 — aperto de tipo) O evento carrega o `tenantId` já
