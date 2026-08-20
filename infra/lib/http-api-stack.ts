@@ -5,7 +5,7 @@ import type * as lambda from 'aws-cdk-lib/aws-lambda';
 import type { Construct } from 'constructs';
 
 export interface RotaHttpProps {
-  /** Nome estável do construct da rota — vira parte do id do recurso CDK (ex.: `ReceberOrcamentoUploadUrl`). */
+  /** Nome estável da rota — vira parte do id da integração CDK (ex.: `ReceberOrcamentoUploadUrlIntegration`). */
   readonly id: string;
   readonly method: apigatewayv2.HttpMethod;
   readonly path: string;
@@ -33,7 +33,7 @@ export class HttpApiStack extends Stack {
     this.terminationProtection = true;
 
     this.httpApi = new apigatewayv2.HttpApi(this, 'HttpApi', {
-      apiName: 'NexoHttpApi',
+      apiName: 'nexo-http-api',
       createDefaultStage: true,
     });
   }
