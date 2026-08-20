@@ -2,9 +2,11 @@
  * Seed do LocalStack para execução local (spec 001 T067 / issue #589).
  *
  * O LocalStack sobe vazio: nem bucket, nem bus, nem filas, nem regras existem.
- * Este script cria o mínimo para o fluxo de 001 → 002 rodar, com os **mesmos
- * nomes de recurso** das stacks CDK de produção (`infra/lib/*-stack.ts`) — se
- * um nome divergir aqui, o teste local deixa de dizer algo sobre produção.
+ * Este script cria o necessário para o encadeamento 001 → 002 → 003 → 004 →
+ * 005 rodar (7 filas + DLQ + regra, uma por consumidor dos 5 BCs — ver
+ * `src/dev/local.ts`), com os **mesmos nomes de recurso** das stacks CDK de
+ * produção (`infra/lib/*-stack.ts`) — se um nome divergir aqui, o teste local
+ * deixa de dizer algo sobre produção.
  *
  * Não substitui as stacks CDK: é o equivalente mínimo delas para desenvolvimento.
  * Idempotente — rodar duas vezes não quebra.

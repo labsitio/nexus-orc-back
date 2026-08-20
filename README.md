@@ -214,12 +214,13 @@ curl -s -X POST http://localhost:3000/v1/orcamentos/upload-url \
 
 ### O que a execução local realmente cobre
 
-`src/dev/local.ts` sobe as rotas de Ingestão e **dois** pollers (`classificador-queue`, `extrator-queue`), chamando **os mesmos handlers das Lambdas de produção**. Postgres, S3, EventBridge e SQS são reais (LocalStack). Limites declarados no próprio arquivo:
+`src/dev/local.ts` sobe as rotas de todos os BCs em produção e **um poller por fila** (`classificador-queue`, `extrator-queue`, `validador-queue`, `indexador-queue`, `contexto-classificacao-queue`, `contexto-extracao-queue`, `decisao-workflow-queue` — 7 no total), chamando **os mesmos handlers das Lambdas de produção**, com os composition roots de produção (`src/composition/*.ts`) onde já existem. Postgres, S3, EventBridge e SQS são reais (LocalStack). Limites declarados no próprio arquivo:
 
-- **Bedrock** não existe no LocalStack community → classificador/extrator são stubs determinísticos (`NEXO_LOCAL_CONFIANCA` controla o ramo `CLASSIFICADO` vs. `PENDENTE_REVISAO_HUMANA`; `NEXO_LOCAL_EXTRACAO_CAMPO_FALTANDO=true` força o escalonamento de 002). Para IA local de verdade, use Ollama (abaixo).
+- **Bedrock** não existe no LocalStack community → com `NEXO_AGENTE_IA=local` (default), classificador/extrator/embedding/orquestrador/interpretador falam com o Ollama real do `docker-compose.yml` (ADR-009). Sem `ollama pull` do modelo, a chamada falha explícito — nunca mascarado.
 - **MarkItDown** ainda não existe → só `.txt`, `.md` e `.csv` atravessam o fluxo local. PDF/XLSX falham **de propósito**: decodificar binário como UTF-8 produziria lixo que o classificador aceitaria em silêncio.
 - **LocalStack não aplica IAM** — nada aqui prova que as roles de produção têm `events:PutEvents`.
-- **003, 004 e 005 não têm wiring local** — o encadeamento local para em 002.
+- **`src/composition/validacao.ts` de produção não existe** — o wiring do BC Validação usado aqui (`criarValidacaoDev`, `src/dev/validacao.ts`) é dev-only, com stubs determinísticos para o cadastro de fornecedor e a categorização de item (sem Ollama para este último agente).
+- **Contrato de evento incompleto entre 002 e 003**: `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada` (BC Extração) nunca publicam `cnpjFornecedor` nem `dataEmissaoProposta`, campos que `OrcamentoExtraidoEventACLImpl` (BC Validação) exige incondicionalmente — o `validador-queue` falha para **qualquer** payload real hoje. Bloqueio de contrato entre bounded contexts, já documentado no próprio ACL; requer decisão do arquiteto-back antes de o encadeamento completo (001→005) fechar automaticamente.
 
 Sem docker: `pnpm docker:down` derruba tudo; `pnpm docker:logs` acompanha.
 
