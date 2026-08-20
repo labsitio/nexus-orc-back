@@ -123,8 +123,9 @@ const validadorQueueStack = new ValidadorQueueStack(app, 'ValidadorQueueStack', 
 
 new ValidarOrcamentoLambdaRoleStack(app, 'ValidarOrcamentoLambdaRoleStack', {
   description:
-    'Role IAM least-privilege da Lambda ValidarOrcamento (sem S3 raw; bedrock:InvokeModel restrito ao ARN do modelo de categorização aprovado) — spec 003, T028/T045.',
+    'Role IAM least-privilege da Lambda ValidarOrcamento (sem S3 raw; bedrock:InvokeModel restrito ao ARN do modelo de categorização aprovado; events:PutEvents restrito ao bus + source nexo.validacao) — spec 003, T028/T045/#616.',
   validadorQueue: validadorQueueStack.validadorQueue,
+  dominioBus: dominioEventBusStack.dominioBus,
 });
 
 new RegistrarDecisaoHumanaValidacaoLambdaRoleStack(

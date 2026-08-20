@@ -1,5 +1,6 @@
 import { App, Stack } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
+import * as events from 'aws-cdk-lib/aws-events';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { ValidarOrcamentoLambdaRoleStack } from './validar-orcamento-lambda-role-stack.ts';
@@ -22,9 +23,11 @@ describe('ValidarOrcamentoLambdaRoleStack — síntese CDK', () => {
     const app = new App();
     const filaStack = new Stack(app, 'FilaFakeStack');
     const validadorQueue = new sqs.Queue(filaStack, 'ValidadorQueueFake');
+    const dominioBus = new events.EventBus(filaStack, 'DominioBusFake');
 
     const stack = new ValidarOrcamentoLambdaRoleStack(app, 'ValidarOrcamentoLambdaRoleStack', {
       validadorQueue,
+      dominioBus,
     });
 
     template = Template.fromStack(stack);
@@ -45,6 +48,23 @@ describe('ValidarOrcamentoLambdaRoleStack — síntese CDK', () => {
             Effect: 'Allow',
             Action: 'bedrock:InvokeModel',
             Resource: { Ref: 'ModeloCategorizacaoAprovadoArn' },
+          }),
+        ]),
+      }),
+    });
+  });
+
+  it('restringe events:PutEvents ao ARN do bus + Condition events:source', () => {
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Sid: 'PublicarEventosDeValidacaoNoBusDeDominio',
+            Effect: 'Allow',
+            Action: 'events:PutEvents',
+            Condition: {
+              StringEquals: { 'events:source': 'nexo.validacao' },
+            },
           }),
         ]),
       }),

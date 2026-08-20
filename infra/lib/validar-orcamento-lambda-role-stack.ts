@@ -1,4 +1,5 @@
 import { CfnParameter, Stack, type StackProps } from 'aws-cdk-lib';
+import type * as events from 'aws-cdk-lib/aws-events';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import type * as sqs from 'aws-cdk-lib/aws-sqs';
 import type { Construct } from 'constructs';
@@ -6,6 +7,8 @@ import type { Construct } from 'constructs';
 export interface ValidarOrcamentoLambdaRoleStackProps extends StackProps {
   /** Fila consumida pelo handler (`validador-queue`, T003/T004). */
   readonly validadorQueue: sqs.IQueue;
+  /** Bus de domínio único — `ValidarOrcamento` publica `OrcamentoValidado`/`OrcamentoInconsistenciaDetectada`. */
+  readonly dominioBus: events.IEventBus;
 }
 
 /**
@@ -25,6 +28,13 @@ export interface ValidarOrcamentoLambdaRoleStackProps extends StackProps {
  *   `BedrockCategorizadorItemGateway` (T041, US3) é o único consumidor de
  *   Bedrock deste contexto (T045/#155, mesmo padrão de
  *   `IndexadorLambdaRoleStack`).
+ * - `events:PutEvents` (#616, ADR-004) restrito ao ARN do bus + `Condition`
+ *   `events:source` — `ValidarOrcamento.executar` publica
+ *   `OrcamentoValidado`/`OrcamentoInconsistenciaDetectada`
+ *   (`EventBridgePublisher`, `source: nexo.validacao`) a cada execução. Sem
+ *   essa permissão, o Lambda valida mas nunca propaga o resultado —
+ *   `AccessDeniedException` silencioso em runtime, mesmo gap já corrigido
+ *   para 001/002 (#576-#580).
  * - Permissões mínimas de execução Lambda (logs) e de consumo da própria
  *   fila (`validador-queue`).
  */
@@ -58,6 +68,17 @@ export class ValidarOrcamentoLambdaRoleStack extends Stack {
         sid: 'InvocarModeloCategorizacaoAprovado',
         actions: ['bedrock:InvokeModel'],
         resources: [modeloCategorizacaoAprovadoArn.valueAsString],
+      }),
+    );
+
+    this.validarOrcamentoLambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'PublicarEventosDeValidacaoNoBusDeDominio',
+        actions: ['events:PutEvents'],
+        resources: [props.dominioBus.eventBusArn],
+        conditions: {
+          StringEquals: { 'events:source': 'nexo.validacao' },
+        },
       }),
     );
 
