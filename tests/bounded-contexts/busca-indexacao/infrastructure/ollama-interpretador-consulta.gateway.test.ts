@@ -106,6 +106,18 @@ describe('OllamaInterpretadorConsultaGateway', () => {
     await expect(gateway.interpretar(inputDeTeste())).rejects.toThrow(/status 500/);
   });
 
+  it('lança erro se a resposta não tiver message.content', async () => {
+    const fetchImpl = fetchFake(200, { message: {} });
+    const gateway = new OllamaInterpretadorConsultaGateway(
+      'http://localhost:11434',
+      'modelo-x',
+      undefined,
+      fetchImpl,
+    );
+
+    await expect(gateway.interpretar(inputDeTeste())).rejects.toThrow(/sem message.content/);
+  });
+
   it('lança erro se message.content não for JSON válido (nunca parsing de texto livre por regex)', async () => {
     const fetchImpl = fetchFake(200, { message: { content: 'não é json' } });
     const gateway = new OllamaInterpretadorConsultaGateway(
