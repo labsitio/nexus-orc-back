@@ -145,6 +145,7 @@ export class ExtrairDadosOrcamento {
       // nenhum gateway de serviço pago existe neste BC (só MarkItDown, ADR-002),
       // então o proxy observável é esta falha de conversão, não o "uso" em si.
       emitirMetrica(this.logger, 'ConversaoMarkItDownFalhou', 1);
+      this.logger.error({ erro }, 'Falha na conversão MarkItDown');
       throw erro;
     }
     const resultado = await this.agenteExtrator.extrair({

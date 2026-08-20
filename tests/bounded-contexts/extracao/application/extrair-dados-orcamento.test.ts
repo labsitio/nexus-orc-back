@@ -95,6 +95,9 @@ class LoggerFake {
   info(objeto: Record<string, unknown>): void {
     this.linhas.push(objeto);
   }
+  error(): void {
+    // Só as métricas (`info`) importam para os testes deste arquivo.
+  }
 }
 
 function comoLogger(fake: LoggerFake): Logger {
