@@ -137,6 +137,10 @@
 - [ ] T056 Coordenar com owners das specs 002/003 a garantia de que o payload de `OrcamentoExtraido`/`OrcamentoValidado` contém dado suficiente para montar `ContextoExtracao`/`ContextoValidacao` sem reabertura de contrato — dependência registrada como risco remanescente no `plan.md` (ADR-001).
 - [ ] T057 Runbook operacional para a DLQ de `decisao-workflow-queue`: mensagem na DLQ dessa fila específica significa "contexto nunca se consolidou" (ver ADR-001) — procedimento de investigação (verificar se `OrcamentoClassificado`/`OrcamentoExtraido` foram de fato publicados para o `orcamentoId`) distinto do runbook genérico de DLQ das specs 001–003.
 
+### Hosting HTTP em produção (gap de Infrastructure — issue #753, ADR-017)
+
+- [ ] T058 Infrastructure: hosting HTTP de produção das 2 rotas deste BC (status de workflow, decisão humana) — ADR-017 (`docs/architecture-diagrams/adr-017-hosting-http-producao.html`). Um `*.production.ts` por rota (Fastify mínimo com só `registrarRotaStatusDecisaoWorkflow`/`registrarRotaDecisaoHumanaWorkflow` já existentes; `opts.preHandler = [criarTenantContextMiddleware(...), criarExigenciaPapel(['comprador-responsavel'])]` na rota de decisão humana — o guard já é concatenado dentro do próprio controller, ver `decisao-humana.controller.ts` — e só `criarTenantContextMiddleware(...)` na de status + `app.inject(...)`, helper transversal, ver Relatório do arquiteto). 1 `NodejsFunction` por rota, ambas exigindo role IAM nova (nenhuma role para HTTP existe hoje para este BC): `status` somente leitura; `decisão humana` escreve o agregado `DecisaoWorkflow`, sem Bedrock/S3/EventBridge (não publica evento neste request síncrono). Ambas mapeadas na stack única de API Gateway HTTP API (transversal, `infra/lib/http-api-stack.ts`). **Faz parte desta task**: apagar `src/bounded-contexts/orquestracao/interface/http/auth-cognito.middleware.ts` e o teste correspondente (não sustenta `request.tenantContext`/`request.papeis`, não é consumido por nenhuma composição real).
+
 ---
 
 ## Dependencies & Execution Order

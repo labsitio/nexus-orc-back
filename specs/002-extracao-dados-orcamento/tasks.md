@@ -130,6 +130,14 @@
 
 ---
 
+### Hosting HTTP em produção (gap de Infrastructure — issue #753, ADR-017)
+
+Achado durante a análise da #753: as 2 rotas HTTP deste BC (`revisão humana`, `consultar-status`) também não têm caminho de produção — mesmo gap da spec 001/T068, resolvido pela mesma decisão. Antecipa o muro que #614/#615 bateriam.
+
+- [ ] T047 Infrastructure: hosting HTTP de produção das 2 rotas deste BC — ADR-017 (`docs/architecture-diagrams/adr-017-hosting-http-producao.html`). Um `*.production.ts` por rota (Fastify mínimo com só `registrarRotaRevisaoHumanaExtracao`/`registrarRotaStatusExtracao` já existentes + `opts.preHandler = criarTenantContextMiddleware(...)` real + `app.inject(...)`, helper transversal — ver Relatório do arquiteto, não recriar). 1 `NodejsFunction` por rota: `revisão humana` liga à role já existente (`ConfirmarRevisaoHumanaExtracaoLambdaRoleStack`); `consultar-status` exige role nova, somente leitura (mesmo padrão de `ConsultaStatusLambdaRoleStack` da spec 001 — sem `events:PutEvents`/S3/Bedrock). Ambas mapeadas na stack única de API Gateway HTTP API (transversal, `infra/lib/http-api-stack.ts`). **Faz parte desta task**: apagar `src/bounded-contexts/extracao/interface/http/auth-cognito.middleware.ts` e o teste correspondente (não sustenta `request.tenantContext`/`request.papeis`, não é consumido por nenhuma composição real).
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

@@ -177,6 +177,14 @@ T023/T034 entregaram só a fábrica de handler (`criarHandlerSftpUpload`/`criarC
 
 ---
 
+### Hosting HTTP em produção (gap de Infrastructure — issue #753, ADR-017)
+
+T068 excluiu explicitamente os 3 casos de uso HTTP deste BC por falta de decisão de arquitetura. ADR-017 (`docs/architecture-diagrams/adr-017-hosting-http-producao.html`) resolve essa lacuna para todos os BCs; esta task cobre a parte deste BC.
+
+- [ ] T069 Infrastructure: hosting HTTP de produção das 3 rotas deste BC (`upload-url`/`confirmar-upload`, `revisão humana`, `consultar-status`) — ADR-017. Um `*.production.ts` por rota em `interface/http/`, cada um montando um Fastify mínimo com só a própria rota (via `registrarRotaUploadUrl`/`registrarRotaConfirmarUpload`/`registrarRotaRevisaoHumana`/`registrarRotaStatusOrcamento` já existentes, `opts.preHandler = criarTenantContextMiddleware(...)` real — nunca o `auth-cognito.middleware.ts` local, ver nota abaixo) e invocando `app.inject(...)` para traduzir de/para `APIGatewayProxyEventV2`/`APIGatewayProxyResultV2` (helper transversal, ver Relatório do arquiteto — não recriar por BC). 1 `NodejsFunction` por rota (mesmo formato de `DecisaoWorkflowFunctionStack`), ligada às roles já existentes (`ReceberOrcamentoLambdaRoleStack`/T026, `ConfirmarRevisaoHumanaLambdaRoleStack`/T054, `ConsultaStatusLambdaRoleStack`/T048), mapeadas na stack única de API Gateway HTTP API (transversal, `infra/lib/http-api-stack.ts`, não recriar aqui). **Faz parte desta task**: apagar `src/bounded-contexts/ingestao-identificacao/interface/http/auth-cognito.middleware.ts` e o teste correspondente — ADR-017 confirma que não é consumido por nenhuma composição real hoje (não popula `request.tenantContext`/`request.papeis`, logo não sustenta `criarExigenciaPapel`).
+
+---
+
 ## Dependencies & Execution Order
 
 - Setup (Phase 1) → Foundational (Phase 2) → US1 (Phase 3) → US2 (Phase 4) → US4 (Phase 6) → US5 (Phase 7) → Polish (Phase 8). (A antiga Phase 5/US3 — Agente Revisor — foi removida na versão 5.)
