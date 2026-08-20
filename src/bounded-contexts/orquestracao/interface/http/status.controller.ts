@@ -70,7 +70,7 @@ export function paraResposta(decisaoWorkflow: DecisaoWorkflow): StatusDecisaoWor
  * repositório concreto (`DrizzleDecisaoWorkflowRepository`, T016) é a
  * composição raiz do handler Lambda, fora deste arquivo (mesmo padrão de
  * `validacao/interface/http/status.controller.ts`). Autenticação Cognito
- * (T031, `criarAutenticacaoCognito`) é injetada via `opts.preHandler`.
+ * (ADR-017, `criarTenantContextMiddleware`) é injetada via `opts.preHandler`.
  */
 export function registrarRotaStatusDecisaoWorkflow(
   app: FastifyInstance,
