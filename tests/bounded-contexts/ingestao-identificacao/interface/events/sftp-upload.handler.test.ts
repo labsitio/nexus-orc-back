@@ -1,4 +1,5 @@
 import type { S3Event } from 'aws-lambda';
+import { pino } from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { ReceberOrcamento } from '../../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/receber-orcamento.js';
 import type { EventPublisher } from '../../../../../src/bounded-contexts/ingestao-identificacao/domain/gateways/event-publisher.js';
@@ -209,7 +210,7 @@ describe('criarHandlerSftpUpload', () => {
       resolver: vi.fn().mockResolvedValue(undefined),
     };
     const childLogger = { warn: vi.fn(), child: vi.fn() };
-    const logger = { child: vi.fn().mockReturnValue(childLogger) };
+    const logger = { child: vi.fn().mockReturnValue(childLogger), info: vi.fn() };
     const handler = criarHandlerSftpUpload(
       useCase,
       resolverTenant,
@@ -235,6 +236,36 @@ describe('criarHandlerSftpUpload', () => {
       expect.stringContaining('TenantId não resolvido'),
     );
     expect(salvar).not.toHaveBeenCalled();
+  });
+
+  it('emite métrica EMF (ADR-016) TenantIdNaoResolvidoNoSftp quando o mapeamento usuário/servidor está ausente', async () => {
+    const { useCase } = receberOrcamentoFake();
+    const resolverTenant: SftpTenantResolverGateway = {
+      resolver: vi.fn().mockResolvedValue(undefined),
+    };
+    const linhas: Record<string, unknown>[] = [];
+    const logger = pino(
+      { level: 'info' },
+      { write: (linha: string) => linhas.push(JSON.parse(linha) as Record<string, unknown>) },
+    );
+    const handler = criarHandlerSftpUpload(useCase, resolverTenant, logger);
+
+    await handler(
+      eventoS3([
+        { bucket: 'nexo-orcamentos-raw', key: 'sftp-incoming/orcamento.pdf', versionId: 'v-1' },
+      ]),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {} as any,
+      () => undefined,
+    );
+
+    const linhaMetrica = linhas.find((linha) => linha.TenantIdNaoResolvidoNoSftp === 1);
+    expect(linhaMetrica).toBeDefined();
+    const emf = linhaMetrica?._aws as { CloudWatchMetrics: Array<Record<string, unknown>> };
+    expect(emf.CloudWatchMetrics[0]).toMatchObject({
+      Namespace: 'Nexo/IngestaoIdentificacao',
+      Metrics: [{ Name: 'TenantIdNaoResolvidoNoSftp', Unit: 'Count' }],
+    });
   });
 
   it('key com segmento final inválido (issue #730, ADR-013 emendado) gera log.error e pula o registro, sem derrubar o batch', async () => {

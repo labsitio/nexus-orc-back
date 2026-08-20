@@ -3,6 +3,7 @@ import type { ClassificarOrcamento } from '../../application/use-cases/classific
 import { TenantDivergenciaError } from '../../application/use-cases/classificar-orcamento.js';
 import { TransicaoInvalidaError } from '../../domain/orcamento.aggregate.js';
 import { criarLogger } from '../../infrastructure/observability/logger.js';
+import { emitirMetrica } from '../../infrastructure/observability/metrica.js';
 import { TenantId } from '../../../../shared-kernel/tenant/tenant-id.vo.js';
 
 /**
@@ -129,7 +130,6 @@ export function criarClassificadorQueueHandler(
             // Nunca esperado hoje: `tenant_id` é NOT NULL desde a migração
             // 0013 e o repositório reconstitui `tenantId` desde o fix #717 —
             // não há caminho legítimo para um agregado sem `tenantId`.
-            // Métrica/alarme dedicados ficam para #641 (convenção ainda inexistente).
             logDaMensagem.error(
               {
                 orcamentoId,
@@ -138,10 +138,11 @@ export function criarClassificadorQueueHandler(
               },
               'Orçamento sem tenantId no agregado — estado inesperado, nunca deveria ocorrer',
             );
+            // (ADR-016) Métrica/alarme de divergência de tenant — antes só logado.
+            emitirMetrica(logDaMensagem, 'TenantIdAusenteAoClassificar', 1);
           } else {
             // Cross-tenant: tenantId da requisição ausente ou diferente do agregado.
             // Nunca esperado em operação normal — sinal de isolamento (ver #299).
-            // Métrica/alarme dedicados ficam para #641 (convenção ainda inexistente).
             logDaMensagem.error(
               {
                 orcamentoId,
@@ -151,6 +152,8 @@ export function criarClassificadorQueueHandler(
               },
               'Divergência de tenantId ao classificar orçamento — possível acesso cross-tenant',
             );
+            // (ADR-016) Métrica/alarme de divergência de tenant — antes só logado.
+            emitirMetrica(logDaMensagem, 'TenantIdDivergenteAoClassificar', 1);
           }
           continue;
         }
