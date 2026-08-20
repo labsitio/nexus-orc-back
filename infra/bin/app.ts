@@ -105,6 +105,7 @@ const extratorLambdaRoleStack = new ExtratorLambdaRoleStack(app, 'ExtratorLambda
   description: 'Role IAM least-privilege da Lambda Extrator — spec 002, T026.',
   orcamentosRawBucket: storageStack.orcamentosRawBucket,
   extratorQueue: extratorQueueStack.extratorQueue,
+  dominioBus: dominioEventBusStack.dominioBus,
 });
 
 new ExtratorFunctionStack(app, 'ExtratorFunctionStack', {

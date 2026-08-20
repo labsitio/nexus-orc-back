@@ -1,4 +1,5 @@
 import { CfnParameter, Stack, type StackProps } from 'aws-cdk-lib';
+import type * as events from 'aws-cdk-lib/aws-events';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import type * as s3 from 'aws-cdk-lib/aws-s3';
 import type * as sqs from 'aws-cdk-lib/aws-sqs';
@@ -9,6 +10,8 @@ export interface ExtratorLambdaRoleStackProps extends StackProps {
   readonly orcamentosRawBucket: s3.IBucket;
   /** Fila consumida pelo handler (T023). */
   readonly extratorQueue: sqs.IQueue;
+  /** Bus de domínio único — `ExtrairDadosOrcamento` publica `OrcamentoExtraido`/eventos irmãos (T003). */
+  readonly dominioBus: events.IEventBus;
 }
 
 /**
@@ -23,6 +26,14 @@ export interface ExtratorLambdaRoleStackProps extends StackProps {
  * - `lambda:InvokeFunction` restrito ao ARN do Lambda dedicado ao MarkItDown
  *   deste BC (ADR-002, instância própria — `MarkItDownConversaoExtracaoACL`,
  *   T018) — sem essa permissão o ACL falha em runtime com AccessDenied.
+ * - `events:PutEvents` (ADR-004) restrito ao ARN do bus + `Condition`
+ *   `events:source` — `ExtrairDadosOrcamento.executar` publica o resultado
+ *   da extração a cada execução (`EventBridgePublisher`,
+ *   `src/bounded-contexts/extracao/infrastructure/eventbridge.publisher.ts`).
+ *   Sem essa permissão, o primeiro invoke real em produção
+ *   (`ExtratorFunctionStack`, issue #614) extrai mas nunca propaga o
+ *   resultado — `AccessDeniedException` silencioso (mesmo achado BLOCKER já
+ *   corrigido em `ClassificadorLambdaRoleStack`, issue #613).
  * - Permissões mínimas de execução Lambda (logs) e de consumo da própria
  *   fila (`extrator-queue`) — sem elas o Lambda não roda, mas nenhuma delas
  *   concede acesso além do necessário para essa função específica.
@@ -75,6 +86,17 @@ export class ExtratorLambdaRoleStack extends Stack {
         sid: 'InvocarMarkItDownExtracaoLambda',
         actions: ['lambda:InvokeFunction'],
         resources: [markItDownExtracaoLambdaArn.valueAsString],
+      }),
+    );
+
+    this.extratorLambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'PublicarEventosDeExtracaoNoBusDeDominio',
+        actions: ['events:PutEvents'],
+        resources: [props.dominioBus.eventBusArn],
+        conditions: {
+          StringEquals: { 'events:source': 'nexo.extracao' },
+        },
       }),
     );
 
