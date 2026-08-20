@@ -3,6 +3,7 @@ import type { Logger } from 'pino';
 import type { ReceberOrcamento } from '../../application/use-cases/receber-orcamento.js';
 import type { SftpTenantResolverGateway } from '../../domain/gateways/sftp-tenant-resolver.gateway.js';
 import { criarLogger } from '../../infrastructure/observability/logger.js';
+import { emitirMetrica } from '../../infrastructure/observability/metrica.js';
 import {
   ReferenciaS3,
   ReferenciaS3KeyInvalidaError,
@@ -75,6 +76,8 @@ export function criarHandlerSftpUpload(
           .warn(
             'TenantId não resolvido — mapeamento usuário/servidor ausente em sftp_tenant_mapping (onboarding pendente?), registro pulado',
           );
+        // (ADR-016) Métrica/alarme de descarte silencioso — antes só logado.
+        emitirMetrica(logger, 'TenantIdNaoResolvidoNoSftp', 1);
         continue;
       }
 

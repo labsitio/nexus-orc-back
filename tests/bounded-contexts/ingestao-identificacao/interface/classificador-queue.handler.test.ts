@@ -192,4 +192,58 @@ describe('criarClassificadorQueueHandler', () => {
     expect(linhaDivergencia?.tenantIdSolicitante).toBe(tenantIdSolicitante);
     expect(linhaDivergencia?.level).not.toBe(30); // nunca info
   });
+
+  it('emite métrica EMF (ADR-016) TenantIdAusenteAoClassificar quando TenantDivergenciaError(AUSENTE)', async () => {
+    const tenantIdSolicitante = '018f0c1a-1111-7000-8000-000000000001';
+    const executar = vi
+      .fn()
+      .mockRejectedValue(
+        new TenantDivergenciaError('id-legado', 'AUSENTE', undefined, tenantIdSolicitante),
+      );
+    const { logger, linhas } = loggerDeTeste();
+    const handler = criarClassificadorQueueHandler(useCaseFake(executar), logger);
+
+    await handler({
+      Records: [{ messageId: 'm1', body: envelopeEventBridge('id-legado', tenantIdSolicitante) }],
+    });
+
+    const linhaMetrica = linhas.find((linha) => linha.TenantIdAusenteAoClassificar === 1);
+    expect(linhaMetrica).toBeDefined();
+    const emf = linhaMetrica?._aws as { CloudWatchMetrics: Array<Record<string, unknown>> };
+    expect(emf.CloudWatchMetrics[0]).toMatchObject({
+      Namespace: 'Nexo/IngestaoIdentificacao',
+      Metrics: [{ Name: 'TenantIdAusenteAoClassificar', Unit: 'Count' }],
+    });
+  });
+
+  it('emite métrica EMF (ADR-016) TenantIdDivergenteAoClassificar quando TenantDivergenciaError(DIVERGENTE, cross-tenant)', async () => {
+    const tenantIdAgregado = '018f0c1a-1111-7000-8000-000000000001';
+    const tenantIdSolicitante = '018f0c1a-2222-7000-8000-000000000002';
+    const executar = vi
+      .fn()
+      .mockRejectedValue(
+        new TenantDivergenciaError(
+          'id-cross-tenant',
+          'DIVERGENTE',
+          tenantIdAgregado,
+          tenantIdSolicitante,
+        ),
+      );
+    const { logger, linhas } = loggerDeTeste();
+    const handler = criarClassificadorQueueHandler(useCaseFake(executar), logger);
+
+    await handler({
+      Records: [
+        { messageId: 'm1', body: envelopeEventBridge('id-cross-tenant', tenantIdSolicitante) },
+      ],
+    });
+
+    const linhaMetrica = linhas.find((linha) => linha.TenantIdDivergenteAoClassificar === 1);
+    expect(linhaMetrica).toBeDefined();
+    const emf = linhaMetrica?._aws as { CloudWatchMetrics: Array<Record<string, unknown>> };
+    expect(emf.CloudWatchMetrics[0]).toMatchObject({
+      Namespace: 'Nexo/IngestaoIdentificacao',
+      Metrics: [{ Name: 'TenantIdDivergenteAoClassificar', Unit: 'Count' }],
+    });
+  });
 });
