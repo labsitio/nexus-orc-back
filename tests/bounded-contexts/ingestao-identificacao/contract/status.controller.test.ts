@@ -290,4 +290,40 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
     });
     await appComOrcamentoOrfao.close();
   });
+
+  it('NAO emite metrica OrcamentoSemStatusConsultavel quando o motivo e DIVERGENTE (cross-tenant, acesso corretamente negado)', async () => {
+    const outroTenant = TenantId.novo();
+    const orcamentoDeOutroTenant = Orcamento.receber({
+      id: OrcamentoId.novo(),
+      canal: Canal.de('PORTAL_WEB'),
+      referenciaBruta: criarReferenciaBruta(),
+      tenantId: outroTenant,
+    });
+    const repositorioComOrcamentoDeOutroTenant: OrcamentoRepository = {
+      salvar: async () => {},
+      buscarPorId: async () => orcamentoDeOutroTenant,
+    };
+    const linhas: Record<string, unknown>[] = [];
+    const logger = pino(
+      { level: 'info' },
+      { write: (linha: string) => linhas.push(JSON.parse(linha)) },
+    );
+    const appComCrossTenant = Fastify();
+    registrarRotaStatusOrcamento(
+      appComCrossTenant,
+      new ConsultarStatusOrcamento(() => repositorioComOrcamentoDeOutroTenant),
+      { preHandler: criarPreHandlerFakeTenant(tenantIdTeste) },
+      logger,
+    );
+
+    const resposta = await appComCrossTenant.inject({
+      method: 'GET',
+      url: `/v1/orcamentos/${orcamentoDeOutroTenant.id.toString()}/status`,
+    });
+
+    expect(resposta.statusCode).toBe(404);
+    const linhaMetrica = linhas.find((linha) => linha.OrcamentoSemStatusConsultavel === 1);
+    expect(linhaMetrica).toBeUndefined();
+    await appComCrossTenant.close();
+  });
 });

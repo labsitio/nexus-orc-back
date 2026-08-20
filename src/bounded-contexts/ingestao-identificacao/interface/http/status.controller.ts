@@ -39,7 +39,7 @@ export function registrarRotaStatusOrcamento(
   app: FastifyInstance,
   consultarStatusOrcamento: ConsultarStatusOrcamento,
   opts: RotaOpts = {},
-  logger: Logger = criarLogger(),
+  logger: Logger = criarLogger({ handler: 'status-orcamento' }),
 ): void {
   app.get(
     '/v1/orcamentos/:orcamentoId/status',
