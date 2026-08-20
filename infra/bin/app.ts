@@ -15,6 +15,7 @@ import { DecisaoWorkflowFunctionStack } from '../lib/decisao-workflow-function-s
 import { DecisaoWorkflowLambdaRoleStack } from '../lib/decisao-workflow-lambda-role-stack.ts';
 import { DecisaoWorkflowQueueStack } from '../lib/decisao-workflow-queue-stack.ts';
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
+import { ExtratorFunctionStack } from '../lib/extrator-function-stack.ts';
 import { ExtratorLambdaRoleStack } from '../lib/extrator-lambda-role-stack.ts';
 import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
 import { HttpApiStack } from '../lib/http-api-stack.ts';
@@ -100,10 +101,19 @@ const extratorQueueStack = new ExtratorQueueStack(app, 'ExtratorQueueStack', {
   dominioBus: dominioEventBusStack.dominioBus,
 });
 
-new ExtratorLambdaRoleStack(app, 'ExtratorLambdaRoleStack', {
+const extratorLambdaRoleStack = new ExtratorLambdaRoleStack(app, 'ExtratorLambdaRoleStack', {
   description: 'Role IAM least-privilege da Lambda Extrator — spec 002, T026.',
   orcamentosRawBucket: storageStack.orcamentosRawBucket,
   extratorQueue: extratorQueueStack.extratorQueue,
+  dominioBus: dominioEventBusStack.dominioBus,
+});
+
+new ExtratorFunctionStack(app, 'ExtratorFunctionStack', {
+  description:
+    'NodejsFunction de produção do handler consumidor de extrator-queue — spec 002, issue #614.',
+  extratorLambdaRole: extratorLambdaRoleStack.extratorLambdaRole,
+  extratorQueue: extratorQueueStack.extratorQueue,
+  dominioBus: dominioEventBusStack.dominioBus,
 });
 
 new ConfirmarRevisaoHumanaExtracaoLambdaRoleStack(
