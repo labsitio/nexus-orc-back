@@ -1,4 +1,5 @@
 import { CfnParameter, Stack, type StackProps } from 'aws-cdk-lib';
+import type * as events from 'aws-cdk-lib/aws-events';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import type * as s3 from 'aws-cdk-lib/aws-s3';
 import type * as sqs from 'aws-cdk-lib/aws-sqs';
@@ -9,6 +10,8 @@ export interface ClassificadorLambdaRoleStackProps extends StackProps {
   readonly orcamentosRawBucket: s3.IBucket;
   /** Fila consumida pelo handler (T033/T034). */
   readonly classificadorQueue: sqs.IQueue;
+  /** Bus de domínio único — `ClassificarOrcamento` publica `OrcamentoClassificado`/`OrcamentoEscalonadoParaRevisaoHumana` (T032). */
+  readonly dominioBus: events.IEventBus;
 }
 
 /**
@@ -23,6 +26,13 @@ export interface ClassificadorLambdaRoleStackProps extends StackProps {
  *   com AccessDenied (backend-reviewer, achado MAJOR). Parâmetro de deploy
  *   igual ao do modelo Bedrock: a stack que provisiona esse Lambda ainda não
  *   existe nesta spec, então o ARN é passado externamente.
+ * - `events:PutEvents` (T062, ADR-004) restrito ao ARN do bus + `Condition`
+ *   `events:source` — `ClassificarOrcamento.executar` publica
+ *   `OrcamentoClassificado`/`OrcamentoEscalonadoParaRevisaoHumana` a cada
+ *   execução. Sem essa permissão, o primeiro invoke real em produção
+ *   (`ClassificadorFunctionStack`, issue #613) classifica mas nunca
+ *   propaga o resultado — `AccessDeniedException` silencioso (achado
+ *   BLOCKER do `backend-reviewer`).
  * - Permissões mínimas de execução Lambda (logs) e de consumo da própria
  *   fila (`classificador-queue`) — sem elas o Lambda não roda, mas nenhuma
  *   delas concede acesso além do necessário para essa função específica.
@@ -75,6 +85,17 @@ export class ClassificadorLambdaRoleStack extends Stack {
         sid: 'InvocarMarkItDownLambda',
         actions: ['lambda:InvokeFunction'],
         resources: [markItDownLambdaArn.valueAsString],
+      }),
+    );
+
+    this.classificadorLambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'PublicarEventosDeClassificacaoNoBusDeDominio',
+        actions: ['events:PutEvents'],
+        resources: [props.dominioBus.eventBusArn],
+        conditions: {
+          StringEquals: { 'events:source': 'nexo.ingestao-identificacao' },
+        },
       }),
     );
 

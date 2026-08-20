@@ -35,18 +35,19 @@ const storageStack = new IngestaoIdentificacaoStorageStack(
   { description: 'Storage (S3) do BC Ingestão & Identificação — spec 001, T012.' },
 );
 
+const dominioEventBusStack = new DominioEventBusStack(app, 'DominioEventBusStack', {
+  description:
+    'Bus de domínio único (EventBridge), compartilhado por todos os Bounded Contexts — spec 001, T013.',
+});
+
 const receberOrcamentoLambdaRoleStack = new ReceberOrcamentoLambdaRoleStack(
   app,
   'ReceberOrcamentoLambdaRoleStack',
   {
     description: 'IAM role do(s) Lambda(s) que executam ReceberOrcamento — spec 001, T026.',
+    dominioBus: dominioEventBusStack.dominioBus,
   },
 );
-
-const dominioEventBusStack = new DominioEventBusStack(app, 'DominioEventBusStack', {
-  description:
-    'Bus de domínio único (EventBridge), compartilhado por todos os Bounded Contexts — spec 001, T013.',
-});
 
 const classificadorQueueStack = new ClassificadorQueueStack(app, 'ClassificadorQueueStack', {
   description:
@@ -61,6 +62,7 @@ const classificadorLambdaRoleStack = new ClassificadorLambdaRoleStack(
     description: 'Role IAM least-privilege da Lambda Classificador — spec 001, T035.',
     orcamentosRawBucket: storageStack.orcamentosRawBucket,
     classificadorQueue: classificadorQueueStack.classificadorQueue,
+    dominioBus: dominioEventBusStack.dominioBus,
   },
 );
 
