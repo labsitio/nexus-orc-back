@@ -11,7 +11,11 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from '
  */
 export function eventoV2ParaInject(evento: APIGatewayProxyEventV2): InjectOptions {
   const query = evento.rawQueryString.length > 0 ? `?${evento.rawQueryString}` : '';
-  const headers: Record<string, string> = { ...(evento.headers as Record<string, string>) };
+  const headers: Record<string, string> = Object.fromEntries(
+    Object.entries(evento.headers).filter(
+      (entrada): entrada is [string, string] => entrada[1] !== undefined,
+    ),
+  );
   if (evento.cookies && evento.cookies.length > 0) {
     headers.cookie = evento.cookies.join('; ');
   }
