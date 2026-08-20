@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { Logger } from 'pino';
 import type { Orcamento } from '../../domain/orcamento.aggregate.js';
 import { OrcamentoIdInvalidoError } from '../../domain/value-objects/orcamento-id.vo.js';
 import {
@@ -6,6 +7,8 @@ import {
   OrcamentoNaoEncontradoError,
   TenantDivergenciaError,
 } from '../../application/use-cases/consultar-status-orcamento.js';
+import { criarLogger } from '../../infrastructure/observability/logger.js';
+import { emitirMetrica } from '../../infrastructure/observability/metrica.js';
 import type { RotaOpts } from './route-opts.js';
 import type { ProblemDetails, StatusIngestaoResponse } from './status.schema.js';
 import { orcamentoIdParamSchema, statusIngestaoResponseSchema } from './status.schema.js';
@@ -36,6 +39,7 @@ export function registrarRotaStatusOrcamento(
   app: FastifyInstance,
   consultarStatusOrcamento: ConsultarStatusOrcamento,
   opts: RotaOpts = {},
+  logger: Logger = criarLogger({ handler: 'status-orcamento' }),
 ): void {
   app.get(
     '/v1/orcamentos/:orcamentoId/status',
@@ -75,6 +79,14 @@ export function registrarRotaStatusOrcamento(
         );
         await reply.status(200).send(paraResposta(orcamento));
       } catch (erro) {
+        if (erro instanceof TenantDivergenciaError && erro.motivo === 'AUSENTE') {
+          // (T049/#54, ADR-016) Métrica "percentual de orçamentos sem status
+          // consultável" (spec 001, Métricas de Avaliação Contínua) — deve
+          // ser 0% a qualquer momento. Só o motivo 'AUSENTE' é anomalia real
+          // (orçamento recebido, mas estruturalmente inconsultável);
+          // 'DIVERGENTE' é acesso corretamente negado (cross-tenant).
+          emitirMetrica(logger, 'OrcamentoSemStatusConsultavel', 1);
+        }
         if (
           erro instanceof OrcamentoNaoEncontradoError ||
           erro instanceof OrcamentoIdInvalidoError ||

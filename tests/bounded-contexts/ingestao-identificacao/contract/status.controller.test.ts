@@ -1,5 +1,6 @@
 import type { preHandlerHookHandler } from 'fastify';
 import Fastify from 'fastify';
+import { pino } from 'pino';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ConsultarStatusOrcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/application/use-cases/consultar-status-orcamento.js';
 import { Orcamento } from '../../../../src/bounded-contexts/ingestao-identificacao/domain/orcamento.aggregate.js';
@@ -244,5 +245,85 @@ describe('GET /v1/orcamentos/{orcamentoId}/status — controller', () => {
 
     expect(resposta.statusCode).toBe(500);
     await appComRepositorioQuebrado.close();
+  });
+
+  it('emite métrica EMF (ADR-016, T049/#54) OrcamentoSemStatusConsultavel quando orçamento existe mas tenantId do agregado está ausente', async () => {
+    const orcamentoSemTenant = Orcamento.reconstituir({
+      id: OrcamentoId.novo(),
+      canal: Canal.de('PORTAL_WEB'),
+      recebidoEm: new Date(),
+      referenciaBruta: criarReferenciaBruta(),
+      status: 'RECEBIDO',
+      resultadoAtual: undefined,
+      historico: [],
+      tenantId: undefined,
+    });
+    const repositorioComOrcamentoOrfao: OrcamentoRepository = {
+      salvar: async () => {},
+      buscarPorId: async () => orcamentoSemTenant,
+    };
+    const linhas: Record<string, unknown>[] = [];
+    const logger = pino(
+      { level: 'info' },
+      { write: (linha: string) => linhas.push(JSON.parse(linha) as Record<string, unknown>) },
+    );
+    const appComOrcamentoOrfao = Fastify();
+    registrarRotaStatusOrcamento(
+      appComOrcamentoOrfao,
+      new ConsultarStatusOrcamento(() => repositorioComOrcamentoOrfao),
+      { preHandler: criarPreHandlerFakeTenant(tenantIdTeste) },
+      logger,
+    );
+
+    const resposta = await appComOrcamentoOrfao.inject({
+      method: 'GET',
+      url: `/v1/orcamentos/${orcamentoSemTenant.id.toString()}/status`,
+    });
+
+    expect(resposta.statusCode).toBe(404);
+    const linhaMetrica = linhas.find((linha) => linha.OrcamentoSemStatusConsultavel === 1);
+    expect(linhaMetrica).toBeDefined();
+    const emf = linhaMetrica?._aws as { CloudWatchMetrics: Array<Record<string, unknown>> };
+    expect(emf.CloudWatchMetrics[0]).toMatchObject({
+      Namespace: 'Nexo/IngestaoIdentificacao',
+      Metrics: [{ Name: 'OrcamentoSemStatusConsultavel', Unit: 'Count' }],
+    });
+    await appComOrcamentoOrfao.close();
+  });
+
+  it('NAO emite metrica OrcamentoSemStatusConsultavel quando o motivo e DIVERGENTE (cross-tenant, acesso corretamente negado)', async () => {
+    const outroTenant = TenantId.novo();
+    const orcamentoDeOutroTenant = Orcamento.receber({
+      id: OrcamentoId.novo(),
+      canal: Canal.de('PORTAL_WEB'),
+      referenciaBruta: criarReferenciaBruta(),
+      tenantId: outroTenant,
+    });
+    const repositorioComOrcamentoDeOutroTenant: OrcamentoRepository = {
+      salvar: async () => {},
+      buscarPorId: async () => orcamentoDeOutroTenant,
+    };
+    const linhas: Record<string, unknown>[] = [];
+    const logger = pino(
+      { level: 'info' },
+      { write: (linha: string) => linhas.push(JSON.parse(linha)) },
+    );
+    const appComCrossTenant = Fastify();
+    registrarRotaStatusOrcamento(
+      appComCrossTenant,
+      new ConsultarStatusOrcamento(() => repositorioComOrcamentoDeOutroTenant),
+      { preHandler: criarPreHandlerFakeTenant(tenantIdTeste) },
+      logger,
+    );
+
+    const resposta = await appComCrossTenant.inject({
+      method: 'GET',
+      url: `/v1/orcamentos/${orcamentoDeOutroTenant.id.toString()}/status`,
+    });
+
+    expect(resposta.statusCode).toBe(404);
+    const linhaMetrica = linhas.find((linha) => linha.OrcamentoSemStatusConsultavel === 1);
+    expect(linhaMetrica).toBeUndefined();
+    await appComCrossTenant.close();
   });
 });
