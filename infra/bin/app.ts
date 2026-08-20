@@ -17,6 +17,7 @@ import { DecisaoWorkflowQueueStack } from '../lib/decisao-workflow-queue-stack.t
 import { DominioEventBusStack } from '../lib/dominio-event-bus-stack.ts';
 import { ExtratorLambdaRoleStack } from '../lib/extrator-lambda-role-stack.ts';
 import { ExtratorQueueStack } from '../lib/extrator-queue-stack.ts';
+import { HttpApiStack } from '../lib/http-api-stack.ts';
 import { IndexadorFunctionStack } from '../lib/indexador-function-stack.ts';
 import { IndexadorLambdaRoleStack } from '../lib/indexador-lambda-role-stack.ts';
 import { IndexadorQueueStack } from '../lib/indexador-queue-stack.ts';
@@ -233,4 +234,12 @@ new IndexadorFunctionStack(app, 'IndexadorFunctionStack', {
   indexadorLambdaRole: indexadorLambdaRoleStack.indexadorLambdaRole,
   indexadorQueue: indexadorQueueStack.indexadorQueue,
   dominioBus: dominioEventBusStack.dominioBus,
+});
+
+// httpApiStack.adicionarRota(...) é chamado pelas 12 tasks derivadas do ADR-017
+// (T069/001, T047/002, T051/003, T047/004, T058/005), cada uma depois de criar
+// sua própria NodejsFunction — nenhuma rota HTTP existe ainda neste repositório.
+new HttpApiStack(app, 'HttpApiStack', {
+  description:
+    'API Gateway HTTP API único, payload v2, sem authorizer — ADR-017. Rotas registradas por task própria via adicionarRota().',
 });
