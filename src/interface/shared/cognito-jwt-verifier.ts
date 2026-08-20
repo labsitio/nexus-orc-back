@@ -6,7 +6,10 @@ import { CognitoJwtVerifier } from 'aws-jwt-verify';
  * <token>`, consumida por `tenant-context.middleware.ts` — único ponto de
  * verificação de JWT Cognito neste projeto (ADR-017: autenticação 100% na
  * Lambda, sem authorizer no API Gateway). ADR-007 registra o trade-off da
- * dupla verificação já descartado por ADR-010.
+ * dupla verificação de JWT quando mais de um middleware roda na mesma rota;
+ * ADR-010 descartou apenas a alternativa de checar papel dentro de cada
+ * middleware local (que criaria uma terceira verificação), sem alterar
+ * esse trade-off.
  */
 export interface CognitoVerifierConfig {
   readonly userPoolId: string;

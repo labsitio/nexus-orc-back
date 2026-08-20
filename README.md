@@ -128,7 +128,7 @@ Isolamento estrutural, não por convenção:
 
 ## Contrato HTTP
 
-Contrato completo em [`docs/openapi.yaml`](docs/openapi.yaml); guia de consumo pelo frontend em [`docs/api-contrato-frontend.md`](docs/api-contrato-frontend.md). Autenticação por JWT Cognito (`auth-cognito.middleware.ts`); erros no formato Problem Details (`src/interface/shared/problem-details.schema.ts`).
+Contrato completo em [`docs/openapi.yaml`](docs/openapi.yaml); guia de consumo pelo frontend em [`docs/api-contrato-frontend.md`](docs/api-contrato-frontend.md). Autenticação por JWT Cognito (`tenant-context.middleware.ts`); erros no formato Problem Details (`src/interface/shared/problem-details.schema.ts`).
 
 | Método | Rota | BC | Status |
 |--------|------|----|--------|

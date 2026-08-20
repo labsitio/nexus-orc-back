@@ -30,7 +30,7 @@ export function paraResposta(orcamentoValidacao: OrcamentoValidacao): StatusVali
  * Recebe `ConsultarStatusValidacao` já construído — quem instancia o
  * repositório concreto (`DrizzleOrcamentoValidacaoRepository`, T014) é a
  * composição raiz do handler Lambda, fora deste arquivo. Autenticação
- * Cognito (T027, `criarAutenticacaoCognito`) é injetada via
+ * Cognito (ADR-017, `criarTenantContextMiddleware`) é injetada via
  * `opts.preHandler`.
  */
 export function registrarRotaStatusValidacao(
