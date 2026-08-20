@@ -15,9 +15,12 @@ minimumReleaseAgeExclude:
 # Remover quando drizzle-kit largar @esbuild-kit (0.31.10 é a última).
 overrides:
   '@esbuild-kit/core-utils>esbuild': '^0.25.0'
-  # GHSA-2v37-7h3g-55p8 (nanoid < 3.3.17): geradores customizados entram em
-  # loop infinito quando o tamanho é zero. Chega por 6 caminhos transitivos,
-  # todos via postcss sob vite/vitest (`@vitest/coverage-v8`, `allure-vitest`).
-  # Nenhum é dependência direta nossa. `^3.3.17` fica dentro do `^3.3.6` que o
-  # postcss pede. Remover quando a cadeia vite/vitest subir sozinha.
-  'nanoid': '^3.3.17'
+  # GHSA-2v37-7h3g-55p8 (nanoid < 3.3.18): geradores customizados entram em
+  # loop infinito quando o tamanho é zero. `^3.3.17` (override anterior,
+  # #705) ainda resolvia para a versão vulnerável — o advisory foi
+  # atualizado depois para cobrir também 3.3.17. Chega por 6 caminhos
+  # transitivos, todos via postcss sob vite/vitest (`@vitest/coverage-v8`,
+  # `allure-vitest`). Nenhum é dependência direta nossa. `^3.3.18` fica
+  # dentro do `^3.3.6` que o postcss pede. Remover quando a cadeia
+  # vite/vitest subir sozinha.
+  'nanoid': '^3.3.18'

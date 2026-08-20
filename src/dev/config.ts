@@ -29,6 +29,8 @@ export interface ConfigLocal {
   readonly ollamaModeloExtrator: string;
   readonly ollamaModeloEmbedding: string;
   readonly ollamaModeloOrquestrador: string;
+  /** Sem env var própria em produção (`selecionarAgenteInterpretador` também não tem default) — cai no mesmo modelo de chat do classificador. */
+  readonly ollamaModeloInterpretador: string;
   /**
    * UUID v7 fixo — substituto local da claim `custom:tenant_id` do JWT
    * Cognito (não existe Cognito em dev). Nunca em produção.
@@ -64,6 +66,10 @@ export function configLocal(): ConfigLocal {
       process.env.OLLAMA_MODELO_EXTRATOR ?? process.env.OLLAMA_MODELO_CLASSIFICADOR ?? 'llama3.1',
     ollamaModeloEmbedding: process.env.OLLAMA_MODELO_EMBEDDING ?? 'mxbai-embed-large',
     ollamaModeloOrquestrador: process.env.OLLAMA_MODELO_ORQUESTRADOR ?? 'llama3.1',
+    ollamaModeloInterpretador:
+      process.env.OLLAMA_MODELO_INTERPRETADOR ??
+      process.env.OLLAMA_MODELO_CLASSIFICADOR ??
+      'llama3.1',
     tenantIdLocal: process.env.NEXO_LOCAL_TENANT_ID ?? '018f4a3c-0000-7000-8000-000000000001',
     papeisLocais: (process.env.NEXO_LOCAL_PAPEIS ?? 'comprador-responsavel,compliance-admin')
       .split(',')
