@@ -63,6 +63,17 @@ Não é regressão desta PR — `aws-clients.production.ts` já existia antes de
 teste não toca nenhum arquivo alterado por ela além de reimportar o módulo com
 `LambdaClient` adicionado (confirmado sem erro na execução isolada).
 
+**Observação de ambiente, não bloqueante**: com o pool default (threads, paralelismo pleno),
+`npx vitest run --reporter=default infra/lib` — agora 5 arquivos de síntese CDK, 2 novos
+desta validação — sofre timeout de hook (30s) nos 5 arquivos por contenção de CPU nesta
+máquina local (cada síntese CDK + bundling esbuild custa segundos, 5 rodando simultâneas
+saturam). Com `--pool=forks --maxWorkers=2` os 5 passam integralmente (11 testes). Registrado
+como limitação de ambiente local, não de código — o CI roda em runner dedicado e não foi
+possível confirmar o comportamento lá nesta validação (fora do escopo desta sessão de QA
+local); recomenda-se ao DevOps confirmar que o CI tem headroom suficiente para N arquivos de
+síntese CDK crescendo por spec, ou considerar isolar `infra/lib/**/*.test.ts` num projeto
+vitest separado com `maxWorkers` mais baixo se o número de synth tests continuar crescendo.
+
 ## Critérios de aceite
 
 1. **T068 — handlers de produção existem e usam o formato `*.production.ts` fino
