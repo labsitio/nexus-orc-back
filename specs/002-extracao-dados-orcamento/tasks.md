@@ -120,7 +120,7 @@
 - [ ] T043a Infrastructure: quando a stack CDK do Lambda Function consumidor de `extrator-queue` existir, adicionar `logs.MetricFilter` sobre o log group desse Lambda casando a mensagem de warn de `EventBridgePublisher` ("Payload de domain event próximo do limite de 262144B do EventBridge") + `cloudwatch.Alarm` (mesmo padrão de `ExtratorQueueDlqAlarm` em `infra/lib/extrator-queue-stack.ts`) — sem essa stack, o `MetricFilter` não tem log group real para se anexar.
 
 - [ ] T044 Security review: `npm audit`/`pnpm audit`, Semgrep, revisão de prompt injection no prompt do Extrator (mesmo checklist da spec 001).
-- [ ] T045 [P] Métrica de observabilidade: taxa de campos marcados "não extraído" e taxa de uso de serviço pago como exceção (MarkItDown vs. exceção) — conforme "Métricas de Avaliação Contínua" do spec.md.
+- [x] T045 [P] Métrica de observabilidade: taxa de campos marcados "não extraído" e taxa de uso de serviço pago como exceção (MarkItDown vs. exceção) — conforme "Métricas de Avaliação Contínua" do spec.md. Entregue via ADR-016 (EMF/pino, `src/bounded-contexts/extracao/infrastructure/observability/metrica.ts`): `CampoMarcadoNaoExtraido` (contador por campo, em `ExtrairDadosOrcamento` após `registrarTentativaExtrator`) e `ConversaoMarkItDownFalhou` (contador no `catch` da conversão, proxy da 2ª métrica — nenhum gateway de serviço pago existe no BC hoje, ADR-002/constituição só autorizam exceção "justificada por escrito"; adicionar o contador real de uso quando esse gateway for construído). Contadores, não taxa/percentual calculada (mesmo escopo do T049/#54 — agregação exigiria job periódico inexistente).
 
 ### Conversão de documento: Lambda MarkItDown deste BC (gap de Infrastructure — achado 2026-08-03)
 

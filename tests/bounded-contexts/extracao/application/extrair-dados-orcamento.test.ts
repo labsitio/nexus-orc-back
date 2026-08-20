@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Logger } from 'pino';
 import { ExtrairDadosOrcamento } from '../../../../src/bounded-contexts/extracao/application/use-cases/extrair-dados-orcamento.js';
 import { ExtracaoOrcamento } from '../../../../src/bounded-contexts/extracao/domain/extracao-orcamento.aggregate.js';
 import { CampoExtraido } from '../../../../src/bounded-contexts/extracao/domain/value-objects/campo-extraido.vo.js';
@@ -85,6 +86,24 @@ class EventPublisherFake implements EventPublisher {
   eventosPublicados: DomainEventEnvelope[] = [];
   async publicar(evento: DomainEventEnvelope): Promise<void> {
     this.eventosPublicados.push(evento);
+  }
+}
+
+/** Captura as linhas de log EMF (T045/#110) sem depender de AWS — JSON puro. */
+class LoggerFake {
+  linhas: Record<string, unknown>[] = [];
+  info(objeto: Record<string, unknown>): void {
+    this.linhas.push(objeto);
+  }
+}
+
+function comoLogger(fake: LoggerFake): Logger {
+  return fake as unknown as Logger;
+}
+
+class MarkItDownConversaoExtracaoACLFalhaFake implements MarkItDownConversaoExtracaoACL {
+  async converter(): Promise<string> {
+    throw new Error('Lambda MarkItDown retornou erro simulado');
   }
 }
 
@@ -298,4 +317,85 @@ describe('ExtrairDadosOrcamento', () => {
   // (`ExtracaoSemTenantIdError`) foi removido: `ExtracaoOrcamento.criar` exige
   // `tenantId` desde o tipo, então o cenário de agregado legado sem tenantId
   // não é mais representável — a garantia agora vem do compilador.
+
+  describe('métrica de observabilidade (T045/#110, ADR-016)', () => {
+    it('emite CampoMarcadoNaoExtraido uma vez por campo obrigatório sem confiança suficiente', async () => {
+      const repositorio = new RepositorioFake();
+      const publisher = new EventPublisherFake();
+      const loggerFake = new LoggerFake();
+      const useCase = new ExtrairDadosOrcamento(
+        () => repositorio,
+        new LeituraBrutaGatewayFake(),
+        new MarkItDownConversaoExtracaoACLFake(),
+        new AgenteExtratorGatewayFake({
+          itens: [itemIncompleto()],
+          condicoesComerciais: condicoesCompletas(),
+        }),
+        publisher,
+        comoLogger(loggerFake),
+      );
+
+      await useCase.executar(PARAMS_BASE);
+
+      const metricas = loggerFake.linhas.filter(
+        (linha) => linha.CampoMarcadoNaoExtraido !== undefined,
+      );
+      expect(metricas).toHaveLength(1);
+      expect(metricas[0]?.campo).toBe('precoUnitario');
+      expect((metricas[0] as { _aws: { CloudWatchMetrics: unknown[] } })._aws).toMatchObject({
+        CloudWatchMetrics: [{ Namespace: 'Nexo/Extracao' }],
+      });
+    });
+
+    it('não emite CampoMarcadoNaoExtraido quando todo campo obrigatório tem confiança suficiente', async () => {
+      const repositorio = new RepositorioFake();
+      const publisher = new EventPublisherFake();
+      const loggerFake = new LoggerFake();
+      const useCase = new ExtrairDadosOrcamento(
+        () => repositorio,
+        new LeituraBrutaGatewayFake(),
+        new MarkItDownConversaoExtracaoACLFake(),
+        new AgenteExtratorGatewayFake({
+          itens: [itemCompleto()],
+          condicoesComerciais: condicoesCompletas(),
+        }),
+        publisher,
+        comoLogger(loggerFake),
+      );
+
+      await useCase.executar(PARAMS_BASE);
+
+      expect(
+        loggerFake.linhas.filter((linha) => linha.CampoMarcadoNaoExtraido !== undefined),
+      ).toHaveLength(0);
+    });
+
+    it('emite ConversaoMarkItDownFalhou e propaga o erro quando o conversor falha', async () => {
+      const repositorio = new RepositorioFake();
+      const publisher = new EventPublisherFake();
+      const loggerFake = new LoggerFake();
+      const useCase = new ExtrairDadosOrcamento(
+        () => repositorio,
+        new LeituraBrutaGatewayFake(),
+        new MarkItDownConversaoExtracaoACLFalhaFake(),
+        new AgenteExtratorGatewayFake({
+          itens: [itemCompleto()],
+          condicoesComerciais: condicoesCompletas(),
+        }),
+        publisher,
+        comoLogger(loggerFake),
+      );
+
+      await expect(useCase.executar(PARAMS_BASE)).rejects.toThrow(
+        'Lambda MarkItDown retornou erro simulado',
+      );
+
+      const metricas = loggerFake.linhas.filter(
+        (linha) => linha.ConversaoMarkItDownFalhou !== undefined,
+      );
+      expect(metricas).toHaveLength(1);
+      expect(repositorio.salvos).toHaveLength(0);
+      expect(publisher.eventosPublicados).toHaveLength(0);
+    });
+  });
 });
