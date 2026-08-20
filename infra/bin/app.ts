@@ -27,6 +27,7 @@ import { ReceberOrcamentoLambdaRoleStack } from '../lib/receber-orcamento-lambda
 import { RegistrarDecisaoHumanaValidacaoLambdaRoleStack } from '../lib/registrar-decisao-humana-validacao-lambda-role-stack.ts';
 import { SftpUploadFunctionStack } from '../lib/sftp-upload-function-stack.ts';
 import { ValidadorQueueStack } from '../lib/validador-queue-stack.ts';
+import { ValidarOrcamentoFunctionStack } from '../lib/validar-orcamento-function-stack.ts';
 import { ValidarOrcamentoLambdaRoleStack } from '../lib/validar-orcamento-lambda-role-stack.ts';
 
 const app = new App();
@@ -131,9 +132,21 @@ const validadorQueueStack = new ValidadorQueueStack(app, 'ValidadorQueueStack', 
   dominioBus: dominioEventBusStack.dominioBus,
 });
 
-new ValidarOrcamentoLambdaRoleStack(app, 'ValidarOrcamentoLambdaRoleStack', {
+const validarOrcamentoLambdaRoleStack = new ValidarOrcamentoLambdaRoleStack(
+  app,
+  'ValidarOrcamentoLambdaRoleStack',
+  {
+    description:
+      'Role IAM least-privilege da Lambda ValidarOrcamento (sem S3 raw; bedrock:InvokeModel restrito ao ARN do modelo de categorização aprovado; events:PutEvents restrito ao bus + source nexo.validacao) — spec 003, T028/T045/#616.',
+    validadorQueue: validadorQueueStack.validadorQueue,
+    dominioBus: dominioEventBusStack.dominioBus,
+  },
+);
+
+new ValidarOrcamentoFunctionStack(app, 'ValidarOrcamentoFunctionStack', {
   description:
-    'Role IAM least-privilege da Lambda ValidarOrcamento (sem S3 raw; bedrock:InvokeModel restrito ao ARN do modelo de categorização aprovado; events:PutEvents restrito ao bus + source nexo.validacao) — spec 003, T028/T045/#616.',
+    'NodejsFunction de produção do handler consumidor de validador-queue — spec 003, issue #615.',
+  validarOrcamentoLambdaRole: validarOrcamentoLambdaRoleStack.validarOrcamentoLambdaRole,
   validadorQueue: validadorQueueStack.validadorQueue,
   dominioBus: dominioEventBusStack.dominioBus,
 });
