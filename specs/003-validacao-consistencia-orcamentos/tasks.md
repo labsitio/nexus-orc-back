@@ -127,6 +127,10 @@
 - [ ] T049 [P] Métrica de observabilidade: "taxa de inconsistência por tipo de regra" e "percentual de orçamentos validados automaticamente sem intervenção humana" — conforme "Métricas de Avaliação Contínua" do spec.md.
 - [ ] T050 Coordenar com owner da spec 002 (Extração) a inclusão de um campo de data de emissão da proposta no payload de `OrcamentoExtraido` — dependência registrada como risco remanescente no `plan.md` (regra de coerência de prazo depende desse dado).
 
+### Hosting HTTP em produção (gap de Infrastructure — issue #753, ADR-017)
+
+- [ ] T051 Infrastructure: hosting HTTP de produção das 3 rotas deste BC (status, decisão humana, faixa de preço por categoria) — ADR-017 (`docs/architecture-diagrams/adr-017-hosting-http-producao.html`). Um `*.production.ts` por rota (Fastify mínimo com só `registrarRotaStatusValidacao`/`registrarRotaDecisaoHumanaValidacao`/`registrarRotaFaixaPrecoCategoria` já existentes, `opts.preHandler = [criarTenantContextMiddleware(...), criarExigenciaPapel(['compliance-admin'])]` na rota de faixa de preço — ADR-010 já exige o papel, mantido aqui — e só `criarTenantContextMiddleware(...)` nas outras 2 + `app.inject(...)`, helper transversal, ver Relatório do arquiteto). 1 `NodejsFunction` por rota: `decisão humana` liga à role já existente (`RegistrarDecisaoHumanaValidacaoLambdaRoleStack`); `status` e `faixa de preço` exigem role nova (somente leitura para `status`; leitura+escrita de configuração, sem Bedrock/S3/EventBridge, para `faixa de preço`). Todas mapeadas na stack única de API Gateway HTTP API (transversal, `infra/lib/http-api-stack.ts`). **Faz parte desta task**: apagar `src/bounded-contexts/validacao/interface/http/auth-cognito.middleware.ts` e o teste correspondente (não sustenta `request.tenantContext`/`request.papeis`, não é consumido por nenhuma composição real).
+
 ---
 
 ## Dependencies & Execution Order

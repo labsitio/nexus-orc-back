@@ -111,6 +111,10 @@
 - [ ] T045 Confirmar com owner da spec 003 (Validação) que o enriquecimento do payload coordenado em T006 foi de fato implementado — **incluindo `tenantId`** (ADR-005) — antes de considerar esta feature pronta para produção — dependência bloqueante registrada como risco remanescente no `plan.md` (ADR-003 e ADR-005).
 - [ ] T046 Validar em npmjs.com/package/drizzle-orm e no console Bedrock da região de deploy, no momento real da implementação: (a) versão exata do `drizzle-orm` com suporte ao tipo `vector`/`customType` (ver Technical Context do `plan.md`); (b) disponibilidade regional atual do model ID `amazon.titan-embed-text-v2:0` — nenhum dos dois deve ser assumido como definitivo sem essa reconfirmação.
 
+### Hosting HTTP em produção (gap de Infrastructure — issue #753, ADR-017)
+
+- [ ] T047 Infrastructure: hosting HTTP de produção das 2 rotas deste BC (status de indexação, busca) — ADR-017 (`docs/architecture-diagrams/adr-017-hosting-http-producao.html`). Um `*.production.ts` por rota (Fastify mínimo com só `registrarRotaStatusIndexacao`/`registrarRotaBuscaOrcamentos` já existentes, `opts.preHandler = criarTenantContextMiddleware(...)` real + `app.inject(...)`, helper transversal — ver Relatório do arquiteto). 1 `NodejsFunction` por rota, ambas exigindo role IAM nova (nenhuma role para HTTP existe hoje para este BC): `status` somente leitura; `busca` invoca `AgenteInterpretadorConsultaGateway`/`AgenteEmbeddingGateway` (Bedrock, restrito ao(s) ARN(s) de modelo já aprovado(s)), sem `events:PutEvents`/S3. Ambas mapeadas na stack única de API Gateway HTTP API (transversal, `infra/lib/http-api-stack.ts`). Este BC não tem `auth-cognito.middleware.ts` legado — nada a remover.
+
 ---
 
 ## Dependencies & Execution Order
