@@ -1,4 +1,5 @@
 import { App } from 'aws-cdk-lib';
+import { ClassificadorFunctionStack } from '../lib/classificador-function-stack.ts';
 import { ClassificadorLambdaRoleStack } from '../lib/classificador-lambda-role-stack.ts';
 import { ClassificadorQueueStack } from '../lib/classificador-queue-stack.ts';
 import { ConfirmarRevisaoHumanaExtracaoLambdaRoleStack } from '../lib/confirmar-revisao-humana-extracao-lambda-role-stack.ts';
@@ -22,6 +23,7 @@ import { IndexadorQueueStack } from '../lib/indexador-queue-stack.ts';
 import { IngestaoIdentificacaoStorageStack } from '../lib/ingestao-identificacao-storage-stack.ts';
 import { ReceberOrcamentoLambdaRoleStack } from '../lib/receber-orcamento-lambda-role-stack.ts';
 import { RegistrarDecisaoHumanaValidacaoLambdaRoleStack } from '../lib/registrar-decisao-humana-validacao-lambda-role-stack.ts';
+import { SftpUploadFunctionStack } from '../lib/sftp-upload-function-stack.ts';
 import { ValidadorQueueStack } from '../lib/validador-queue-stack.ts';
 import { ValidarOrcamentoLambdaRoleStack } from '../lib/validar-orcamento-lambda-role-stack.ts';
 
@@ -33,15 +35,19 @@ const storageStack = new IngestaoIdentificacaoStorageStack(
   { description: 'Storage (S3) do BC Ingestão & Identificação — spec 001, T012.' },
 );
 
-new ReceberOrcamentoLambdaRoleStack(app, 'ReceberOrcamentoLambdaRoleStack', {
-  description: 'IAM role do(s) Lambda(s) que executam ReceberOrcamento — spec 001, T026.',
-  orcamentosRawBucket: storageStack.orcamentosRawBucket,
-});
-
 const dominioEventBusStack = new DominioEventBusStack(app, 'DominioEventBusStack', {
   description:
     'Bus de domínio único (EventBridge), compartilhado por todos os Bounded Contexts — spec 001, T013.',
 });
+
+const receberOrcamentoLambdaRoleStack = new ReceberOrcamentoLambdaRoleStack(
+  app,
+  'ReceberOrcamentoLambdaRoleStack',
+  {
+    description: 'IAM role do(s) Lambda(s) que executam ReceberOrcamento — spec 001, T026.',
+    dominioBus: dominioEventBusStack.dominioBus,
+  },
+);
 
 const classificadorQueueStack = new ClassificadorQueueStack(app, 'ClassificadorQueueStack', {
   description:
@@ -49,10 +55,32 @@ const classificadorQueueStack = new ClassificadorQueueStack(app, 'ClassificadorQ
   dominioBus: dominioEventBusStack.dominioBus,
 });
 
-new ClassificadorLambdaRoleStack(app, 'ClassificadorLambdaRoleStack', {
-  description: 'Role IAM least-privilege da Lambda Classificador — spec 001, T035.',
-  orcamentosRawBucket: storageStack.orcamentosRawBucket,
+const classificadorLambdaRoleStack = new ClassificadorLambdaRoleStack(
+  app,
+  'ClassificadorLambdaRoleStack',
+  {
+    description: 'Role IAM least-privilege da Lambda Classificador — spec 001, T035.',
+    orcamentosRawBucket: storageStack.orcamentosRawBucket,
+    classificadorQueue: classificadorQueueStack.classificadorQueue,
+    dominioBus: dominioEventBusStack.dominioBus,
+  },
+);
+
+new ClassificadorFunctionStack(app, 'ClassificadorFunctionStack', {
+  description:
+    'NodejsFunction de produção do handler consumidor de classificador-queue — spec 001, issue #613.',
+  classificadorLambdaRole: classificadorLambdaRoleStack.classificadorLambdaRole,
   classificadorQueue: classificadorQueueStack.classificadorQueue,
+  dominioBus: dominioEventBusStack.dominioBus,
+  orcamentosRawBucket: storageStack.orcamentosRawBucket,
+});
+
+new SftpUploadFunctionStack(app, 'SftpUploadFunctionStack', {
+  description:
+    'NodejsFunction de produção do handler trigger S3 (sftp-incoming/) de ReceberOrcamento — spec 001, issue #613.',
+  receberOrcamentoLambdaRole: receberOrcamentoLambdaRoleStack.role,
+  orcamentosRawBucket: storageStack.orcamentosRawBucket,
+  dominioBus: dominioEventBusStack.dominioBus,
 });
 
 new ConfirmarRevisaoHumanaLambdaRoleStack(app, 'ConfirmarRevisaoHumanaLambdaRoleStack', {

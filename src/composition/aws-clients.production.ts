@@ -12,6 +12,7 @@
  */
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { EventBridgeClient } from '@aws-sdk/client-eventbridge';
+import { LambdaClient } from '@aws-sdk/client-lambda';
 import { S3Client } from '@aws-sdk/client-s3';
 import { SQSClient } from '@aws-sdk/client-sqs';
 import { db } from '../shared-kernel/database/client.js';
@@ -22,6 +23,8 @@ export interface ClientesProducao {
   readonly eventBridge: EventBridgeClient;
   readonly sqs: SQSClient;
   readonly bedrock: BedrockRuntimeClient;
+  /** Invoca o Lambda dedicado ao MarkItDown (`MarkItDownConversaoACL`, issue #613). */
+  readonly lambda: LambdaClient;
 }
 
 export function clientesProducao(): ClientesProducao {
@@ -31,6 +34,7 @@ export function clientesProducao(): ClientesProducao {
     eventBridge: new EventBridgeClient({}),
     sqs: new SQSClient({}),
     bedrock: new BedrockRuntimeClient({}),
+    lambda: new LambdaClient({}),
   };
 }
 
