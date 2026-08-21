@@ -124,7 +124,7 @@
 - [ ] T046 [P] Documentação OpenAPI gerada a partir dos schemas Zod dos 3 endpoints REST deste BC (status, decisão humana, configuração de faixa de preço).
 - [ ] T047 Medir p95 real end-to-end (extração disponível → validação disponível) em ambiente de teste; decidir se a chamada síncrona ao categorizador de item (Bedrock) exige Provisioned Concurrency, dado que não é fluxo crítico de decisão de consistência (ver Constraints do `plan.md`).
 - [ ] T048 Security review: `npm audit`/`pnpm audit`, Semgrep, revisão de prompt injection no prompt do `AgenteCategorizadorItemGateway`, revisão de timeout/circuit breaker do `FornecedorCadastradoHttpGateway` (mesmo checklist das specs 001/002).
-- [ ] T049 [P] Métrica de observabilidade: "taxa de inconsistência por tipo de regra" e "percentual de orçamentos validados automaticamente sem intervenção humana" — conforme "Métricas de Avaliação Contínua" do spec.md.
+- [x] T049 [P] Métrica de observabilidade: "taxa de inconsistência por tipo de regra" e "percentual de orçamentos validados automaticamente sem intervenção humana" — conforme "Métricas de Avaliação Contínua" do spec.md. Implementado via EMF (ADR-016): `InconsistenciaDetectada` (dimensão `regra`) e `OrcamentoValidacaoConcluida` (dimensão `resultado`) em `validar-orcamento.ts` — contadores no ponto de decisão, percentual/taxa derivados por métrica CloudWatch, sem agregação em código (issue #159, PR #TBD).
 - [ ] T050 Coordenar com owner da spec 002 (Extração) a inclusão de um campo de data de emissão da proposta no payload de `OrcamentoExtraido` — dependência registrada como risco remanescente no `plan.md` (regra de coerência de prazo depende desse dado).
 
 ### Hosting HTTP em produção (gap de Infrastructure — issue #753, ADR-017)

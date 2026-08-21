@@ -1,3 +1,4 @@
+import type { Logger } from 'pino';
 import type { AgenteCategorizadorItemGateway } from '../../domain/gateways/agente-categorizador-item.gateway.js';
 import type { EventPublisher } from '../../domain/gateways/event-publisher.js';
 import type { FornecedorCadastradoGateway } from '../../domain/gateways/fornecedor-cadastrado.gateway.js';
@@ -18,6 +19,8 @@ import { DadosExtraidosParaValidacao } from '../../domain/value-objects/dados-ex
 import type { FaixaPreco } from '../../domain/value-objects/faixa-preco.vo.js';
 import { InconsistenciaDetectada } from '../../domain/value-objects/inconsistencia-detectada.vo.js';
 import { ItemParaValidacao } from '../../domain/value-objects/item-para-validacao.vo.js';
+import { criarLogger } from '../../infrastructure/observability/logger.js';
+import { emitirMetrica } from '../../infrastructure/observability/metrica.js';
 
 /**
  * Consumidor dos eventos `OrcamentoExtraido`/`OrcamentoExtraidoComPendenciaConfirmada`
@@ -51,6 +54,16 @@ import { ItemParaValidacao } from '../../domain/value-objects/item-para-validaca
  * inteiramente delegada ao status resultante de
  * `OrcamentoValidacao.avaliarRegrasDeConsistencia` (nunca reimplementada
  * aqui), coberto por `validar-orcamento.test.ts`.
+ *
+ * T049 — métricas de observabilidade (ADR-016, "Métricas de Avaliação
+ * Contínua" do spec.md): `InconsistenciaDetectada` (1 por regra que falhou,
+ * dimensão `regra` — enum fechado de 5 valores, `RegraInconsistencia`) dá a
+ * "taxa de inconsistência por tipo de regra"; `OrcamentoValidacaoConcluida`
+ * (1 por execução, dimensão `resultado` = `validacao.status`) dá o
+ * "percentual de orçamentos validados automaticamente sem intervenção
+ * humana" via métrica derivada no CloudWatch (`VALIDADO` / total), sem
+ * cálculo nem agregação em código — spec.md não define meta rígida, só
+ * contador honesto no ponto de decisão, mesmo precedente de #54/#110.
  */
 export class ValidarOrcamento {
   constructor(
@@ -60,6 +73,7 @@ export class ValidarOrcamento {
     private readonly parametroFaixaPreco: ParametroFaixaPrecoGateway,
     private readonly eventPublisher: EventPublisher,
     private readonly agenteCategorizador: AgenteCategorizadorItemGateway,
+    private readonly logger: Logger = criarLogger({ useCase: 'validar-orcamento' }),
   ) {}
 
   async executar(payloadBruto: unknown): Promise<void> {
@@ -109,7 +123,16 @@ export class ValidarOrcamento {
           ]),
     ];
 
+    for (const inconsistencia of inconsistencias) {
+      emitirMetrica(this.logger, 'InconsistenciaDetectada', 1, {
+        dimensoes: { regra: inconsistencia.regra },
+      });
+    }
+
     validacao.avaliarRegrasDeConsistencia(inconsistencias);
+    emitirMetrica(this.logger, 'OrcamentoValidacaoConcluida', 1, {
+      dimensoes: { resultado: validacao.status },
+    });
     await repositorio.salvar(validacao);
 
     // (issue #656 — aperto de tipo) O evento carrega o `tenantId` já
