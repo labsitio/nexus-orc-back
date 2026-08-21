@@ -1,3 +1,4 @@
+import type { Logger } from 'pino';
 import { describe, expect, it } from 'vitest';
 import { ValidarOrcamento } from '../../../../src/bounded-contexts/validacao/application/use-cases/validar-orcamento.js';
 import { OrcamentoValidacao } from '../../../../src/bounded-contexts/validacao/domain/orcamento-validacao.aggregate.js';
@@ -84,6 +85,21 @@ class EventPublisherFake implements EventPublisher {
   async publicar(evento: DomainEventEnvelope): Promise<void> {
     this.eventosPublicados.push(evento);
   }
+}
+
+/** Captura as linhas de log EMF (T049) sem depender de AWS — JSON puro, mesmo padrão de extracao (#766). */
+class LoggerFake {
+  linhas: Record<string, unknown>[] = [];
+  info(objeto: Record<string, unknown>): void {
+    this.linhas.push(objeto);
+  }
+  error(): void {
+    // Só as métricas (`info`) importam para os testes deste arquivo.
+  }
+}
+
+function comoLogger(fake: LoggerFake): Logger {
+  return fake as unknown as Logger;
 }
 
 /**
@@ -390,6 +406,101 @@ describe('ValidarOrcamento', () => {
 
       expect(repositorio.salvos).toHaveLength(0);
       expect(publisher.eventosPublicados).toHaveLength(0);
+    });
+  });
+
+  // T049 (#159, achado MINOR do backend-reviewer) — emissão real da métrica no
+  // ponto de uso: dimensão `regra` por inconsistência e dimensão `resultado`
+  // por status do agregado, mesmo padrão do precedente em extracao (#766).
+  describe('métricas de observabilidade (T049)', () => {
+    it('emite InconsistenciaDetectada uma vez por regra e OrcamentoValidacaoConcluida com resultado=VALIDADO quando todas as regras passam', async () => {
+      const repositorio = new OrcamentoValidacaoRepositoryFake();
+      const publisher = new EventPublisherFake();
+      const loggerFake = new LoggerFake();
+      const useCase = new ValidarOrcamento(
+        new ACLFake({
+          orcamentoId: ORCAMENTO_ID,
+          dadosExtraidos: dadosConsistentes(),
+          tenantId: TENANT_ID,
+        }),
+        () => repositorio,
+        new FornecedorCadastradoGatewayFake(true),
+        new ParametroFaixaPrecoGatewayFake(),
+        publisher,
+        new AgenteCategorizadorItemGatewayFake(),
+        comoLogger(loggerFake),
+      );
+
+      await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+      expect(
+        loggerFake.linhas.filter((linha) => linha.InconsistenciaDetectada !== undefined),
+      ).toHaveLength(0);
+      const concluida = loggerFake.linhas.filter(
+        (linha) => linha.OrcamentoValidacaoConcluida !== undefined,
+      );
+      expect(concluida).toHaveLength(1);
+      expect(concluida[0]?.resultado).toBe('VALIDADO');
+      expect((concluida[0] as { _aws: { CloudWatchMetrics: unknown[] } })._aws).toMatchObject({
+        CloudWatchMetrics: [{ Namespace: 'Nexo/Validacao' }],
+      });
+    });
+
+    it('emite InconsistenciaDetectada com dimensão regra por cada inconsistência e OrcamentoValidacaoConcluida com resultado=PENDENTE_REVISAO_HUMANA', async () => {
+      const repositorio = new OrcamentoValidacaoRepositoryFake();
+      const publisher = new EventPublisherFake();
+      const loggerFake = new LoggerFake();
+      const useCase = new ValidarOrcamento(
+        new ACLFake({
+          orcamentoId: ORCAMENTO_ID,
+          dadosExtraidos: dadosConsistentes(),
+          tenantId: TENANT_ID,
+        }),
+        () => repositorio,
+        new FornecedorCadastradoGatewayFake(false),
+        new ParametroFaixaPrecoGatewayFake(),
+        publisher,
+        new AgenteCategorizadorItemGatewayFake(),
+        comoLogger(loggerFake),
+      );
+
+      await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+      const inconsistencias = loggerFake.linhas.filter(
+        (linha) => linha.InconsistenciaDetectada !== undefined,
+      );
+      expect(inconsistencias).toHaveLength(1);
+      expect(inconsistencias[0]?.regra).toBe('CNPJ_DIVERGENTE_CADASTRO');
+      const concluida = loggerFake.linhas.filter(
+        (linha) => linha.OrcamentoValidacaoConcluida !== undefined,
+      );
+      expect(concluida).toHaveLength(1);
+      expect(concluida[0]?.resultado).toBe('PENDENTE_REVISAO_HUMANA');
+    });
+
+    it('nunca emite métrica quando a entrega é duplicada e o orçamento já saiu de PENDENTE', async () => {
+      const jaValidado = OrcamentoValidacao.criar(ORCAMENTO_ID, dadosConsistentes(), TENANT_ID);
+      jaValidado.avaliarRegrasDeConsistencia([]);
+      const repositorio = new OrcamentoValidacaoRepositoryFake(jaValidado);
+      const publisher = new EventPublisherFake();
+      const loggerFake = new LoggerFake();
+      const useCase = new ValidarOrcamento(
+        new ACLFake({
+          orcamentoId: ORCAMENTO_ID,
+          dadosExtraidos: dadosConsistentes(),
+          tenantId: TENANT_ID,
+        }),
+        () => repositorio,
+        new FornecedorCadastradoGatewayFake(true),
+        new ParametroFaixaPrecoGatewayFake(),
+        publisher,
+        new AgenteCategorizadorItemGatewayFake(),
+        comoLogger(loggerFake),
+      );
+
+      await useCase.executar({ orcamentoId: ORCAMENTO_ID.toString() });
+
+      expect(loggerFake.linhas).toHaveLength(0);
     });
   });
 });
