@@ -88,7 +88,8 @@ new SftpUploadFunctionStack(app, 'SftpUploadFunctionStack', {
 
 new ConfirmarRevisaoHumanaLambdaRoleStack(app, 'ConfirmarRevisaoHumanaLambdaRoleStack', {
   description:
-    'Role IAM least-privilege da Lambda de confirmação humana (sem Bedrock/S3 raw) — spec 001, T054.',
+    'Role IAM least-privilege da Lambda de confirmação humana (sem Bedrock/S3 raw) — spec 001, T054/T064.',
+  dominioBus: dominioEventBusStack.dominioBus,
 });
 
 new ConsultaStatusLambdaRoleStack(app, 'ConsultaStatusLambdaRoleStack', {
